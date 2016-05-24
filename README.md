@@ -37,15 +37,72 @@ Example
 Running a webserver for static content is easy:
 
 ```csharp
+using System;
 using Ceenhttpd;
+using Ceenhttpd.Handler;
 using System.Net;
 using System.Threading;
+
+...
 
 public static void Main(string[] args)
 {
     var server = new HttpServer(new ServerConfig() {
         Router = new Router(
             new Tuple<string, IHttpModule>[] {
+                new Tuple<string, IHttpModule>(
+                    "[.*]", 
+                    new FileHandler(args.Length == 0 ? "." : args[0])
+                )
+            }
+        ),
+
+        Logger = new CLFLogger(Console.OpenStandardOutput())
+    });
+
+    var tcs = new CancellationTokenSource();
+    var task = server.Listen(new IPEndPoint(IPAddress.Any, 8080), tcs);
+
+    Console.WriteLine("Serving files, press enter to stop ...");
+    Console.ReadLine();
+
+    tcs.Cancel(); // Request stop
+    task.Wait();  // Wait for shutdown
+}
+```
+
+
+Dynamic content can be added with a simple handler:
+
+```csharp
+using System;
+using Ceenhttpd;
+using Ceenhttpd.Handler;
+using System.Net;
+using System.Threading;
+using Newtonsoft.Json;
+...
+
+public class TimeOfDayHandler : IHttpModule
+{
+    public async Task<bool> HandleAsync(HttpRequest request, HttpResponse response)
+    {
+        response.SetNonCacheable();
+        await response.WriteAllJsonAsync(JsonConvert.SerializeObject(new { time = DateTime.Now.TimeOfDay } ));
+        return true;
+    }
+} 
+
+public static void Main(string[] args)
+{
+    var server = new HttpServer(new ServerConfig() {
+        Router = new Router(
+            new Tuple<string, IHttpModule>[] {
+                new Tuple<string, IHttpModule>(
+                    "/timeofday", 
+                    new TimeOfDayHandler()
+                ),
+
                 new Tuple<string, IHttpModule>(
                     "[.*]", 
                     new FileHandler(args.Length == 0 ? "." : args[0])

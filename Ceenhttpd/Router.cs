@@ -26,7 +26,7 @@ namespace Ceenhttpd
 				if (x.Item1.StartsWith("[") && x.Item1.EndsWith("]"))
 					return new Tuple<Regex, IHttpModule>(new Regex(x.Item1.Substring(1, x.Item1.Length - 2)), x.Item2);
 				else
-					return new Tuple<Regex, IHttpModule>(new Regex(Regex.Escape(x.Item1) + ".*"), x.Item2);
+					return new Tuple<Regex, IHttpModule>(new Regex(Regex.Escape(x.Item1)), x.Item2);
 			}).ToArray();
 		}
 

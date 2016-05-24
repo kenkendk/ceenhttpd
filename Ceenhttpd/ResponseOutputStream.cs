@@ -144,14 +144,16 @@ namespace Ceenhttpd
 		/// <summary>
 		/// Writes data from the stream into the buffer, given offset and count.
 		/// </summary>
+		/// <returns>The awaitable task.</returns>
 		/// <param name="buffer">The buffer to write into.</param>
 		/// <param name="offset">The offset into the buffer where data is read from.</param>
 		/// <param name="count">The number of bytes to write.</param>
-		public override void Write(byte[] buffer, int offset, int count)
+		/// <param name="cancellationToken">Cancellation token.</param>
+		public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
 		{
 			if (m_isDisposed)
 				throw new ObjectDisposedException("ResponseOutputStream");
-					
+
 			if (!m_passThrough)
 			{
 				if (m_response.HasSentHeaders || m_response.ContentLength >= 0 || ((m_buffer == null ? 0 : m_buffer.Length) + count) > MAX_RESPONSE_BUFFER)
@@ -161,7 +163,7 @@ namespace Ceenhttpd
 					if (m_buffer == null)
 						m_buffer = new MemoryStream();
 
-					m_buffer.Write(buffer, offset, count);
+					await m_buffer.WriteAsync(buffer, offset, count, cancellationToken);
 					m_written += count;
 
 					if (m_buffer.Length < MAX_RESPONSE_BUFFER)
@@ -169,11 +171,22 @@ namespace Ceenhttpd
 				}
 
 				// If we get here, we dump what we have
-				Flush();
+				await FlushAsync();
 			}
 
-			m_parent.Write(buffer, offset, count);
+			await m_parent.WriteAsync(buffer, offset, count, cancellationToken);
 			m_written += count;
+		}
+
+		/// <summary>
+		/// Writes data from the stream into the buffer, given offset and count.
+		/// </summary>
+		/// <param name="buffer">The buffer to write into.</param>
+		/// <param name="offset">The offset into the buffer where data is read from.</param>
+		/// <param name="count">The number of bytes to write.</param>
+		public override void Write(byte[] buffer, int offset, int count)
+		{
+			WriteAsync(buffer, offset, count).Wait();
 		}
 
 		/// <summary>

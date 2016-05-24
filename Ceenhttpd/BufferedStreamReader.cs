@@ -392,7 +392,7 @@ namespace Ceenhttpd
 			if (m_buffercount > 0)
 				res = ReadFromBuffer(buffer, offset, mread);
 			else
-				res = await m_parent.ReadAsync(buffer, offset, mread);
+				res = await m_parent.ReadAsync(buffer, offset, mread, cancellationToken);
 			
 			m_remainingbytes -= res;
 			if (m_remainingbytes < 0)

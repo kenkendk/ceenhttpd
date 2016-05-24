@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Globalization;
 
-namespace Ceenhttpd
+namespace Ceenhttpd.Handler
 {
 	/// <summary>
 	/// Basic implementation of a file-serving module

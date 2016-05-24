@@ -30,6 +30,11 @@ namespace Ceenhttpd
 	public delegate void DebugLogDelegate(string message, string logtaskid, object data);
 
 	/// <summary>
+	/// A delegate for handling a HTTP request
+	/// </summary>
+	public delegate Task<bool> HttpHandlerDelegate(HttpRequest request, HttpResponse response);
+
+	/// <summary>
 	/// Interface for implementing a logging provider
 	/// </summary>
 	public interface ILogger

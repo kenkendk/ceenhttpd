@@ -6,21 +6,20 @@ using Ceenhttpd;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using Ceenhttpd.Logging;
+using Ceenhttpd.Handler;
+using Newtonsoft.Json;
 
 namespace Ceenhttpdcli
 {
 	class MainClass
 	{
-		private class TestHandler : IHttpModule
+		private class TimeOfDayHandler : IHttpModule
 		{
 			#region IHttpModule implementation
 			public async Task<bool> HandleAsync(HttpRequest request, HttpResponse response)
 			{
-				response.ContentType = "application/json";
-
-				using (var streamwriter = new StreamWriter(response.GetResponseStream()))
-					new Newtonsoft.Json.JsonSerializer().Serialize(streamwriter, new { Xyz = 1 });
-
+				response.SetNonCacheable();
+				await response.WriteAllJsonAsync(JsonConvert.SerializeObject(new { time = DateTime.Now.TimeOfDay } ));
 				return true;
 			}
 			#endregion
@@ -59,7 +58,7 @@ namespace Ceenhttpdcli
 					new Tuple<string, IHttpModule>[] {
 						new Tuple<string, IHttpModule>(
 							"/data",
-							new TestHandler()
+							new TimeOfDayHandler()
 						),
 						new Tuple<string, IHttpModule>(
 							"/",
