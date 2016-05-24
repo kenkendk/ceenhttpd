@@ -1,7 +1,7 @@
 Ceenhttpd
 =========
 
-A tiny and effecient CIL web server. 
+A tiny and efficient CIL web server. 
 
 Ceedhttpd is meant for use with high-load webservers where mod_mono or another CGI-like approach would normally be required. By hosting the entire webserver in CIL, the overhead associcated with CGI, FCGI and SCGI is removed. If the handling code relies on `async`/`await` as the server does, it can scale to a very high number of simultaneous connections.
 
