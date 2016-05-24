@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceenhttpd-cli", "Ceenhttpd-cli\Ceenhttpd-cli.csproj", "{AF13A77D-FD50-4ED1-943B-266E577CB28B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceenhttpd", "Ceenhttpd\Ceenhttpd.csproj", "{030E03E0-C7E1-4316-B7D5-44582840DEA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unittests", "Unittests\Unittests.csproj", "{77A69C2A-6FCA-479A-8B8C-B79B869230E8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{030E03E0-C7E1-4316-B7D5-44582840DEA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{030E03E0-C7E1-4316-B7D5-44582840DEA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{030E03E0-C7E1-4316-B7D5-44582840DEA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{030E03E0-C7E1-4316-B7D5-44582840DEA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77A69C2A-6FCA-479A-8B8C-B79B869230E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77A69C2A-6FCA-479A-8B8C-B79B869230E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77A69C2A-6FCA-479A-8B8C-B79B869230E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77A69C2A-6FCA-479A-8B8C-B79B869230E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF13A77D-FD50-4ED1-943B-266E577CB28B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF13A77D-FD50-4ED1-943B-266E577CB28B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF13A77D-FD50-4ED1-943B-266E577CB28B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF13A77D-FD50-4ED1-943B-266E577CB28B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
