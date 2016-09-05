@@ -72,12 +72,12 @@ namespace Ceenhttpd.Handler
 					throw new HttpException(HttpStatusCode.BadRequest);
 
 			var path = MapToLocalPath(request.Path);
-			if (!path.StartsWith(m_sourcefolder))
+			if (!path.StartsWith(m_sourcefolder, StringComparison.Ordinal))
 				throw new HttpException(HttpStatusCode.BadRequest);
 
 			if (Directory.Exists(path))
 			{
-				if (!request.Path.EndsWith("/"))
+				if (!request.Path.EndsWith("/", StringComparison.Ordinal))
 				{
 					if (!m_indexfiles.Any(p => File.Exists(Path.Combine(path, p))))
 						throw new HttpException(HttpStatusCode.NotFound);
@@ -205,13 +205,12 @@ namespace Ceenhttpd.Handler
 				default:
 					return null;
 			}
-		}
-	
+		}	
 
 		private string MapToLocalPath(string path)
 		{
 			path = path.Replace("/", DIRSEP);
-			while (path.StartsWith(DIRSEP))
+			while (path.StartsWith(DIRSEP, StringComparison.Ordinal))
 				path = path.Substring(1);
 
 			return Path.Combine(m_sourcefolder, path);
