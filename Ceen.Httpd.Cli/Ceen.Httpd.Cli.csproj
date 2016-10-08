@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AF13A77D-FD50-4ED1-943B-266E577CB28B}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ceen.Httpd.Cli</RootNamespace>
+    <AssemblyName>Ceen.Httpd.Cli</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+    <Commandlineparameters>/Users/kenneth/Udvikler/duplicati-git/Duplicati/Server/webroot</Commandlineparameters>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Externalconsole>true</Externalconsole>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="SyslogNet.Client">
+      <HintPath>..\packages\SyslogNet.Client.0.3.1\lib\net40\SyslogNet.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SyslogLogger.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj">
+      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
+      <Name>Ceen.Httpd</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
+      <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
+      <Name>Ceen.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj">
+      <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
+      <Name>Ceen.Mvc</Name>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

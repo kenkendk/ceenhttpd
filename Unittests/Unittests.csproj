@@ -40,10 +40,4 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Ceenhttpd\Ceenhttpd.csproj">
-      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
-      <Name>Ceenhttpd</Name>
-    </ProjectReference>
-  </ItemGroup>
 </Project>
