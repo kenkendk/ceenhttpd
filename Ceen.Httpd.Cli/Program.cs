@@ -131,7 +131,13 @@ namespace Ceen.Httpd.Cli
 						},
 						typeof(MainClass).Assembly))
 					*/
-					.AddRoute(typeof(MainClass).Assembly.ToRoute(new ControllerRouterConfig(typeof(HomeController))))
+					.AddRoute(
+						typeof(MainClass)
+						.Assembly
+						.ToRoute(
+							new ControllerRouterConfig(typeof(HomeController))
+							{ Debug = true }
+					))
 
 					.AddRoute(new FileHandler(args[0]))
 

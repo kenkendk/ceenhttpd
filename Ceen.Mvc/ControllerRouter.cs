@@ -199,16 +199,6 @@ namespace Ceen.Mvc
 		private readonly Regex m_fullre;
 
 		/// <summary>
-		/// The regular expression used to match prefixes
-		/// </summary>
-		private readonly Regex m_prefixre;
-
-		/// <summary>
-		/// The regular expressions to use after the prefix
-		/// </summary>
-		private readonly Dictionary<string, Regex> m_subprefixre;
-
-		/// <summary>
 		/// The default controller
 		/// </summary>
 		private string m_defaultcontroller;
@@ -408,9 +398,9 @@ namespace Ceen.Mvc
 				.SelectMany(
 					x => allwithverbs
 					.Where(y => 
-					       !y.Controller.GetType().GetParentInterfaces<IControllerPrefix>().Any() 
-					       || 
-					       y.Controller.GetType().GetInterfaces().Contains(x.Key)
+					       string.IsNullOrWhiteSpace(x.Value)
+					       ? !y.Controller.GetType().GetParentInterfaces<IControllerPrefix>().Any() 
+					       : y.Controller.GetType().GetInterfaces().Contains(x.Key)
 			        )
 			        .Select(z => new RouteEntry(
 						z.Route,
@@ -427,33 +417,6 @@ namespace Ceen.Mvc
 	            .OrderByDescending(x => x.Route.Value.Length)
 	            .ToArray();
 
-			m_prefixre = new Regex(string.Join("|", allwithprefix.Select(x => x.Prefix).Distinct().Select(x => string.IsNullOrWhiteSpace(x) ? "()" : Regex.Escape(x))));
-
-			m_subprefixre =
-				allwithprefix
-					 .GroupBy(x => x.Prefix)
-					 .ToDictionary(
-						x => x.Key,
-						x => 
-							new Regex(basetemplate
-							.Bind(m_config.PrefixGroupName, x.Key.StartsWith("/") ? x.Key.Substring(1) : x.Key, false, false)
-				            .Bind(m_config.ControllerGroupName, 
-						          string.Join(
-							          "|", 
-							          x
-							          .Where(z => !m_config.HideDefaultController || z.ControllerName != m_defaultcontroller).Distinct()
-							          .Select(z => $"({Regex.Escape(z.ControllerName)})").Distinct()), true, !string.IsNullOrWhiteSpace(m_defaultcontroller)
-						         )
-							.Bind(m_config.ActionGroupName, string.Join(
-							              "|", 
-							              x
-							              .Where(z => !m_config.HideDefaultAction || z.ActionName != m_defaultaction).Distinct()
-							              .Select(z => $"({Regex.Escape(z.ActionName)})").Distinct()), true, !string.IsNullOrWhiteSpace(m_defaultaction)
-						         )
-			               .RegularExpression
-						)
-					);
-				             
 
 			var controllernames = allwithverbs.Select(x => x.ControllerName).Where(x => !m_config.HideDefaultController || x != m_defaultcontroller).Distinct().ToList();
 			var actionnames = allwithverbs.Select(x => x.ActionName).Where(x => !m_config.HideDefaultAction || x != m_defaultaction).Distinct().ToList();
@@ -465,6 +428,7 @@ namespace Ceen.Mvc
 
 			// Build expression with all controller/action names
 			var bound = basetemplate
+				.Bind(m_config.PrefixGroupName, string.Join("|", allwithprefix.Select(x => Regex.Escape(x.Prefix)).Distinct().Select(x => string.IsNullOrWhiteSpace(x) ? "()" : x)), true, false, true)
 				.Bind(m_config.ControllerGroupName, string.Join("|", controllernames.Select(x => $"({Regex.Escape(x)})")), true, !string.IsNullOrWhiteSpace(m_defaultcontroller))
 				.Bind(m_config.ActionGroupName, string.Join("|", actionnames.Select(x => $"({Regex.Escape(x)})")), true, !string.IsNullOrWhiteSpace(m_defaultaction));
 
@@ -493,6 +457,43 @@ namespace Ceen.Mvc
 								)
 						)
 				);
+
+			if (m_config.Debug)
+			{
+				Console.WriteLine("ControllerRouter debug information:");
+				Console.WriteLine("Full regex: {0}", m_fullre.ToString());
+				Console.WriteLine();
+
+				foreach (var verb in m_targets)
+				{
+					Console.WriteLine("Verb: {0}", string.IsNullOrWhiteSpace(verb.Key) ? "*" : verb.Key);
+
+					var rt = basetemplate;
+					foreach (var prefix in verb.Value)
+					{
+						var prefix_rt = rt.Bind(m_config.PrefixGroupName, prefix.Key, skipdelimiter: true);
+
+						foreach (var controller in prefix.Value)
+						{
+							var controller_rt = prefix_rt.Bind(m_config.ControllerGroupName, controller.Key);
+
+							foreach (var action in controller.Value)
+							{
+								var action_rt = controller_rt.Bind(m_config.ControllerGroupName, action.Key);
+
+								Console.WriteLine("Route: {0}" , action_rt.Value);
+
+								foreach (var method in action.Value)
+									Console.WriteLine("Method: {0}: {1}", method.Controller.GetType().FullName, method.Action.Method.ToString());
+
+								Console.WriteLine();
+							}
+						}
+					}
+
+					Console.WriteLine();
+				}
+			}
 		}
 
 		/// <summary>
@@ -539,23 +540,8 @@ namespace Ceen.Mvc
 		/// <param name="context">The exexcution context.</param>
 		public async Task<bool> Process(IHttpContext context)
 		{
-			var pre = m_prefixre.Match(context.Request.Path);
-			if (!pre.Success || pre.Index != 0)
-				return false;
-
-			var prefix = pre.Value;
-			Regex targetre;
-			if (!m_subprefixre.TryGetValue(prefix, out targetre))
-				return false;
-
-			var m = targetre.Match(context.Request.Path);
-			if (!m.Success || m.Index != 0)
-				return false;
-
-			var m2 = m_fullre.Match(context.Request.Path);
-
-			//if (!(m.Groups[m_config.ControllerGroupName].Success)) // && m.Groups[m_config.ActionGroupName].Success && m.Groups[m_config.PrefixGroupName].Success))
-			//	return false;
+			var m = m_fullre.Match(context.Request.Path);
+			var prefix = m.Groups[m_config.PrefixGroupName].Value;
 
 			var controller = m.Groups[m_config.ControllerGroupName].Value;
 			if (string.IsNullOrWhiteSpace(controller))

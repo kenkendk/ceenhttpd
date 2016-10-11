@@ -61,6 +61,11 @@ namespace Ceen.Mvc
 		public string[] ControllerSuffixRemovals { get; set; } = new string[] { "Controller", "Handler" };
 
 		/// <summary>
+		/// Gets or sets a value indicating whether this <see cref="T:Ceen.Mvc.ControllerRouterConfig"/> is emitting debug information.
+		/// </summary>
+		public bool Debug { get; set; } = false;
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ControllerRouterConfig"/> class.
 		/// </summary>
 		/// <param name="defaultController">The default controller to use.</param>

@@ -453,11 +453,11 @@ namespace Ceen.Mvc
 		/// <param name="value">The literal value to use.</param>
 		/// <param name="escaped">A flag indicating if the literal value is already escaped</param>
 		/// <param name="optional">A flag indicating if the literal is optional</param>
-		public RouteParser Bind(string varname, string value, bool escaped = false, bool optional = false)
+		public RouteParser Bind(string varname, string value, bool escaped = false, bool optional = false, bool skipdelimiter = false)
 		{
 			return new RouteParser(m_fragments.Select(x => {
 				if (x is Variable && (x as Variable).Name == varname)
-					return new NamedCapture(varname, value, (x as Variable).Delimiter, escaped, optional);
+					return new NamedCapture(varname, value, skipdelimiter ? string.Empty : (x as Variable).Delimiter, escaped, optional);
 				else if (x is Variable || x is Literal || x is NamedCapture)
 					return x;
 				else
