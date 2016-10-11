@@ -16,6 +16,11 @@ namespace Ceen.Mvc
 		public const string DEFAULT_ROUTING_TEMPLATE = @"{controller}/{action=index}";
 
 		/// <summary>
+		/// Gets or sets the name of the prefix group in the template.
+		/// </summary>
+		public string PrefixGroupName { get; set; } = "prefix";
+
+		/// <summary>
 		/// Gets or sets the name of the controller group in the template.
 		/// </summary>
 		public string ControllerGroupName { get; set; } = "controller";
@@ -24,11 +29,6 @@ namespace Ceen.Mvc
 		/// Gets or sets the name of the action group in the template.
 		/// </summary>
 		public string ActionGroupName { get; set; } = "action";
-
-		/// <summary>
-		/// Gets or sets the route prefix.
-		/// </summary>
-		public string RoutePrefix { get; set; } = "/";
 
 		/// <summary>
 		/// The template used to locate controllers
@@ -48,7 +48,7 @@ namespace Ceen.Mvc
 		/// <summary>
 		/// Gets a value indicating if the default controller, if any, can be adressed explicitly
 		/// </summary>
-		public bool HideDefaultController { get; set; } = false;
+		public bool HideDefaultController { get; set; } = true;
 
 		/// <summary>
 		/// Gets a value indicating if the default action, if any, can be adressed explicitly

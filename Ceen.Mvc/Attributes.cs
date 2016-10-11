@@ -19,7 +19,7 @@ namespace Ceen.Mvc
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteAttribute"/> class.
 		/// </summary>
-		/// <param name="route">Teh route expression to use.</param>
+		/// <param name="route">The route expression to use.</param>
 		public RouteAttribute(string route)
 		{
 			Route = route;
@@ -29,7 +29,7 @@ namespace Ceen.Mvc
 	/// <summary>
 	/// Attribute for renaming an elements route
 	/// </summary>
-	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
+	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter | AttributeTargets.Interface, Inherited = false, AllowMultiple = false)]
 	public class NameAttribute : Attribute 
 	{ 
 		/// <summary>
@@ -71,11 +71,22 @@ namespace Ceen.Mvc
 		/// Gets or sets the allowed sources for the entry
 		/// </summary>
 		/// <value>The source.</value>
-		public ParameterSource Source { get; set; } = ParameterSource.Default;
+		public ParameterSource Source { get; set; }
 		/// <summary>
 		/// Gets or sets a value indicating whether this argument is required.
 		/// </summary>
-		public bool Required { get; set; } = true;
+		public bool Required { get; set; }
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ParameterAttribute"/> class.
+		/// </summary>
+		/// <param name="source">Sets the allowed sources.</param>
+		/// <param name="required">A flag indicating if the parameter is required.</param>
+		public ParameterAttribute(ParameterSource source = ParameterSource.Default, bool required = true)
+		{
+			Source = source;
+			Required = required;
+		}
 	}
 
 	/// <summary>

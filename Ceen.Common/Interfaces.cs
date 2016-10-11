@@ -6,8 +6,11 @@ using System.Net;
 using System.Text;
 using System.Security.Cryptography.X509Certificates;
 
-namespace Ceen.Common
+namespace Ceen
 {
+	/// <summary>
+	/// Interface for a multipart-item, from a multi-part form request
+	/// </summary>
 	public interface IMultipartItem
 	{
 		/// <summary>
@@ -36,6 +39,59 @@ namespace Ceen.Common
 		/// </summary>
 		/// <value>The data.</value>
 		Stream Data { get; }
+	}
+
+	/// <summary>
+	/// An interface describing a response cookie
+	/// </summary>
+	public interface IResponseCookie
+	{
+		/// <summary>
+		/// List of settings attached to the cookie
+		/// </summary>
+		/// <value>The settings.</value>
+		IDictionary<string, string> Settings { get; }
+
+		/// <summary>
+		/// The name of the cookie
+		/// </summary>
+		string Name { get; set; }
+
+		/// <summary>
+		/// The value of the cookie
+		/// </summary>
+		string Value { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie path
+		/// </summary>
+		string Path { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie domain
+		/// </summary>
+		string Domain { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie expiration date
+		/// </summary>
+		DateTime? Expires { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie max age.
+		/// Zero or negative values means un-set
+		/// </summary>
+		long MaxAge { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie secure flag
+		/// </summary>
+		bool Secure { get; set; }
+
+		/// <summary>
+		/// Gets or sets the cookie HttpOnly flag
+		/// </summary>
+		bool HttpOnly { get; set; }
 	}
 
 	/// <summary>
@@ -164,8 +220,21 @@ namespace Ceen.Common
 		/// Cannot be modified after the headers have been sent.
 		/// </summary>
 		/// <value>The cookies.</value>
-		IList<ResponseCookie> Cookies { get; }
+		IList<IResponseCookie> Cookies { get; }
 
+		/// <summary>
+		/// Adds a cookie to the output
+		/// </summary>
+		/// <returns>The new cookie.</returns>
+		/// <param name="name">The name of the cookie.</param>
+		/// <param name="value">The cookie value.</param>
+		/// <param name="path">The optional path limiter.</param>
+		/// <param name="domain">The optional domain limiter.</param>
+		/// <param name="expires">The optional expiration date.</param>
+		/// <param name="maxage">The optional maximum age.</param>
+		/// <param name="secure">A flag for making the cookie available over SSL only.</param>
+		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
+		IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false);
 
 		/// <summary>
 		/// Adds a header to the output, use null to delete a header.
@@ -271,14 +340,6 @@ namespace Ceen.Common
 	}
 
 	/// <summary>
-	/// Basic interface for a request handler
-	/// </summary>
-	public interface IHttpModule
-	{
-		Task<bool> HandleAsync(IHttpContext context);
-	}
-
-	/// <summary>
 	/// Interface for implementing a routing provider
 	/// </summary>
 	public interface IRouter
@@ -287,24 +348,10 @@ namespace Ceen.Common
 	}
 
 	/// <summary>
-	/// A delegate for handling a HTTP request
+	/// Basic interface for a request handler
 	/// </summary>
-	public delegate Task<bool> HttpHandlerDelegate(IHttpContext context);
-
-	/// <summary>
-	/// Interface for implementing a logging provider
-	/// </summary>
-	public interface ILogger
+	public interface IHttpModule
 	{
-		Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
-	}
-
-	/// <summary>
-	/// Interface for logging requests before they are processed
-	/// </summary>
-	public interface IStartLogger : ILogger
-	{
-		Task LogRequestStarted(IHttpRequest request);
+		Task<bool> HandleAsync(IHttpContext context);
 	}
 }
-

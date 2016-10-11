@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Globalization;
-using Ceen.Common;
 
 namespace Ceen.Httpd.Logging
 {

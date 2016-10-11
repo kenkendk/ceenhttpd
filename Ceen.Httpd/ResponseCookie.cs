@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace Ceen.Common
+namespace Ceen.Httpd
 {
 	/// <summary>
 	/// Representation of a response cookie
 	/// </summary>
-	public class ResponseCookie
+	public class ResponseCookie : IResponseCookie
 	{
 		/// <summary>
 		/// List of settings attached to the cookie

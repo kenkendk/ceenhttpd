@@ -43,7 +43,6 @@
     <Compile Include="HttpServer.cs" />
     <Compile Include="MultipartItem.cs" />
     <Compile Include="Logging\CLFLogger.cs" />
-    <Compile Include="Logging\LogSplitter.cs" />
     <Compile Include="Logging\FunctionLogger.cs" />
     <Compile Include="DelimitedSubStream.cs" />
     <Compile Include="LimitedBodyStream.cs" />
@@ -51,6 +50,8 @@
     <Compile Include="Handler\FunctionHandler.cs" />
     <Compile Include="Interfaces.cs" />
     <Compile Include="HttpContext.cs" />
+    <Compile Include="DefaultableDictionary.cs" />
+    <Compile Include="ResponseCookie.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

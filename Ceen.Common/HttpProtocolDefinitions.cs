@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Ceen.Common
+namespace Ceen
 {
 	/// <summary>
 	/// List of supported HTTP status codes

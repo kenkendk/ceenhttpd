@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Ceen.Common;
 
 namespace Ceen.Mvc
 {
@@ -159,7 +158,10 @@ namespace Ceen.Mvc
 		/// The HTTP verb for this method
 		/// </summary>
 		public readonly string Verb;
-
+		/// <summary>
+		/// The prefix for this method
+		/// </summary>
+		public readonly string Prefix;
 		/// <summary>
 		/// The regular expression.
 		/// </summary>
@@ -174,7 +176,7 @@ namespace Ceen.Mvc
 		/// <param name="action">The action for this entry.</param>
 		/// <param name="actionName">The action name.</param>
 		/// <param name="verb">The HTTP verb.</param>
-		public RouteEntry(RouteParser route, Controller controller, string controllerName, MethodInfo action, string actionName, string verb)
+		public RouteEntry(RouteParser route, Controller controller, string controllerName, MethodInfo action, string actionName, string verb, string prefix)
 		{
 			Route = route;
 			Controller = controller;
@@ -182,6 +184,7 @@ namespace Ceen.Mvc
 			Action = new MethodEntry(action, route);
 			ActionName = actionName;
 			Verb = verb;
+			Prefix = prefix;
 			RegularExpression = new Regex(route.RegularExpression);
 		}
 

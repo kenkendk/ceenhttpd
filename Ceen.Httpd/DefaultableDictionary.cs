@@ -20,7 +20,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Ceen.Common
+namespace Ceen.Httpd
 {
 	/// <summary>
 	/// Implements default values for lookup in a standard dictionary

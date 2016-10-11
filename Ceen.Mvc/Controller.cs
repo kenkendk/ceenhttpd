@@ -5,22 +5,22 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Ceen.Common;
 
 namespace Ceen.Mvc
 {
+	/// <summary>
+	/// A marker interface for setting routes on a controller.
+	/// Use this interface and place a RouteAttribute on it
+	/// </summary>
+	public interface IControllerPrefix
+	{
+	}
+
 	/// <summary>
 	/// Implementation of a controller
 	/// </summary>
 	public abstract class Controller
 	{
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceenhttpd.Mvc.Controller"/> class.
-		/// </summary>
-		public Controller()
-		{
-		}
-
 		/// <summary>
 		/// Returns the result as JSON encoded with UTF-8
 		/// </summary>
@@ -67,16 +67,38 @@ namespace Ceen.Mvc
 		}
 
 		/// <summary>
-		/// Sends a &quot;400 - Bad request&quot; response with an optional extra message
+		/// Sets the status for the request
+		/// </summary>
+		/// <param name="code">The status code.</param>
+		/// <param name="message">An optional status message.</param>
+		protected IResult Status(HttpStatusCode code, string message = null, bool disablecaching = true)
+		{
+			return new LambdaResult(ctx =>
+			{
+				if (disablecaching)
+					ctx.Response.SetNonCacheable();
+				
+				ctx.Response.StatusCode = code;
+				ctx.Response.StatusMessage = message ?? HttpStatusMessages.DefaultMessage(code);
+			});
+		}
+
+		/// <summary>
+		/// Sends a &quot;400 - Bad request&quot; response with an optional specific message
 		/// </summary>
 		/// <param name="message">An optional status message.</param>
 		protected IResult BadRequest(string message = null)
 		{
-			return new LambdaResult(ctx =>
-			{
-				ctx.Response.StatusCode = HttpStatusCode.BadRequest;
-				ctx.Response.StatusMessage = message ?? "Bad request";
-			});
+			return Status(HttpStatusCode.BadRequest, message);
+		}
+
+		/// <summary>
+		/// Sends a &quot;404 - Not found&quot; response with an optional specific message
+		/// </summary>
+		/// <param name="message">An optional status message.</param>
+		protected IResult NotFound(string message = null)
+		{
+			return Status(HttpStatusCode.NotFound, message);
 		}
 
 		/// <summary>
@@ -89,6 +111,24 @@ namespace Ceen.Mvc
 			{
 				ctx.Response.Redirect(url);
 			});
+		}
+
+		/// <summary>
+		/// Wraps a result method
+		/// </summary>
+		/// <param name="func">The function to use.</param>
+		protected IResult Result(Func<Task> func)
+		{
+			return new LambdaResult(func);
+		}
+
+		/// <summary>
+		/// Wraps a result method
+		/// </summary>
+		/// <param name="func">The function to use.</param>
+		protected IResult Result(Action func)
+		{
+			return new LambdaResult(func);
 		}
 	}
 }

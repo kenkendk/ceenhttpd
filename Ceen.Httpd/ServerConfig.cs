@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
 using System.Globalization;
-using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -68,7 +69,7 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// The logger instance to use
 		/// </summary>
-		public ILogger Logger;
+		public IList<ILogger> Loggers;
 		/// <summary>
 		/// A callback method for injecting headers into the responses
 		/// </summary>
@@ -104,6 +105,92 @@ namespace Ceen.Httpd
 		{
 			response.AddHeader("Date", DateTime.UtcNow.ToString("R", CultureInfo.InvariantCulture));
 			response.AddHeader("Server", "ceenhttpd/0.1");
+		}
+
+		/// <summary>
+		/// Adds a logger instance to the server
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="logger">The logger module to add.</param>
+		public ServerConfig AddLogger(LogDelegate logger)
+		{
+			return AddLogger(new Logging.FunctionLogger(logger));
+		}
+
+		/// <summary>
+		/// Adds a logger instance to the server
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="logger">The logger module to add.</param>
+		public ServerConfig AddLogger(ILogger logger)
+		{
+			if (logger == null)
+				throw new ArgumentNullException(nameof(logger));
+			if (Loggers == null)
+				Loggers = new List<ILogger>();
+
+			Loggers.Add(logger);
+			return this;
+		}
+
+		/// <summary>
+		/// Adds a route to this configuration
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="handler">The handler function that will execute the operation.</param>
+		public ServerConfig AddRoute(HttpHandlerDelegate handler)
+		{
+			if (handler == null)
+				throw new ArgumentNullException(nameof(handler));
+			return AddRoute(null, new Handler.FunctionHandler(handler));
+		}
+
+		/// <summary>
+		/// Adds a route to this configuration
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="handler">The handler function that will execute the operation.</param>
+		public ServerConfig AddRoute(IHttpModule handler)
+		{
+			if (handler == null)
+				throw new ArgumentNullException(nameof(handler));
+			return AddRoute(null, handler);
+		}
+
+		/// <summary>
+		/// Adds a route to this configuration
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="route">The expression used to pre-filter requests before invoking the handler.</param>
+		/// <param name="handler">The handler function that will execute the operation.</param>
+		public ServerConfig AddRoute(string route, HttpHandlerDelegate handler)
+		{
+			if (handler == null)
+				throw new ArgumentNullException(nameof(handler));
+			return AddRoute(route, new Handler.FunctionHandler(handler));
+		}
+
+		/// <summary>
+		/// Adds a route to this configuration
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="route">The expression used to pre-filter requests before invoking the handler.</param>
+		/// <param name="handler">The handler module that will execute the operation.</param>
+		public ServerConfig AddRoute(string route, IHttpModule handler)
+		{
+			if (handler == null)
+				throw new ArgumentNullException(nameof(handler));
+
+			Router rt;
+			if (this.Router == null)
+				this.Router = rt = new Router();
+			else if (this.Router is Router)
+				rt = this.Router as Router;
+			else
+				throw new Exception($"Cannot use the AddRoute method unless the {nameof(Router)} is an instance of {typeof(Router).FullName}");
+
+			rt.Add(route, handler);
+			return this;		
 		}
 	}
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -13,4 +12,26 @@ namespace Ceen.Httpd
 	/// A delegate for handling a debug log event. Note that the response and exception values may be <c>null</c>.
 	/// </summary>
 	public delegate void DebugLogDelegate(string message, string logtaskid, object data);
+
+	/// <summary>
+	/// A delegate for handling a HTTP request
+	/// </summary>
+	public delegate Task<bool> HttpHandlerDelegate(IHttpContext context);
+
+	/// <summary>
+	/// Interface for implementing a logging provider
+	/// </summary>
+	public interface ILogger
+	{
+		Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
+	}
+
+	/// <summary>
+	/// Interface for logging requests before they are processed
+	/// </summary>
+	public interface IStartLogger : ILogger
+	{
+		Task LogRequestStarted(IHttpRequest request);
+	}
+
 }

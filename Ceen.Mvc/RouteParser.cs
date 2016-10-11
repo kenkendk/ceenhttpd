@@ -405,6 +405,18 @@ namespace Ceen.Mvc
 		}
 
 		/// <summary>
+		/// Appends a route to another route
+		/// </summary>
+		/// <param name="first">First.</param>
+		/// <param name="second">Second.</param>
+		public static RouteParser PrependRegex(RouteParser first, string name, string match, string delimiter)
+		{
+			var list = new List<IFragment>(first.m_fragments);
+			list.Insert(0, new NamedCapture(name, match, delimiter, true, false));
+			return new RouteParser(list);
+		}
+
+		/// <summary>
 		/// Combines two routes into one new route
 		/// </summary>
 		/// <param name="first">First.</param>

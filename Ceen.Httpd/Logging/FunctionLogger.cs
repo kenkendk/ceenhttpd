@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Ceen.Common;
 
 namespace Ceen.Httpd.Logging
 {

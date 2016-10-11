@@ -5,7 +5,6 @@ using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Globalization;
-using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -19,8 +18,15 @@ namespace Ceen.Httpd
 		/// </summary>
 		private class HttpResponseHeaders : IDictionary<string, string>
 		{
+			/// <summary>
+			/// The wrapped parent
+			/// </summary>
 			private readonly HttpResponse m_parent;
 
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpResponse.HttpResponseHeaders"/> class.
+			/// </summary>
+			/// <param name="parent">The parent to wrap.</param>
 			public HttpResponseHeaders(HttpResponse parent)
 			{
 				m_parent = parent;
@@ -169,7 +175,7 @@ namespace Ceen.Httpd
 		/// Cannot be modified after the headers have been sent.
 		/// </summary>
 		/// <value>The cookies.</value>
-		public IList<ResponseCookie> Cookies { get; private set; }
+		public IList<IResponseCookie> Cookies { get; private set; }
 
 		/// <summary>
 		/// The underlying output stream
@@ -211,7 +217,7 @@ namespace Ceen.Httpd
 			m_stream = stream;
 			m_serverconfig = config;
 			m_headerwrapper = new HttpResponseHeaders(this);
-			Cookies = new List<ResponseCookie>();
+			Cookies = new List<IResponseCookie>();
 			Reset();
 		}
 
@@ -361,8 +367,8 @@ namespace Ceen.Httpd
 					await m_stream.WriteAsync(line, 0, line.Length);
 				}
 
-				if (Cookies is List<ResponseCookie>)
-					Cookies = ((List<ResponseCookie>)Cookies).AsReadOnly();
+				if (Cookies is List<IResponseCookie>)
+					Cookies = ((List<IResponseCookie>)Cookies).AsReadOnly();
 
 				line = Encoding.ASCII.GetBytes(CRLF);
 				await m_stream.WriteAsync(line, 0, line.Length);
@@ -488,6 +494,32 @@ namespace Ceen.Httpd
 		{
 			return m_outstream;
 		}
+
+		/// <summary>
+		/// Adds a cookie to the output
+		/// </summary>
+		/// <returns>The new cookie.</returns>
+		/// <param name="name">The name of the cookie.</param>
+		/// <param name="value">The cookie value.</param>
+		/// <param name="path">The optional path limiter.</param>
+		/// <param name="domain">The optional domain limiter.</param>
+		/// <param name="expires">The optional expiration date.</param>
+		/// <param name="maxage">The optional maximum age.</param>
+		/// <param name="secure">A flag for making the cookie available over SSL only.</param>
+		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
+		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false)
+		{
+			return new ResponseCookie(name, value) 
+			{
+				Path = path,
+				Domain = domain,
+				Expires = expires,
+				MaxAge = maxage,
+				Secure = secure,
+				HttpOnly = httponly
+			};
+		}
+
 	}
 }
 

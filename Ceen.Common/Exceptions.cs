@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Ceen.Common
+namespace Ceen
 {
 	/// <summary>
 	/// Implements an exception that should be reported to the client 

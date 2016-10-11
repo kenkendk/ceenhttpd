@@ -8,7 +8,6 @@ using System.Security.Cryptography.X509Certificates;
 using Ceen.Httpd.Logging;
 using Ceen.Httpd.Handler;
 using Newtonsoft.Json;
-using Ceen.Common;
 using Ceen.Mvc;
 
 namespace Ceen.Httpd.Cli
@@ -29,8 +28,14 @@ namespace Ceen.Httpd.Cli
 
 		private const string API_V1_NAMESPACE = "/api/v1/";
 
+		[Name("api")]
+		public interface IAPI : IControllerPrefix { }
+
+		[Name("v1")]
+		public interface IApiV1 : IAPI { }
+
 		[Name("entry")]
-		public class ApiExampleController : Controller
+		public class ApiExampleController : Controller, IApiV1
 		{
 
 			[HttpGet]
@@ -67,13 +72,22 @@ namespace Ceen.Httpd.Cli
 		}
 
 		[Name("wait")]
-		[Route("/api/v1/wait")]
-		public class WaitExample : Controller
+		public class WaitExample : Controller, IApiV1
 		{
 			public async Task<IResult> Index()
 			{
 				await Task.Delay(TimeSpan.FromSeconds(30));
 				return Text(HttpServer.TotalActiveClients.ToString());
+			}
+		}
+
+		[Name("home")]
+		[Route("/")]
+		public class HomeController : Controller
+		{
+			public IResult Index()
+			{
+				return Html("<html><body>Hello!</body></html>");
 			}
 		}
 
@@ -105,42 +119,31 @@ namespace Ceen.Httpd.Cli
 				return 1;
 			}
 
-			var server = new HttpServer(new ServerConfig() {
-				Router = new Router(
-					new Tuple<string, IHttpModule>[] {
-						new Tuple<string, IHttpModule>(
-							"/data",
-							new TimeOfDayHandler()
-						),
-						new Tuple<string, IHttpModule>(
-							"[.*]",
-							new Mvc.ControllerRouter(
-								new ControllerRouterConfig() {
-									RoutePrefix = API_V1_NAMESPACE
-								},
-								typeof(MainClass).Assembly
-							)
-						),
-						new Tuple<string, IHttpModule>(
-							"/",
-							new FileHandler(args[0])
-						)
+			var server = new HttpServer(
+				new ServerConfig() 
+					{ SSLCertificate = cert }
+					
+					.AddRoute("/data", new TimeOfDayHandler())
 
-					}
-				),
+					/*.AddRoute(null, new Mvc.ControllerRouter(
+						new ControllerRouterConfig() {
+							RoutePrefix = API_V1_NAMESPACE
+						},
+						typeof(MainClass).Assembly))
+					*/
+					.AddRoute(typeof(MainClass).Assembly.ToRoute(new ControllerRouterConfig(typeof(HomeController))))
 
-				Logger = new LogSplitter(new ILogger[] {
-					//new CLFLogger(Console.OpenStandardOutput()),
-					//new SyslogLogger(),
-					new FunctionLogger((ctx, ex,start, duration) => {
+					.AddRoute(new FileHandler(args[0]))
+
+					.AddLogger(new CLFLogger(Console.OpenStandardOutput()))
+					.AddLogger(new SyslogLogger())
+					.AddLogger((ctx, ex, start, duration) =>
+					{
 						if (ex != null)
 							Console.WriteLine(ex);
 						return Task.FromResult(true);
 					})
-				}),
-
-				SSLCertificate = cert
-			});
+			);
 
 			var tcs = new System.Threading.CancellationTokenSource();
 			var task = 

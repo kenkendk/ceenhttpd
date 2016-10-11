@@ -4,7 +4,6 @@ using SyslogNet.Client;
 using SyslogNet.Client.Serialization;
 using SyslogNet.Client.Transport;
 using System.IO;
-using Ceen.Common;
 
 namespace Ceen.Httpd.Cli
 {

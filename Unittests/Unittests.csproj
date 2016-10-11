@@ -30,13 +30,27 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\packages\NUnit.3.5.0\lib\net45\nunit.framework.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Test.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <ItemGroup>
+    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
+      <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
+      <Name>Ceen.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj">
+      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
+      <Name>Ceen.Httpd</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj">
+      <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
+      <Name>Ceen.Mvc</Name>
+    </ProjectReference>
+  </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>

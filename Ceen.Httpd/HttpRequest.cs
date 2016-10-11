@@ -5,7 +5,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.IO;
 using System.Linq;
-using Ceen.Common;
 
 namespace Ceen.Httpd
 {

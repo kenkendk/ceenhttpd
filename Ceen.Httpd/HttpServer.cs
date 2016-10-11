@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Threading;
@@ -7,7 +8,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
 using System.IO;
 using System.Net.Security;
-using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -251,6 +251,28 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
+		/// Logs a message to all configured loggers
+		/// </summary>
+		/// <returns>The awaitable task.</returns>
+		/// <param name="context">The request context.</param>
+		/// <param name="ex">Exception data, if any.</param>
+		/// <param name="start">The request start time.</param>
+		/// <param name="duration">The request duration.</param>
+		private Task LogMessage(HttpContext context, Exception ex, DateTime start, TimeSpan duration)
+		{
+			if (Config.Loggers == null)
+				return Task.FromResult(true);
+
+			var count = Config.Loggers.Count;
+			if (count == 0)
+				return Task.FromResult(true);
+			else if (count == 1)
+				return Config.Loggers[0].LogRequest(context, ex, start, duration);
+			else
+				return Task.WhenAll(Config.Loggers.Select(x => x.LogRequest(context, ex, start, duration)));
+		}
+
+		/// <summary>
 		/// Listens to a port, using the given endpoint. 
 		/// Note that this method does not use SSL.
 		/// </summary>
@@ -300,11 +322,7 @@ namespace Ceen.Httpd
 				}
 				catch (Exception aex)
 				{
-					if (Config.Logger != null)
-						try { await Config.Logger.LogRequest(new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, null), null), aex, DateTime.Now, new TimeSpan()); }
-						catch { }
-
-					return;
+					await LogMessage(new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, null), null), aex, DateTime.Now, new TimeSpan());
 				}
 
 				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Run SSL", logtaskid, client);
@@ -401,18 +419,31 @@ namespace Ceen.Httpd
 						else
 							resp.KeepAlive = false;
 
-						if (Config.Logger as IStartLogger != null)
-							await ((IStartLogger)Config.Logger).LogRequestStarted(cur);
+
+						if (Config.Loggers != null)
+						{
+							var count = Config.Loggers.Count;
+							if (count == 1)
+							{
+								var sl = Config.Loggers[0] as IStartLogger;
+								if (sl != null)
+									await sl.LogRequestStarted(cur);
+							}
+							else if (count != 0)
+								await Task.WhenAll(Config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));								
+						}
 
 						if (Config.DebugLogHandler != null) Config.DebugLogHandler("Running handler", logtaskid, cur);
 
 						try
 						{
 							// TODO: Set a timer on the processing as well?
+							// TODO: Use a cancellation token?
+							// TODO: Abort processing if the client closes?
 
 							// Process the request
 							if (!await Config.Router.Process(context))
-								throw new HttpException(Ceen.Common.HttpStatusCode.NotFound);
+								throw new HttpException(Ceen.HttpStatusCode.NotFound);
 						}
 						catch (HttpException hex)
 						{
@@ -433,8 +464,7 @@ namespace Ceen.Httpd
 						keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength;
 						requests--;
 
-						if (Config.Logger != null)
-							await Config.Logger.LogRequest(context, null, started, DateTime.Now - started);
+						await LogMessage(context, null, started, DateTime.Now - started);
 					
 					} while(keepingalive);
 				}
@@ -446,8 +476,8 @@ namespace Ceen.Httpd
 				{
 					if (!resp.HasSentHeaders)
 					{
-						resp.StatusCode = Ceen.Common.HttpStatusCode.InternalServerError;
-						resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.Common.HttpStatusCode.InternalServerError);
+						resp.StatusCode = Ceen.HttpStatusCode.InternalServerError;
+						resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.HttpStatusCode.InternalServerError);
 					}
 
 					try { await resp.FlushAsErrorAsync(); }
@@ -457,14 +487,8 @@ namespace Ceen.Httpd
 				try { stream.Close(); }
 				catch {}
 
-				try
-				{
-					if (Config.Logger != null)
-						await Config.Logger.LogRequest(context, ex, started, DateTime.Now - started);
-				}
-				catch
-				{
-				}
+				try { await LogMessage(context, ex, started, DateTime.Now - started); }
+				catch { }
 
 				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Failed handler", logtaskid, cur);
 
