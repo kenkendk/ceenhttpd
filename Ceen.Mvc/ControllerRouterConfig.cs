@@ -46,12 +46,12 @@ namespace Ceen.Mvc
 		public bool LowerCaseNames { get; set; } = true;
 
 		/// <summary>
-		/// Gets a value indicating if the default controller, if any, can be adressed explicitly
+		/// Gets a value indicating if the default controller, if any, cannot be adressed explicitly
 		/// </summary>
 		public bool HideDefaultController { get; set; } = true;
 
 		/// <summary>
-		/// Gets a value indicating if the default action, if any, can be adressed explicitly
+		/// Gets a value indicating if the default action, if any, cannot be adressed explicitly
 		/// </summary>
 		public bool HideDefaultAction { get; set; } = true;
 
@@ -84,7 +84,17 @@ namespace Ceen.Mvc
 				if (attr != null)
 					name = attr.Name;
 				else
-					name = LowerCaseNames ? defaultController.Name.ToLowerInvariant() : defaultController.Name;
+				{
+					name = defaultController.Name;
+					if (ControllerSuffixRemovals != null)
+						foreach (var rm in ControllerSuffixRemovals)
+							while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+								name = name.Substring(0, name.Length - rm.Length);
+
+					if (LowerCaseNames)
+						name = name.ToLowerInvariant();
+				}
+
 				sb.Append($"{{{ControllerGroupName}={name}}}");
 			}
 
