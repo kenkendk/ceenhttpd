@@ -210,13 +210,12 @@ namespace Ceen.Mvc
 
 		/// <summary>
 		/// Lookup table for finding target methods,
-		/// outer key is &quot;http-verb&quot;,
-		/// inner key is &quot;prefix&quot;,
+		/// outer key is &quot;prefix&quot;,
 		/// inner key is the &quot;controller&quot;,
 		/// inner key is the &quot;action&quot;
+		/// inner key is &quot;http-verb&quot;,
 		/// </summary>
 		private readonly Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, List<RouteEntry>>>>> m_targets;
-
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ControllerRouter"/> class.
@@ -437,26 +436,27 @@ namespace Ceen.Mvc
 
 			// Build lookup table with verb, controller, action
 			m_targets = allwithprefix
-				.GroupBy(verb => verb.Verb)
-				.ToDictionary(
-					verb => verb.Key,
-					verb => verb
-						.GroupBy(prefix => prefix.Prefix)
-						.ToDictionary(
-							prefix => prefix.Key,
-							prefix => prefix
-								.GroupBy(controller => controller.ControllerName)
-								.ToDictionary(
-									controller => controller.Key,
-									controller => controller
-											  .GroupBy(action => action.ActionName)
-											  .ToDictionary(
-												  action => action.Key,
-												  action => action.ToList()
-											   )
-								)
-						)
-				);
+					.GroupBy(prefix => prefix.Prefix)
+					.ToDictionary(
+						prefix => prefix.Key,
+						prefix => prefix
+							.GroupBy(controller => controller.ControllerName)
+							.ToDictionary(
+								controller => controller.Key,
+								controller => controller
+										  .GroupBy(action => action.ActionName)
+										  .ToDictionary(
+											  action => action.Key,
+											  action => action
+													.GroupBy(verb => verb.Verb)
+													.ToDictionary(
+														verb => verb.Key,
+														verb => verb.ToList()
+												   )
+										)
+							)
+					)
+			;
 
 			if (m_config.Debug)
 			{
@@ -551,18 +551,34 @@ namespace Ceen.Mvc
 			if (string.IsNullOrWhiteSpace(action))
 				action = m_defaultaction ?? string.Empty;
 
-			//var prefix = m.Groups[m_config.PrefixGroupName].Value;
-
-			var candidates = GetTargets(context.Request.Method, prefix, controller, action);
-			if (candidates == null || candidates.Count == 0)
-				candidates = GetTargets(string.Empty, prefix, controller, action);
-
-			if (candidates == null || candidates.Count == 0)
+			var verblookup = GetTargets(prefix, controller, action);
+			if (verblookup == null)
 				return false;
+
+			List<RouteEntry> lookupres_targeted;
+			List<RouteEntry> lookupres_defaults;
+
+			verblookup.TryGetValue(context.Request.Method, out lookupres_targeted);
+			verblookup.TryGetValue(string.Empty, out lookupres_defaults);
+
+			// If we get here, it was not possible to match the verb, so we give "405 - Method not allowed"
+			if ((lookupres_targeted == null || lookupres_targeted.Count == 0) && (lookupres_defaults == null || lookupres_defaults.Count == 0))
+			{
+				context.Response.StatusCode = HttpStatusCode.MethodNotAllowed;
+				context.Response.StatusMessage = HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed);
+				return true;
+			}
 
 			var subpath = context.Request.Path.Substring(m.Length);
 			if (!subpath.StartsWith("/"))
 				subpath = "/" + subpath;
+
+			var candidates =
+				lookupres_targeted == null
+				? lookupres_defaults
+				: lookupres_defaults == null 
+				? lookupres_targeted
+				: lookupres_targeted.Union(lookupres_defaults);
 
 			var best = candidates.Select(x => BuildPathDictionary(x, subpath, m))
 	                .Where(x => x.Key != null)
@@ -626,21 +642,17 @@ namespace Ceen.Mvc
 		/// <param name="verb">The path prefix to match.</param>
 		/// <param name="controller">The controller to use.</param>
 		/// <param name="action">The action to use.</param>
-		private List<RouteEntry> GetTargets(string verb, string prefix, string controller, string action)
+		private Dictionary<string, List<RouteEntry>> GetTargets(string prefix, string controller, string action)
 		{
-			Dictionary<string, Dictionary<string, Dictionary<string, List<RouteEntry>>>> prefixlist;
-			if (!m_targets.TryGetValue(verb, out prefixlist))
+			Dictionary<string, Dictionary<string, Dictionary<string, List<RouteEntry>>>> controllerlist;
+			if (!m_targets.TryGetValue(prefix, out controllerlist))
 				return null;
 
-			Dictionary<string, Dictionary<string, List<RouteEntry>>> controllerlist;
-			if (!prefixlist.TryGetValue(prefix, out controllerlist))
-				return null;
-
-			Dictionary<string, List<RouteEntry>> actionlist;
+			Dictionary<string, Dictionary<string, List<RouteEntry>>> actionlist;
 			if (!controllerlist.TryGetValue(controller, out actionlist))
 				return null;
 
-			List<RouteEntry> methodlist;
+			Dictionary<string, List<RouteEntry>> methodlist;
 			if (!actionlist.TryGetValue(action, out methodlist))
 				return null;
 
