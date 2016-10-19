@@ -100,6 +100,10 @@ namespace Ceen
 	public interface IHttpRequest
 	{
 		/// <summary>
+		/// Gets the HTTP Request line as sent by the client
+		/// </summary>
+		string RawHttpRequestLine { get; }
+		/// <summary>
 		/// The HTTP method or Verb
 		/// </summary>
 		/// <value>The method.</value>

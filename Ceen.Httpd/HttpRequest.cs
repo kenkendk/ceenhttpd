@@ -14,6 +14,10 @@ namespace Ceen.Httpd
 	internal class HttpRequest : IHttpRequest
 	{
 		/// <summary>
+		/// Gets the HTTP Request line as sent by the client
+		/// </summary>
+		public string RawHttpRequestLine { get; private set; }
+		/// <summary>
 		/// The HTTP method or Verb
 		/// </summary>
 		/// <value>The method.</value>
@@ -155,6 +159,7 @@ namespace Ceen.Httpd
 					path = path.Substring(0, qix);
 				}
 
+				this.RawHttpRequestLine = line;
 				this.Method = components[0];
 				this.Path = path;
 				this.RawQueryString = qs;
@@ -173,7 +178,10 @@ namespace Ceen.Httpd
 					foreach(var k in SplitHeaderLine((components[1] ?? string.Empty).Trim()))
 						Cookies[k.Key] = k.Value;
 
-				this.Headers[components[0].Trim()] = (components[1] ?? string.Empty).Trim();
+				var key = components[0].Trim();
+				var value = (components[1] ?? string.Empty).Trim();
+
+				this.Headers[key] = value;
 			}
 		}
 
@@ -427,9 +435,17 @@ namespace Ceen.Httpd
 				stoptask
 			);
 
-
 			if (this.ContentLength > config.MaxPostSize)
 				throw new HttpException(HttpStatusCode.PayloadTooLarge);
+
+			if (config.AllowHttpMethodOverride)
+			{
+				string newmethod;
+				this.Headers.TryGetValue("X-HTTP-Method-Override", out newmethod);
+				if (!string.IsNullOrWhiteSpace(newmethod))
+					this.Method = newmethod;					
+			}
+
 
 			await ParseFormData(reader, config, idletime, timeouttask, stoptask);
 		}

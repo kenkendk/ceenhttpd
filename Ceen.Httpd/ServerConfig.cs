@@ -47,6 +47,11 @@ namespace Ceen.Httpd
 		public long MaxPostSize = 100 * 1024 * 1024;
 
 		/// <summary>
+		/// A flag indicating if the X-HTTP-Method-Override header is supported
+		/// </summary>
+		public bool AllowHttpMethodOverride = true;
+
+		/// <summary>
 		/// The request idle timeout in seconds.
 		/// </summary>
 		public int RequestIdleTimeoutSeconds = 5;
