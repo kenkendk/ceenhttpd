@@ -70,7 +70,7 @@ namespace Unittests
 			}
 		}
 
-		[Name("home")]
+		//[Name("home")]
 		public class HomeController : Controller
 		{
 			public IResult Index()
@@ -108,6 +108,7 @@ namespace Unittests
 			try
 			{
 				var req = System.Net.HttpWebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
+				req.Method = verb;
 				using (var res = (System.Net.HttpWebResponse)req.GetResponse())
 					return (HttpStatusCode)res.StatusCode;
 			}
@@ -124,6 +125,7 @@ namespace Unittests
 			try
 			{
 				var req = System.Net.HttpWebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
+				req.Method = verb;
 				using (var res = (System.Net.HttpWebResponse)req.GetResponse())
 					return res.StatusDescription;
 			}
@@ -161,6 +163,8 @@ namespace Unittests
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/xyz"));
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/home1"));
 
+				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/", "GET"));
+				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/", "XYZ"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/home", "GET"));
 				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/", "XYZ"));
 
@@ -204,6 +208,8 @@ namespace Unittests
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/xyz"));
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/home1"));
 
+				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/", "GET"));
+				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/", "XYZ"));
 				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "GET"));
 				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "XYZ"));
 
