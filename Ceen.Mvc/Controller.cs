@@ -50,7 +50,7 @@ namespace Ceen.Mvc
 			{
 				if (disablecaching)
 					ctx.Response.SetNonCacheable();
-				
+
 				return ctx.Response.WriteAllAsync(data, encoding, string.Format("{0}; charset={1}", contenttype, encoding.BodyName));
 			});
 		}
@@ -77,29 +77,53 @@ namespace Ceen.Mvc
 			{
 				if (disablecaching)
 					ctx.Response.SetNonCacheable();
-				
+
 				ctx.Response.StatusCode = code;
 				ctx.Response.StatusMessage = message ?? HttpStatusMessages.DefaultMessage(code);
 			});
 		}
 
 		/// <summary>
-		/// Sends a &quot;400 - Bad request&quot; response with an optional specific message
+		/// Sets the status for the request
 		/// </summary>
+		/// <param name="code">The status code.</param>
 		/// <param name="message">An optional status message.</param>
-		protected IResult BadRequest(string message = null)
+		protected IResult Status(IStatusCodeResult code, string message = null, bool disablecaching = true)
 		{
-			return Status(HttpStatusCode.BadRequest, message);
+			return new LambdaResult(ctx =>
+			{
+				if (disablecaching)
+					ctx.Response.SetNonCacheable();
+
+				ctx.Response.StatusCode = code.StatusCode;
+				ctx.Response.StatusMessage = message ?? code.StatusMessage;
+			});
 		}
+
+		/// <summary>
+		/// Sends a &quot;400 - Bad request&quot;
+		/// </summary>
+		protected static readonly IStatusCodeResult BadRequest = new StatusCodeResult(HttpStatusCode.BadRequest);
 
 		/// <summary>
 		/// Sends a &quot;404 - Not found&quot; response with an optional specific message
 		/// </summary>
-		/// <param name="message">An optional status message.</param>
-		protected IResult NotFound(string message = null)
-		{
-			return Status(HttpStatusCode.NotFound, message);
-		}
+		protected static readonly IStatusCodeResult NotFound = new StatusCodeResult(HttpStatusCode.NotFound);
+
+		/// <summary>
+		/// Sends a &quot;200 - OK&quot; response with an optional specific message
+		/// </summary>
+		protected static readonly IStatusCodeResult OK = new StatusCodeResult(HttpStatusCode.OK);
+
+		/// <summary>
+		/// Sends a &quot;403 - Forbidden&quot; response with an optional specific message
+		/// </summary>
+		protected static readonly IStatusCodeResult Forbidden = new StatusCodeResult(HttpStatusCode.Forbidden);
+
+		/// <summary>
+		/// Sends a &quot;204 - No Content&quot; response with an optional specific message
+		/// </summary>
+		protected static readonly IStatusCodeResult NoContent = new StatusCodeResult(HttpStatusCode.NoContent);
 
 		/// <summary>
 		/// Sends a &quot;302 - redirect&quot; to the client

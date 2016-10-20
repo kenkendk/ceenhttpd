@@ -12,6 +12,61 @@ namespace Ceen.Mvc
 	}
 
 	/// <summary>
+	/// Interface for representing a simple status response without content
+	/// </summary>
+	public interface IStatusCodeResult : IResult
+	{
+		/// <summary>
+		/// Gets the status code.
+		/// </summary>
+		HttpStatusCode StatusCode { get; }
+
+		/// <summary>
+		/// Gets the status message.
+		/// </summary>
+		string StatusMessage { get; }
+	}
+
+	/// <summary>
+	/// Result wrapper for providing a status code result
+	/// </summary>
+	internal struct StatusCodeResult : IStatusCodeResult
+	{
+		/// <summary>
+		/// Gets the status code.
+		/// </summary>
+		/// <value>The status code.</value>
+		public HttpStatusCode StatusCode { get; private set; }
+
+		/// <summary>
+		/// Gets the status message.
+		/// </summary>
+		public string StatusMessage { get; private set; }
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.StatusCodeResult"/> struct.
+		/// </summary>
+		/// <param name="code">The status code.</param>
+		/// <param name="message">The status message.</param>
+		public StatusCodeResult(HttpStatusCode code, string message = null)
+		{
+			StatusCode = code;
+			StatusMessage = message ?? HttpStatusMessages.DefaultMessage(code);
+		}
+
+		/// <summary>
+		/// Execute the method with the specified context.
+		/// </summary>
+		/// <param name="context">The context to use.</param>
+		public Task Execute(IHttpContext context)
+		{
+			context.Response.StatusCode = StatusCode;
+			context.Response.StatusMessage = StatusMessage;
+			return Task.FromResult(true);
+		}		
+	}
+
+	/// <summary>
 	/// Result wrapper for providing an IResult from a function
 	/// </summary>
 	internal struct LambdaResult : IResult
