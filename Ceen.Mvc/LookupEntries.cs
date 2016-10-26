@@ -82,12 +82,13 @@ namespace Ceen.Mvc
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.Controller.MethodEntry"/> struct.
 		/// </summary>
 		/// <param name="method">The method to wrap.</param>
-		public MethodEntry(MethodInfo method, RouteParser route)
+		/// <param name="variables">The variables to include</param>
+		public MethodEntry(MethodInfo method, IEnumerable<KeyValuePair<string, bool>> variables)
 		{
 			Method = method;
 			ArgumentCount = method.GetParameters().Length;
 
-			var urlargs = route.Variables.ToLookup(x => x.Key, x => x.Value);
+			var urlargs = (variables ?? new KeyValuePair<string, bool>[0]).ToLookup(x => x.Key, x => x.Value);
 
 			var i = 0;
 			Parameters = Method
@@ -122,12 +123,12 @@ namespace Ceen.Mvc
 
 
 					var pe = new ParameterEntry(par, name, source, !optional, i);
-					
+
 					i++;
 
 					return pe;
 				})
-				.ToArray();
+				.ToArray();;
 		}
 
 	}
@@ -135,57 +136,45 @@ namespace Ceen.Mvc
 	internal class RouteEntry
 	{
 		/// <summary>
-		/// The route for this entry
-		/// </summary>
-		public readonly RouteParser Route;
-		/// <summary>
 		/// The controller for this entry
 		/// </summary>
 		public readonly Controller Controller;
-		/// <summary>
-		/// The controller name for this entry
-		/// </summary>
-		public readonly string ControllerName;
 		/// <summary>
 		/// The method for this entry
 		/// </summary>
 		public readonly MethodEntry Action;
 		/// <summary>
-		/// The action for this entry
+		/// The HTTP verbs for this method
 		/// </summary>
-		public readonly string ActionName;
+		public readonly string[] Verbs;
 		/// <summary>
-		/// The HTTP verb for this method
+		/// Gets a value indicating whether this <see cref="T:Ceen.Mvc.RouteEntry2"/> accepts all verbs.
 		/// </summary>
-		public readonly string Verb;
+		/// <value><c>true</c> if accepts all verbs; otherwise, <c>false</c>.</value>
+		public bool AcceptsAllVerbs { get { return Verbs == null || Verbs.Length == 0; } }
+
 		/// <summary>
-		/// The prefix for this method
+		/// Checks if this route accepts the given verb
 		/// </summary>
-		public readonly string Prefix;
-		/// <summary>
-		/// The regular expression.
-		/// </summary>
-		public readonly Regex RegularExpression;
+		/// <returns><c>true</c>, if verb was accepted, <c>false</c> otherwise.</returns>
+		/// <param name="verb">The verb to test.</param>
+		public bool AcceptsVerb(string verb)
+		{
+			return AcceptsAllVerbs || Verbs.Contains(verb, StringComparer.Ordinal);
+		}
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteEntry"/> class.
 		/// </summary>
-		/// <param name="route">The route for this entry.</param>
 		/// <param name="controller">The controller for this entry.</param>
-		/// <param name="controllerName">The controller name.</param>
 		/// <param name="action">The action for this entry.</param>
-		/// <param name="actionName">The action name.</param>
-		/// <param name="verb">The HTTP verb.</param>
-		public RouteEntry(RouteParser route, Controller controller, string controllerName, MethodInfo action, string actionName, string verb, string prefix)
+		/// <param name="verbs">The HTTP verbs.</param>
+		/// <param name="variables">The variables to include</param>
+		public RouteEntry(Controller controller, MethodInfo action, string[] verbs, IEnumerable<KeyValuePair<string, bool>> variables)
 		{
-			Route = route;
 			Controller = controller;
-			ControllerName = controllerName;
-			Action = new MethodEntry(action, route);
-			ActionName = actionName;
-			Verb = verb;
-			Prefix = prefix;
-			RegularExpression = new Regex(route.RegularExpression);
+			Action = new MethodEntry(action, variables);
+			Verbs = verbs;
 		}
 
 	}

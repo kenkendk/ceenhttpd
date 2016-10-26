@@ -43,10 +43,6 @@
     <Compile Include="RouteParser.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Ceenhttpd\Ceenhttpd.csproj">
-      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
-      <Name>Ceen.Httpd</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
       <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
       <Name>Ceen.Common</Name>

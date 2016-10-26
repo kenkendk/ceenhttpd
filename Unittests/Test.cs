@@ -18,6 +18,7 @@ namespace Unittests
 		public const string ENTRY_UPDATE = "POST /api/v1/entry/update";
 		public const string ENTRY_INDEX_ID = "GET /api/v1/entry/id";
 		public const string ENTRY_DETAIL_INDEX = "GET /api/v1/entry/detail";
+		public const string ENTRY_DETAIL_CROSS = "GET /api/v1/entry/cross/id";
 		public const string ENTRY_DETAIL_ID = "GET /api/v1/entry/detail/id";
 		public const string WAIT_INDEX = "GET /api/v1/wait";
 		public const string XYZ_HOME_INDEX = "XYZ /";
@@ -47,10 +48,16 @@ namespace Unittests
 				return Status(HttpStatusCode.OK, ENTRY_INDEX_ID);
 			}
 
-			[Route("{id}")]
+			[Route("detail/{id}")]
 			public IResult Detail(IHttpContext context, int id)
 			{
 				return Status(HttpStatusCode.OK, ENTRY_DETAIL_ID);
+			}
+
+			[Route("{id}/detail")]
+			public IResult Cross(IHttpContext context, int id)
+			{
+				return Status(HttpStatusCode.OK, ENTRY_DETAIL_CROSS);
 			}
 
 			public IResult Detail(IHttpContext context)
@@ -64,9 +71,9 @@ namespace Unittests
 		public class WaitExample : Controller, IApiV1
 		{
 			[HttpGet]
-			public async Task<IResult> Index()
+			public Task<IResult> Index()
 			{
-				return Status(HttpStatusCode.OK, WAIT_INDEX);
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX));
 			}
 		}
 
@@ -80,6 +87,45 @@ namespace Unittests
 		}
 	}
 
+	public class ConflictControllerItems1
+	{
+		public const string WAIT_INDEX = "GET /api/v1/wait";
+
+		[Name("wait")]
+		public class WaitExample : Controller, IApiV1
+		{
+			[HttpGet]
+			public Task<IResult> Index()
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX));
+			}
+
+			[HttpGet]
+			public Task<IResult> Index(int id)
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX));
+			}
+		}
+	}
+
+	public class ConflictControllerItems2
+	{
+		public const string WAIT_INDEX = "GET /api/v1/wait";
+
+		[Name("wait")]
+		public class WaitExample : Controller, IApiV1
+		{
+			public Task<IResult> Index()
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX));
+			}
+
+			public Task<IResult> Index(int id)
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX));
+			}
+		}
+	}
 
 	internal class ServerRunner : IDisposable
 	{
@@ -107,7 +153,7 @@ namespace Unittests
 		{
 			try
 			{
-				var req = System.Net.HttpWebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
+				var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
 				req.Method = verb;
 				using (var res = (System.Net.HttpWebResponse)req.GetResponse())
 					return (HttpStatusCode)res.StatusCode;
@@ -124,7 +170,7 @@ namespace Unittests
 		{
 			try
 			{
-				var req = System.Net.HttpWebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
+				var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{Port}{path}");
 				req.Method = verb;
 				using (var res = (System.Net.HttpWebResponse)req.GetResponse())
 					return res.StatusDescription;
@@ -143,6 +189,46 @@ namespace Unittests
 	public class Test
 	{
 		[Test()]
+		public void TestRoutingWithConflictingVerbs()
+		{
+			Assert.Throws<Exception>(() =>
+			{
+				using (var server = new ServerRunner(
+					new Ceen.Httpd.HttpServer(
+						new Ceen.Httpd.ServerConfig()
+						.AddRoute(
+							typeof(ConflictControllerItems1)
+							.GetNestedTypes()
+							.ToRoute(
+								new ControllerRouterConfig()
+								{ Debug = true }
+							))
+					)))
+				{ }
+			});
+		}
+
+		[Test()]
+		public void TestRoutingWithConflictingDefaultVerbs()
+		{
+			Assert.Throws<Exception>(() =>
+			{
+				using (var server = new ServerRunner(
+					new Ceen.Httpd.HttpServer(
+						new Ceen.Httpd.ServerConfig()
+						.AddRoute(
+							typeof(ConflictControllerItems2)
+							.GetNestedTypes()
+							.ToRoute(
+								new ControllerRouterConfig()
+								{ Debug = true }
+							))
+					)))
+				{ }
+			});
+		}
+
+		[Test()]
 		public void TestRoutingWithDefaultHiddenController()
 		{
 			using (var server = new ServerRunner(
@@ -154,7 +240,7 @@ namespace Unittests
 						.ToRoute(
 							new ControllerRouterConfig(
 								typeof(ControllerItems.HomeController)) 
-								{ HideDefaultController = true }
+								{ HideDefaultController = true, Debug = true }
 						))
 				)))
 			{
@@ -176,6 +262,8 @@ namespace Unittests
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_INDEX, server.GetStatusMessage("/api/v1/entry/detail"));
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_ID, server.GetStatusMessage("/api/v1/entry/detail/7"));
 				Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/detail/y"));
+
+				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_CROSS, server.GetStatusMessage("/api/v1/entry/7/detail"));
 
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1"));
@@ -199,7 +287,7 @@ namespace Unittests
 						.ToRoute(
 							new ControllerRouterConfig(
 								typeof(ControllerItems.HomeController)) 
-								{ HideDefaultController = false }
+								{ HideDefaultController = false, Debug = true }
 						))
 				)))
 			{
@@ -221,6 +309,8 @@ namespace Unittests
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_INDEX, server.GetStatusMessage("/api/v1/entry/detail"));
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_ID, server.GetStatusMessage("/api/v1/entry/detail/7"));
 				Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/detail/y"));
+
+				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_CROSS, server.GetStatusMessage("/api/v1/entry/7/detail"));
 
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1"));
@@ -261,6 +351,8 @@ namespace Unittests
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_INDEX, server.GetStatusMessage("/api/v1/entry/detail"));
 				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_ID, server.GetStatusMessage("/api/v1/entry/detail/7"));
 				Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/detail/y"));
+
+				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_CROSS, server.GetStatusMessage("/api/v1/entry/7/detail"));
 
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1"));

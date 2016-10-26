@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Ceen.Mvc
 {
 	/// <summary>
-	/// Class for handling parsing of route specifications
+	/// Class for parsing route descriptions
 	/// </summary>
-	public class RouteParser
+	internal class RouteParser
 	{
 		/// <summary>
 		/// Common interface for fragments
@@ -17,266 +17,428 @@ namespace Ceen.Mvc
 		private interface IFragment
 		{
 			/// <summary>
-			/// Gets the literal value
+			/// Checks if the fragment matches
 			/// </summary>
-			string Value { get; }
+			/// <param name="fragment">The fragment to check.</param>
+			/// <returns>The number of characters matched, negative numbers indicate no match</returns>
+			int Matches(string fragment);
 
 			/// <summary>
-			/// Gets the fragment as a regular expression.
+			/// Gets the children of this entry.
 			/// </summary>
-			string RegularExpression { get; }
+			IFragment[] Children { get; }
+
+			/// <summary>
+			/// Returns a copy of the instance with the children entry set to the designated child
+			/// </summary>
+			/// <returns>The copy of this entry.</returns>
+			/// <param name="children">The children to attach.</param>
+			IFragment AttachChildren(IFragment[] children);
+
+
 		}
 
 		/// <summary>
-		/// Class representing a literal fragment of a route
+		/// Represents a literal token
 		/// </summary>
-		private class Literal : IFragment
+		private struct Literal : IFragment
 		{
 			/// <summary>
-			/// Gets the literal value
+			/// The literal value for this fragment
 			/// </summary>
-			/// <value>The value.</value>
-			public string Value { get; private set; }
+			private readonly string m_value;
+			/// <summary>
+			/// The string comparer used for this instance
+			/// </summary>
+			private readonly StringComparison m_stringComparer;
+			/// <summary>
+			/// The list of child entries
+			/// </summary>
+			private readonly IFragment[] m_children;
 
 			/// <summary>
-			/// Gets a value indicating if this fragment delimits paths
+			/// Gets a value indicating whether this <see cref="T:Ceen.Mvc.RouteParser2.Literal"/> is case sensitive.
 			/// </summary>
-			/// <value><c>true</c> if is path delimiter; otherwise, <c>false</c>.</value>
-			public bool IsPathDelimiter { get; private set; }
+			public bool IsCaseSensitive { get { return m_stringComparer == StringComparison.OrdinalIgnoreCase; } }
+			/// <summary>
+			/// Gets the literal value.
+			/// </summary>
+			public string Value { get { return m_value; } }
+			/// <summary>
+			/// Gets the children.
+			/// </summary>
+			public IFragment[] Children { get { return m_children;} }
 
 			/// <summary>
-			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser.Literal"/> class.
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.Literal"/> struct.
 			/// </summary>
-			/// <param name="value">The literal value.</param>
-			public Literal(string value)
+			/// <param name="value">The literal value to use.</param>
+			/// <param name="caseinsensitive">If set to <c>true</c>, matches will be case insensitive.</param>
+			/// <param name="children">The children associated with this entry.</param>
+			public Literal(string value, bool caseinsensitive, IFragment[] children)
 			{
-				Value = value;
+				m_value = value;
+				m_stringComparer = caseinsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+				m_children = children;
 			}
 
 			/// <summary>
-			/// Gets the fragment as a regular expression.
+			/// Matches the fragment with the literal value.
 			/// </summary>
-			public string RegularExpression
+			/// <param name="fragment">The fragment to match.</param>
+			/// <returns>The number of charaters matched, negative numbers indicate no match</returns>
+			public int Matches(string fragment)
 			{
-				get
-				{
-					return Regex.Escape(Value);
-				}
-			}
-		}
-
-		/// <summary>
-		/// Class representing a variable entry
-		/// </summary>
-		private class Variable : IFragment
-		{
-			/// <summary>
-			/// Gets the full string from the route
-			/// </summary>
-			public string Value { get; private set; }
-
-			/// <summary>
-			/// Gets the name of the variable
-			/// </summary>
-			public string Name { get; private set; }
-
-			/// <summary>
-			/// Gets a value indicating if the argument is optional
-			/// </summary>
-			public bool Optional { get; private set; }
-
-			/// <summary>
-			/// Gets a value indicating if this item is slurping the rest of the line
-			/// </summary>
-			public bool Slurp { get; private set; }
-
-			/// <summary>
-			/// Gets the constraint of this variable
-			/// </summary>
-			public string Constraint { get; private set; }
-
-			/// <summary>
-			/// Gets the default value for this variable
-			/// </summary>
-			/// <value>The default value.</value>
-			public string DefaultValue { get; private set; }
-
-			/// <summary>
-			/// Gets or sets the delimiter.
-			/// </summary>
-			/// <value>The delimiter.</value>
-			public string Delimiter { get; set; } = "/";
-
-			/// <summary>
-			/// The regular expression for matching a variable's components
-			/// </summary>
-			private static readonly Regex VARIABLE_MATCH = new Regex(@"(?<slurp>\*)?(?<name>\w+)(?<optional>\?)?(:(?<constraint>[^\=\?]+))?(?<optional>\?)?(\=(?<default>.*))?");
-
-			/// <summary>
-			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser.Variable"/> class.
-			/// </summary>
-			/// <param name="value">The value to parse.</param>
-			public Variable(string value)
-			{
-				Value = string.Format("{{{0}}}", value);
-
-				var m = VARIABLE_MATCH.Match(value);
-				if (!m.Success)
-					throw new ArgumentException($"The supplied string is not a valid variable specification: {{{value}}}", nameof(value));
-
-				Slurp = m.Groups["slurp"].Success;
-				Name = m.Groups["name"].Value;
-				Optional = m.Groups["optional"].Success;
-				Constraint = m.Groups["constraint"].Value;
-				DefaultValue = m.Groups["default"].Value;
+				return fragment.StartsWith(m_value, m_stringComparer) ? m_value.Length : -1;
 			}
 
 			/// <summary>
-			/// Gets the fragment as a regular expression.
+			/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Literal"/>.
 			/// </summary>
-			public string RegularExpression
+			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Literal"/>.</returns>
+			public override string ToString()
 			{
-				get
-				{
-					return string.Format("({3}(?<{0}>{2})){1}", Regex.Escape(Name), Optional || DefaultValue != null ? "?" : "", Slurp ? ".*" : "[^" + Regex.Escape(Delimiter) + "]+", Regex.Escape(Delimiter));
-				}
+				var v = m_value;
+
+				if (this.Children != null)
+					v = string.Join("|", this.Children.Select(x => v + x.ToString()));
+
+				return v;
+			}
+
+			/// <summary>
+			/// Creates a clone of this entry, but assigned to new children
+			/// </summary>
+			/// <returns>The cloned copy.</returns>
+			/// <param name="children">The new children.</param>
+			public IFragment AttachChildren(IFragment[] children)
+			{
+				return new Literal(m_value, m_stringComparer == StringComparison.OrdinalIgnoreCase, children);
 			}
 		}
 
 		/// <summary>
-		/// Gets all variables and a boolean indicating if they are optional
+		/// A bound variable
 		/// </summary>
-		public IEnumerable<KeyValuePair<string, bool>> Variables
+		private struct BoundVariable : IFragment
 		{
-			get
+			/// <summary>
+			/// The name of the variable
+			/// </summary>
+			private readonly string m_name;
+			/// <summary>
+			/// The bound value for the variable
+			/// </summary>
+			private readonly string m_value;
+			/// <summary>
+			/// The string comparer used for this instance
+			/// </summary>
+			private readonly StringComparison m_stringComparer;
+			/// <summary>
+			/// The children.
+			/// </summary>
+			private readonly IFragment[] m_children;
+
+			/// <summary>
+			/// Gets a value indicating whether this <see cref="T:Ceen.Mvc.RouteParser2.BoundVariable"/> is case sensitive.
+			/// </summary>
+			public bool IsCaseSensitive { get { return m_stringComparer == StringComparison.OrdinalIgnoreCase; } }
+			/// <summary>
+			/// Gets the bound value.
+			/// </summary>
+			public string Value { get { return m_value; } }
+			/// <summary>
+			/// Gets the bound name
+			/// </summary>
+			public string Name { get { return m_name; } }
+			/// <summary>
+			/// Gets the children.
+			/// </summary>
+			public IFragment[] Children { get { return m_children; } }
+
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.BoundVariable"/> struct.
+			/// </summary>
+			/// <param name="name">The name of the variable.</param>
+			/// <param name="value">The bound value.</param>
+			/// <param name="caseinsensitive">If set to <c>true</c>, comapres are performed case insensitive.</param>
+			/// <param name="children">The children to assign.</param>
+			public BoundVariable(string name, string value, bool caseinsensitive, IFragment[] children)
 			{
-				foreach(var x in m_fragments)
-				{
-					if (x is Variable)
-						yield return new KeyValuePair<string, bool>((x as Variable).Name, (x as Variable).Optional);
-					else if (!(x is Variable || x is Literal || x is NamedCapture))
-						throw new Exception($"Unable to bind route with elments that are not {typeof(Variable).Name}, {typeof(Literal).Name}, or {typeof(NamedCapture).Name}");
-				}
+				m_name = name;
+				m_value = value;
+				m_stringComparer = caseinsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+				m_children = children;
+			}
+
+			/// <summary>
+			/// Checks if the fragment matches
+			/// </summary>
+			/// <param name="fragment">The fragment to check.</param>
+			/// <returns>The number of characters matched, negative numbers indicate no match</returns>
+			public int Matches(string fragment)
+			{
+				return string.Equals(m_value, fragment, m_stringComparer) ? m_value.Length : -1;
+			}
+
+			/// <summary>
+			/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.BoundVariable"/>.
+			/// </summary>
+			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.BoundVariable"/>.</returns>
+			public override string ToString()
+			{
+				var v = $"[{m_name}={m_value}]";
+
+				if (this.Children != null)
+					v = string.Join("|", this.Children.Select(x => v + x.ToString()));
+
+				return v;
+			}
+
+			/// <summary>
+			/// Returns a copy of the instance with the children entry set to the designated child
+			/// </summary>
+			/// <returns>The copy of this entry.</returns>
+			/// <param name="children">The children to attach.</param>
+			public IFragment AttachChildren(IFragment[] children)
+			{
+				return new BoundVariable(m_name, m_value, m_stringComparer == StringComparison.OrdinalIgnoreCase, children);
 			}
 		}
 
 		/// <summary>
-		/// Represents a choice between multiple paths
+		/// Represents a variable
 		/// </summary>
-		private class Choice : IFragment
+		private struct Variable : IFragment
 		{
 			/// <summary>
-			/// Gets the full string from the route
+			/// The variable name
 			/// </summary>
-			public string Value
-			{
-				get { return string.Join("|", Items.Select(x => string.Join("", x.Select(y => y.Value)))); }
-			}
+			private readonly string m_name;
+			/// <summary>
+			/// The variable default value, if any
+			/// </summary>
+			private readonly string m_defaultvalue;
+			/// <summary>
+			/// A flag indicating if the variable is optional
+			/// </summary>
+			private readonly bool m_optional;
+			/// <summary>
+			/// A flag indicating if this variable slurps up the rest of the url
+			/// </summary>
+			private readonly bool m_slurp;
+			/// <summary>
+			/// Additional constraints for matching
+			/// </summary>
+			private readonly string m_constraint;
+			/// <summary>
+			/// A string delimiting the variable
+			/// </summary>
+			private readonly string m_delimiter;
+			/// <summary>
+			/// The assigned children.
+			/// </summary>
+			private readonly IFragment[] m_children;
 
 			/// <summary>
-			/// One value
+			/// Gets the children.
 			/// </summary>
-			public IFragment[][] Items { get; private set; }
+			public IFragment[] Children { get { return m_children; } }
 
 			/// <summary>
-			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser.Choice"/> class.
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.Variable"/> struct.
 			/// </summary>
-			/// <param name="first">One value.</param>
-			/// <param name="second">Another value.</param>
-			public Choice(IFragment[] first, IFragment[] second)
+			/// <param name="name">Name.</param>
+			/// <param name="defaultvalue">Defaultvalue.</param>
+			/// <param name="optional">If set to <c>true</c> optional.</param>
+			/// <param name="contraint">Contraint.</param>
+			/// <param name="slurp">If set to <c>true</c> slurp.</param>
+			/// <param name="children">Children.</param>
+			public Variable(string name, string defaultvalue, bool optional, string contraint, bool slurp, IFragment[] children)
 			{
-				Items = new[] { first, second };
-			}
-
-			/// <summary>
-			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser.Choice"/> class.
-			/// </summary>
-			/// <param name="first">One value.</param>
-			/// <param name="second">Another value.</param>
-			public Choice(IEnumerable<IFragment[]> items)
-			{
-				Items = items.ToArray();
-			}
-
-			/// <summary>
-			/// Gets the fragment as a regular expression.
-			/// </summary>
-			public string RegularExpression
-			{
-				get
+				m_name = name;
+				m_defaultvalue = defaultvalue;
+				m_optional = optional;
+				m_constraint = contraint;
+				m_slurp = slurp;
+				m_children = children;
+				if (children == null || m_children.Length == 0)
+					m_delimiter = "/";
+				else
 				{
-					return
-						string.Join("|",
-									Items.Select(x => "(" + string.Join("", x.Select(y => y.RegularExpression)) + ")")
-  						);
+					var firstliteral = m_children.Where(x => x is Literal).Select(x => ((Literal)x).Value).FirstOrDefault();
+					if (string.IsNullOrWhiteSpace(firstliteral))
+						m_delimiter = "/";
+					else
+						m_delimiter = firstliteral.Substring(0);
 				}
+			}
+
+			/// <summary>
+			/// Checks if the fragment matches
+			/// </summary>
+			/// <param name="fragment">The fragment to check.</param>
+			/// <returns>The number of characters matched, negative numbers indicate no match</returns>
+			public int Matches(string fragment)
+			{
+				if (string.IsNullOrWhiteSpace(fragment))
+					return m_optional ? 0 : -1;
+
+				if (m_slurp)
+					return fragment.Length;
+
+				var ix = fragment.IndexOf(m_delimiter, StringComparison.Ordinal);
+				return ix < 0 ? fragment.Length : ix;
+			}
+
+			/// <summary>
+			/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Variable"/>.
+			/// </summary>
+			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Variable"/>.</returns>
+			public override string ToString()
+			{
+				var ext = string.IsNullOrWhiteSpace(m_defaultvalue) ? "" : "=" + m_defaultvalue;
+				var cst = string.IsNullOrWhiteSpace(m_constraint) ? "" : ":" + m_constraint;
+				var str = "{" + string.Format(string.Format("{0}{1}{2}{3}", m_slurp ? "*" : "", m_name, cst, ext)) + "}";
+
+				if (this.Children != null)
+					str = string.Join("|", this.Children.Select(x => str + x.ToString()));
+
+				return str;
+			}
+
+			/// <summary>
+			/// Gets the name of the variable.
+			/// </summary>
+			public string Name { get { return m_name; } }
+			/// <summary>
+			/// Gets a value indicating if the variable is optional
+			/// </summary>
+			public bool Optional { get { return m_optional; } }
+			/// <summary>
+			/// Gets the default value
+			/// </summary>
+			public string DefaultValue { get { return m_defaultvalue; } }
+
+			/// <summary>
+			/// Returns a copy of the instance with the children entry set to the designated child
+			/// </summary>
+			/// <returns>The copy of this entry.</returns>
+			/// <param name="children">The children to attach.</param>
+			public IFragment AttachChildren(IFragment[] children)
+			{
+				return new Variable(m_name, m_defaultvalue, m_optional, m_constraint, m_slurp, children);
 			}
 		}
 
 		/// <summary>
-		/// Represents a named capture group
+		/// Represents a terminator
 		/// </summary>
-		private class NamedCapture : IFragment
+		private struct Result : IFragment
 		{
 			/// <summary>
-			/// The name of the group to capture
+			/// The target route this entry points to
 			/// </summary>
-			public string GroupName { get; set; }
-			/// <summary>
-			/// The match sequence to capture
-			/// </summary>
-			/// <value>The match.</value>
-			public string Match { get; set; }
-			/// <summary>
-			/// The delimiter value
-			/// </summary>
-			/// <value>The delimiter.</value>
-			public string Delimiter { get; set; }
+			public readonly RouteEntry Route;
 
 			/// <summary>
-			/// Gets or sets a value indicating whether this <see cref="T:Ceen.Mvc.RouteParser.NamedCapture"/> is escaped.
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.Result"/> struct.
 			/// </summary>
-			public bool Escaped { get; set; }
-
-			/// <summary>
-			/// Gets or sets a flag indicating if the literal is optional
-			/// </summary>
-			/// <value><c>true</c> if optional; otherwise, <c>false</c>.</value>
-			public bool Optional { get; set; }
-
-			/// <summary>
-			/// Gets the value that would represent this capture group
-			/// </summary>
-			/// <value>The value.</value>
-			public string Value { get { return $"{{{GroupName}={Match}}}"; } }
-
-			/// <summary>
-			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser.NamedCapture"/> class.
-			/// </summary>
-			/// <param name="groupname">The groupname to use.</param>
-			/// <param name="match">The match expression.</param>
-			/// <param name="delimiter">The delimiter expression.</param>
-			/// <param name="escaped">A flag indicating if the literal value is already escaped</param>
-			/// <param name="optional">A flag indicating if the literal is optional</param>
-			public NamedCapture(string groupname, string match, string delimiter, bool escaped = false, bool optional = false)
+			/// <param name="entry">The entry to represent.</param>
+			public Result(RouteEntry entry)
 			{
-				GroupName = groupname;
-				Match = match;
-				Delimiter = string.IsNullOrWhiteSpace(Match) ? string.Empty : delimiter;
-				Escaped = escaped;
-				Optional = optional;
+				Route = entry;
 			}
 
 			/// <summary>
-			/// Gets the fragment as a regular expression.
+			/// Checks if the fragment matches
 			/// </summary>
-			public string RegularExpression
+			/// <param name="fragment">The fragment to check.</param>
+			/// <returns>The number of characters matched, negative numbers indicate no match</returns>
+			public int Matches(string fragment)
 			{
-				get
-				{
-					
-					return string.Format($"({Regex.Escape(Delimiter)}(?<{GroupName}>{(Escaped ? Match : Regex.Escape(Match))})){(Optional ? "?" : "")}");
-				}
+				return 0;
+			}
+			
+			/// <summary>
+			/// Returns a copy of the instance with the children entry set to the designated child
+			/// </summary>
+			/// <returns>The copy of this entry.</returns>
+			/// <param name="children">The children to attach.</param>
+			public IFragment AttachChildren(IFragment[] children)
+			{
+				throw new Exception("Cannot attach children to a result node");
+			}
+
+			/// <summary>
+			/// Gets the children.
+			/// </summary>
+			public IFragment[] Children { get { return null; } }
+
+			/// <summary>
+			/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Result"/>.
+			/// </summary>
+			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Result"/>.</returns>
+			public override string ToString()
+			{
+				return string.Format(" => {0}, {1}", Route.Controller.GetType().FullName, Route.Action.Method);
+
+			}
+		}
+
+		/// <summary>
+		/// Represents a choice between different fragments
+		/// </summary>
+		private struct Choice : IFragment
+		{
+			/// <summary>
+			/// Teh children representing the choices
+			/// </summary>
+			private readonly IFragment[] m_children;
+
+			/// <summary>
+			/// Gets the children.
+			/// </summary>
+			public IFragment[] Children { get { return m_children; } }
+
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.Choice"/> struct.
+			/// </summary>
+			/// <param name="choices">The choices to use.</param>
+			public Choice(IFragment[] choices)
+			{
+				if (choices == null || choices.Length == 0)
+					throw new ArgumentNullException(nameof(choices));
+				m_children = choices;
+			}
+
+			/// <summary>
+			/// Checks if the fragment matches
+			/// </summary>
+			/// <param name="fragment">The fragment to check.</param>
+			/// <returns>The number of characters matched, negative numbers indicate no match</returns>
+			public int Matches(string fragment)
+			{
+				return 0;
+			}
+
+			/// <summary>
+			/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Choice"/>.
+			/// </summary>
+			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Choice"/>.</returns>
+			public override string ToString()
+			{
+				return string.Join("|", m_children.Select(x => x.ToString()));
+			}
+
+			/// <summary>
+			/// Returns a copy of the instance with the children entry set to the designated child
+			/// </summary>
+			/// <returns>The copy of this entry.</returns>
+			/// <param name="children">The children to attach.</param>
+			public IFragment AttachChildren(IFragment[] children)
+			{
+				throw new InvalidOperationException($"Cannot set child on a choice");
 			}
 		}
 
@@ -286,34 +448,22 @@ namespace Ceen.Mvc
 		private static readonly Regex CURLY_MATCH = new Regex(@"((?<!\{)\{(?!{))(?<name>[^\}]+)\}(?!\})");
 
 		/// <summary>
+		/// The regular expression for matching a variable's components
+		/// </summary>
+		private static readonly Regex VARIABLE_MATCH = new Regex(@"(?<slurp>\*)?(?<name>\w+)(?<optional>\?)?(:(?<constraint>[^\=\?]+))?(?<optional>\?)?(\=(?<default>.*))?");
+
+		/// <summary>
 		/// The list of fragments in this route
 		/// </summary>
-		private readonly List<IFragment> m_fragments;
-
-		/// <summary>
-		/// Gets the value this instance is built from
-		/// </summary>
-		/// <value>The value.</value>
-		public string Value { get; private set; }
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser"/> class.
-		/// </summary>
-		/// <param name="fragments">The fragments to base this instance on.</param>
-		private RouteParser(List<IFragment> fragments)
-		{
-			m_fragments = fragments;
-			Value = string.Join("", m_fragments.Select(x => x.Value));
-		}
+		private readonly IFragment m_root;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser"/> class.
 		/// </summary>
 		/// <param name="route">The route specification to parse.</param>
-		public RouteParser(string route)
+		public RouteParser(string route, bool caseinsensitive, RouteEntry target)
 		{
-			m_fragments = new List<IFragment>();
-			Value = route = route ?? string.Empty;
+			var fragments = new List<IFragment>();
 
 			var ix = 0;
 			var slurp = false;
@@ -323,155 +473,567 @@ namespace Ceen.Mvc
 					throw new Exception($"Cannot have trailing data after slurp: {m.Value}");
 
 				if (ix != m.Index)
-					m_fragments.Add(new Literal(route.Substring(ix, m.Index - ix)));
+					fragments.Add(new Literal(route.Substring(ix, m.Index - ix), caseinsensitive, null));
 
-				var v = new Variable(m.Groups["name"].Value);
+				var mv = VARIABLE_MATCH.Match(m.Groups["name"].Value);
+				if (!mv.Success)
+					throw new ArgumentException($"Failed to parse {m.Groups["name"].Value} as a valid variable expression");
 
-				if (m_fragments.Count > 0 && m_fragments.Last() is Literal)
-				{
-					var prev = (Literal)m_fragments.Last();
-					v.Delimiter = prev.Value.Substring(prev.Value.Length - 1);
-					if (prev.Value.Length == 1)
-						m_fragments.RemoveAt(m_fragments.Count - 1);
-					else
-						m_fragments[m_fragments.Count - 1] = new Literal(prev.Value.Substring(0, prev.Value.Length - 1));
+				var v = new Variable(mv.Groups["name"].Value, mv.Groups["default"].Value, mv.Groups["optional"].Success, mv.Groups["constraint"].Value, mv.Groups["slurp"].Success, null);
 
-				}
-				else if (m_fragments.Count > 0)
-					throw new Exception(string.Format("Must have literal spacer between {0} and {1}", m_fragments[m_fragments.Count - 2].Value, v.Value));
+				if (fragments.Count > 0 && !(fragments.Last() is Literal))
+					throw new Exception(string.Format("Must have literal spacer between {0} and {1}", fragments[fragments.Count - 2], v));
 
-				m_fragments.Add(v);
+				fragments.Add(v);
 
 				ix = m.Index + m.Length;
 			}
 
 			if (ix != route.Length)
-				m_fragments.Add(new Literal(route.Substring(ix, route.Length - ix)));
+				fragments.Add(new Literal(route.Substring(ix, route.Length - ix), caseinsensitive, null));
+
+			fragments.Add(new Result(target));
+
+			m_root = LinkList(fragments);
 		}
 
 		/// <summary>
-		/// Gets the route as a regular expression.
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2"/> class.
 		/// </summary>
-		public string RegularExpression
+		/// <param name="root">The root fragment instance.</param>
+		private RouteParser(IFragment root)
 		{
-			get
+			m_root = root;
+		}
+
+		/// <summary>
+		/// Merges a list of entries into a new tree
+		/// </summary>
+		/// <param name="entries">The entries to merge.</param>
+		private static IFragment Merge(List<IFragment> entries)
+		{
+			if (entries.Count == 0)
+				throw new Exception("Cannot work with empty list");
+			if (entries.Count == 1)
+				return entries.First();
+
+			if (entries.All(x => x is Literal))
 			{
-				return string.Join("", m_fragments.Select(x => x.RegularExpression));
+				var roots = entries.OrderBy(x => ((Literal)x).Value).Cast<Literal>().ToList();
+				var shortest = roots.First();
+
+				// Get the longest shared prefix
+				var sb = new StringBuilder();
+				for (var n = 0; n < shortest.Value.Length; n++)
+				{
+					var cmp = shortest.Value[n];
+					if (roots.All(x => x.Value[n] == cmp))
+						sb.Append(cmp);
+					else
+						break;
+				}
+
+				if (sb.Length > 0)
+				{
+					var childchoices =
+						roots
+							.Where(x => x.Value.Length > sb.Length)
+							.Select(x => new Literal(x.Value.Substring(sb.Length), shortest.IsCaseSensitive, x.Children))
+							.GroupBy(
+								x => x.Value.Length == 0 ? string.Empty : x.Value.Substring(0, 1),
+								x => x
+							)
+							.Select(x => Merge(x.Cast<IFragment>().ToList()))
+							.Union(
+								   roots
+								.Where(x => x.Value.Length == sb.Length)
+								   .SelectMany(x => x.Children)
+								   .GroupBy(x => x.GetType(), (key, list) => Merge(list.ToList())).ToArray()
+							)
+							.ToArray();
+
+					return new Literal(sb.ToString(), shortest.IsCaseSensitive, childchoices);
+				}
 			}
-		}
-
-		/// <summary>
-		/// Appends a route to another route
-		/// </summary>
-		/// <param name="first">First.</param>
-		/// <param name="second">Second.</param>
-		public static RouteParser Append(RouteParser first, RouteParser second)
-		{
-			if (second.m_fragments.Count == 0)
-				return new RouteParser(new List<IFragment>(first.m_fragments));
-			if (first.m_fragments.Count == 0)
-				return new RouteParser(new List<IFragment>(second.m_fragments));
-
-			var second_lead = second.m_fragments.First() as Literal;
-			if (second_lead != null && second_lead.Value.StartsWith("/"))
-				return new RouteParser(new List<IFragment>(second.m_fragments));
-
-			var slurper = first.m_fragments.Where(x => x is Variable && (x as Variable).Slurp).FirstOrDefault();
-			if (slurper != null && second.m_fragments.Any(x => !(x is Literal)))
-				throw new Exception($"Cannot append \"{second.Value}\" to \"{first.Value}\" due to the slurping variable \"{slurper.Value}\"");
-
-			var traillit = first.m_fragments.Last() as Literal;
-			var leadlit = second.m_fragments.First() as Literal;
-
-			var trailpath = traillit != null && traillit.Value.EndsWith("/");
-			var leadpath = leadlit != null && leadlit.Value.StartsWith("/");
-
-			var list = new List<IFragment>();
-			if (trailpath && leadpath)
+			else if (entries.All(x => x is Variable))
 			{
-				list.AddRange(first.m_fragments);
-				//list.Add(new Literal(leadlit.Value.Substring(1)));
-				list.AddRange(second.m_fragments.Skip(1));
+				// TODO: This does not work, if some variables are optional, and others not....
+				var first = (Variable)entries.First();
+				if (entries.All(x => ((Variable)x).Name == first.Name))
+				{
+					return first.AttachChildren(
+						entries
+						.SelectMany(x => x.Children)
+						.GroupBy(x => x.GetType(), (key, list) => Merge(list.ToList()))
+						.ToArray());
+				}
+				else
+				{
+					return new Choice(entries.GroupBy(x => ((Variable)x).Name, (key, list) => Merge(list.ToList())).ToArray());
+				}
+			}
+			else if (entries.All(x => x is Result))
+			{
+				var lst = entries.Cast<Result>().ToList();
+				var allverbs = lst.Where(x => x.Route.AcceptsAllVerbs).ToList();
+				if (allverbs.Count > 1)	
+					throw new Exception(string.Format("Unable to disambiguate the routes for: {0}{1}", Environment.NewLine, string.Join(Environment.NewLine, allverbs.Select(x => x.Route.Action.Method))));
+
+				var specificverbs = lst.Where(x => !x.Route.AcceptsAllVerbs);
+				var verblist = specificverbs.SelectMany(x => x.Route.Verbs.Distinct().Select(y => new { Verb = y, Route = x.Route }));
+				var duplicates = verblist.GroupBy(x => x.Verb).Where(x => x.Count() > 1).Select(x => x.ToList()).FirstOrDefault();
+				if (duplicates != null)
+					throw new Exception(string.Format("Unable to disambiguate the routes for HTTP verb {2}: {0}{1}", Environment.NewLine, string.Join(Environment.NewLine, duplicates.Select(x => x.Route.Action.Method)), duplicates.First().Verb));
+
+				// "false" is first, so items without wildcard http are seen first
+				return new Choice(lst.OrderBy(x => x.Route.AcceptsAllVerbs).Cast<IFragment>().ToArray());
 			}
 			else
 			{
-				list.AddRange(first.m_fragments);
-				//if (!(trailpath || leadpath))
-				//	list.Add(new Literal("/"));
-				list.AddRange(second.m_fragments);
+				var f = entries.First();
+				if (entries.All(x => x.GetType() == f.GetType()))
+					return new Choice(entries.ToArray());
 			}
 
-			return new RouteParser(list);
+			return new Choice(entries.GroupBy(x => x.GetType(), (key, list) => Merge(list.ToList())).ToArray());
 		}
 
 		/// <summary>
-		/// Appends a route to another route
+		/// Merges a list of routes
 		/// </summary>
-		/// <param name="first">First.</param>
-		/// <param name="second">Second.</param>
-		public static RouteParser PrependRegex(RouteParser first, string name, string match, string delimiter)
+		/// <param name="entries">The routes to merge.</param>
+		public static RouteParser Merge(IEnumerable<RouteParser> entries)
 		{
-			var list = new List<IFragment>(first.m_fragments);
-			list.Insert(0, new NamedCapture(name, match, delimiter, true, false));
-			return new RouteParser(list);
+			if (entries.Count() == 0)
+				throw new Exception("Cannot work with empty list");
+			if (entries.Count() == 1)
+				return entries.First();
+			
+			var roots = entries.Select(x => x.m_root).ToList();
+			if (roots.Any(x => !(x is Literal)))
+				throw new Exception("Invalid initial values");
+
+			if (roots.Any(x => !((Literal)x).Value.StartsWith("/", StringComparison.Ordinal)))
+				throw new Exception("Invalid initial values");
+
+			return new RouteParser(Merge(roots));
 		}
 
 		/// <summary>
-		/// Combines two routes into one new route
+		/// A state keeper to track the current position in the matching sequence
 		/// </summary>
-		/// <param name="first">First.</param>
-		/// <param name="second">Second.</param>
-		public static RouteParser Join(RouteParser first, RouteParser second)
+		private struct LookupStackEntry
 		{
-			if (first.Value == second.Value)
-				return new RouteParser(new List<IFragment>(first.m_fragments));
+			/// <summary>
+			/// The fragment this entry represents
+			/// </summary>
+			public readonly IFragment Fragment;
+			/// <summary>
+			/// The string offset matched so far
+			/// </summary>
+			public readonly int Offset;
+			/// <summary>
+			/// The list of variables picked up so far
+			/// </summary>
+			public readonly Dictionary<string, string> Variables;
+			/// <summary>
+			/// The number of pre-matched characters
+			/// </summary>
+			public readonly int MatchedCharacters;
 
-			var list = new List<IFragment>();
-			var max = Math.Min(first.m_fragments.Count, second.m_fragments.Count);
-
-			var i = 0;
-			for (; i < max - 1; i++)
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Mvc.RouteParser2.LookupStackEntry"/> struct.
+			/// </summary>
+			/// <param name="fragment">The fragment to use.</param>
+			/// <param name="offset">The string offset.</param>
+			/// <param name="variables">The variable dictionary.</param>
+			public LookupStackEntry(IFragment fragment, int offset, Dictionary<string, string> variables, int prematched)
 			{
-				if (first.m_fragments[i].Value == second.m_fragments[i].Value)
-					list.Add(first.m_fragments[i]);
-				else
+				Fragment = fragment;
+				Offset = offset;
+				Variables = variables;
+				MatchedCharacters = prematched;
+
+			}
+		}
+
+		/// <summary>
+		/// Attempts to match a request to routes
+		/// </summary>
+		/// <returns>The matched potential routes.</returns>
+		/// <param name="request">Teh request to match.</param>
+		internal IEnumerable<KeyValuePair<RouteEntry, Dictionary<string, string>>> MatchRequest(string request)
+		{
+			if (!string.IsNullOrWhiteSpace(request))
+			{
+				var work = new Stack<LookupStackEntry>();
+				var reuse = true;
+				var prev = new LookupStackEntry(m_root, 0, new Dictionary<string, string>(), -1);
+
+				while (work.Count > 0 || reuse)
+				{
+					// If we re-use, don't bother with the stack
+					var e = reuse ? prev : work.Pop();
+					reuse = false;
+
+					// If we have pre-matched, don't match again
+					var m = e.MatchedCharacters < 0 ? e.Fragment.Matches(request.Substring(e.Offset)) : e.MatchedCharacters;
+					if (m >= 0)
+					{
+						if (e.Fragment is Result)
+						{
+							// Otherwise we have unmatched trailing chars
+							if (e.Offset + m == request.Length)
+								yield return new KeyValuePair<RouteEntry, Dictionary<string, string>>(((Result)e.Fragment).Route, e.Variables);
+						}
+						else if (e.Fragment.Children != null)
+						{
+							// If this entry introduced variables, update the dictionary
+							var dict = e.Variables;
+							if (e.Fragment is Variable)
+							{
+								dict = new Dictionary<string, string>(dict);
+								dict[((Variable)e.Fragment).Name] = request.Substring(e.Offset, m);
+							}
+							else if (e.Fragment is BoundVariable)
+							{
+								dict = new Dictionary<string, string>(dict);
+								dict[((BoundVariable)e.Fragment).Name] = request.Substring(e.Offset, m);
+							}
+
+							// Add to work stack, re-using if possible
+							var offset = e.Offset + m;
+							var frag = request.Substring(offset);
+							foreach(var c in e.Fragment.Children)
+							{
+								var m2 = c.Matches(frag);
+								if (m2 < 0)
+									continue;
+
+								if (!reuse)
+								{
+									prev = new LookupStackEntry(c, offset, dict, m2);
+									reuse = true;
+								}
+								else
+								{
+									work.Push(new LookupStackEntry(c, offset, dict, m2));
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// Clones the list, by assigning each element with children from the previous entry
+		/// </summary>
+		/// <returns>The cloned list.</returns>
+		/// <param name="cur">The root entry.</param>
+		/// <param name="conv">An optional conversion/filter function.</param>
+		private static IFragment CloneList(IFragment cur, Func<IFragment, IFragment> conv = null)
+		{
+			var lst = new List<IFragment>();
+			conv = conv ?? (x => x);
+
+			while (cur != null)
+			{
+				var cv = conv(cur);
+				if (cv == null)
 					break;
+				
+				lst.Add(cv);
+				
+				if (cur.Children == null)
+					cur = null;
+				else if (cur.Children.Length != 1)
+					throw new Exception("Cannot modify choice entry");
+				else
+					cur = cur.Children.First();
 			}
 
-			list.Add(new Choice(
-				first.m_fragments.Skip(i).ToArray(),
-				second.m_fragments.Skip(i).ToArray()
-			));
-
-			return new RouteParser(list);
+			return LinkList(lst);
 		}
 
 		/// <summary>
-		/// Returns a new RouteParser where some variable is bound to a literal value
+		/// Builds a sequential list from a root fragment
 		/// </summary>
-		/// <param name="varname">The variable to find.</param>
-		/// <param name="value">The literal value to use.</param>
-		/// <param name="escaped">A flag indicating if the literal value is already escaped</param>
-		/// <param name="optional">A flag indicating if the literal is optional</param>
-		public RouteParser Bind(string varname, string value, bool escaped = false, bool optional = false, bool skipdelimiter = false)
+		/// <returns>The sequential list.</returns>
+		/// <param name="f">The root fragment</param>
+		private static List<IFragment> BuildList(IFragment f)
 		{
-			return new RouteParser(m_fragments.Select(x => {
-				if (x is Variable && (x as Variable).Name == varname)
-					return new NamedCapture(varname, value, skipdelimiter ? string.Empty : (x as Variable).Delimiter, escaped, optional);
-				else if (x is Variable || x is Literal || x is NamedCapture)
-					return x;
+			var lst = new List<IFragment>();
+			var r = f;
+			while (r != null)
+			{
+				lst.Add(r);
+
+				if (r.Children == null)
+					r = null;
+				else if (r.Children.Length != 1)
+					throw new Exception("Cannot modify choice entry");
 				else
-					throw new Exception($"Unable to bind route with elments that are not {typeof(Variable).Name}, {typeof(Literal).Name}, or {typeof(NamedCapture).Name}");
-			}).ToList());
+					r = r.Children.First();
+			}
+
+			return lst;
 		}
 
 		/// <summary>
-		/// Returns the default value of a named variable
+		/// Re-links a list by assigning the children
 		/// </summary>
-		/// <param name="varname">The variable to find.</param>
-		public string GetDefaultValue(string varname)
+		/// <returns>The root elemnt.</returns>
+		/// <param name="lst">The list to link.</param>
+		private static IFragment LinkList(List<IFragment> lst)
 		{
-			return m_fragments.Where(x => x is Variable && (x as Variable).Name == varname).Cast<Variable>().Select(x => x.DefaultValue).FirstOrDefault();
+			if (lst.Count == 0)
+				throw new ArgumentException(nameof(lst), "Cannot use an empty list");
+
+			if (!(lst[lst.Count - 1] is Result))
+			{
+				lst[lst.Count - 1] = lst[lst.Count - 1].AttachChildren(null);
+
+				if (lst.Count == 1)
+					return lst.First().AttachChildren(null);
+			}
+
+			for (var i = lst.Count - 1; i > 0; i--)
+				lst[i - 1] = lst[i - 1].AttachChildren(new[] { lst[i] });
+
+			return lst.First();
+		}
+
+		/// <summary>
+		/// Constructs a new route by appending a path to this instance
+		/// </summary>
+		/// <param name="path">The path to append.</param>
+		/// <param name="caseinsensitive">If set to <c>true</c>, comapres are performed case insensitive.</param>
+		/// <param name="target">The target method.</param>
+		/// <returns>The combined route</returns>
+		public RouteParser Append(string path, bool caseinsensitive, RouteEntry target)
+		{
+			return Append(new RouteParser(path, caseinsensitive, target));
+		}
+
+		/// <summary>
+		/// Appends a route to the end of this route
+		/// </summary>
+		/// <param name="suffix">The route to append.</param>
+		/// <returns>The combined route</returns>
+		public RouteParser Append(RouteParser suffix)
+		{
+			var lst = BuildList(this.m_root);
+			lst.RemoveAt(lst.Count - 1);
+			lst.AddRange(BuildList(suffix.m_root));
+
+			if (!(lst.Last() is Result))
+				throw new InvalidOperationException("Cannot append an entry that does not terminate");
+
+			return new RouteParser(LinkList(lst));
+		}
+
+		/// <summary>
+		/// Prunes the list, by removing empty entries and joining adjacent literals
+		/// </summary>
+		/// <returns>The pruned list.</returns>
+		/// <param name="lst">The list to prune</param>
+		private List<IFragment> PruneList(List<IFragment> lst)
+		{
+			IFragment prev = null;
+			for (var i = 0; i < lst.Count; i++)
+			{
+				var cur = lst[i];
+				if (prev != null)
+				{					
+					if (i != 0 && cur is Literal && string.IsNullOrEmpty(((Literal)cur).Value))
+					{
+						lst.RemoveAt(i);
+						i--;
+						continue;
+					}
+
+					if (prev is Literal && cur is Literal)
+					{
+						var s1 = ((Literal)prev).Value;
+						var s2 = ((Literal)cur).Value;
+
+						var joinchar = s1.EndsWith("/", StringComparison.Ordinal) || s2.EndsWith("/", StringComparison.Ordinal) ? "/" : "";
+						var s3 = s1.TrimEnd(new[] { '/' }) + joinchar + s2.TrimStart(new[] { '/' });
+
+						prev = lst[i - 1] = new Literal(s3, ((Literal)prev).IsCaseSensitive, null);
+
+						// Remove it and continue
+						lst.RemoveAt(i);
+						i--;
+						continue;
+					}
+					else if (prev is Literal && cur is Result)
+					{
+						var s = ((Literal)prev).Value.TrimEnd(new[] { '/' });
+
+						// Fixup if we attempt to remove the root slash
+						if (lst.Count == 2 && s.Length == 0)
+							s += '/';
+						
+						if (string.IsNullOrEmpty(s))
+							lst.RemoveAt(i - 1);
+						else
+							prev = lst[i - 1] = new Literal(s, ((Literal)prev).IsCaseSensitive, null);
+						continue;
+					}
+				}
+
+				prev = cur;
+			}
+
+			return lst;
+		}
+
+		/// <summary>
+		/// Constructs a new route by pruning this instance
+		/// </summary>
+		/// <returns>The pruned route.</returns>
+		public RouteParser PrunePath()
+		{
+			return new RouteParser(LinkList(PruneList(BuildList(this.m_root))));
+		}
+
+		/// <summary>
+		/// Bind the named variable(s) to the given value
+		/// </summary>
+		/// <param name="name">The name of the variable to bind.</param>
+		/// <param name="value">The literal value to bind to.</param>
+		/// <param name="iscasesensitive">If set to <c>true</c>, compares are performed case sensitive.</param>
+		/// <param name="asliteral">If set to <c>true</c>, binding is done with literal values.</param>
+		public RouteParser Bind(string name, string value, bool iscasesensitive, bool asliteral)
+		{
+			var lst = BuildList(this.m_root);
+			for (var i = 0; i < lst.Count; i++)
+			{
+				var x = lst[i];
+				if (x is Variable && ((Variable)x).Name == name)
+				{
+					if (asliteral)
+						lst[i] = new Literal(value, iscasesensitive, x.Children);
+					else
+						lst[i] = new BoundVariable(name, value, iscasesensitive, x.Children);
+
+					//break; // If we want a single match
+				}
+			}
+				
+			var rp = new RouteParser(LinkList(lst));
+
+			return rp;
+		}
+
+		/// <summary>
+		/// Gets the default value for a variable from this route
+		/// </summary>
+		/// <returns>The default value.</returns>
+		/// <param name="name">The name of the variable.</param>
+		public string GetDefaultValue(string name)
+		{
+			var r = this.m_root;
+			while (r != null)
+			{
+				if (r is Variable && ((Variable)r).Name == name)
+					return ((Variable)r).DefaultValue;
+				
+				if (r.Children == null)
+					r = null;
+				else if (r.Children.Length != 1)
+					throw new Exception("Cannot search choice entry");
+				else if (r.Children.First() is Result)
+					r = null;
+				else
+					r = r.Children.First();				
+			}
+
+			return null;
+		}
+
+		public IEnumerable<KeyValuePair<string, bool>> Variables
+		{
+			get
+			{
+				var lst = BuildList(this.m_root);
+				return
+					lst
+						.Where(x => x is Variable)
+						.Select(x => new KeyValuePair<string, bool>(((Variable)x).Name, ((Variable)x).Optional))
+						.Union(
+							lst
+							.Where(x => x is BoundVariable)
+							.Select(x => new KeyValuePair<string, bool>(((BoundVariable)x).Name, false))
+						)
+						.Distinct(x => x.Key)
+						;
+			}
+		}
+
+		/// <summary>
+		/// Replaces the target entry with one based on the given input
+		/// </summary>
+		/// <returns>The new route.</returns>
+		/// <param name="controller">The controller to use.</param>
+		/// <param name="method">The method to call.</param>
+		/// <param name="verbs">The accepted verbs.</param>
+		public RouteParser ReplaceTarget(Controller controller, System.Reflection.MethodInfo method, string[] verbs)
+		{
+			var lst = BuildList(this.m_root);
+			lst = lst.Take(lst.Count - 1).ToList();
+			lst.Add(new Result(new RouteEntry(controller, method, verbs, Variables)));
+			return new RouteParser(LinkList(lst));
+		}
+
+		/// <summary>
+		/// Returns a string-like representation of this entry
+		/// </summary>
+		public string Path { get { return CloneList(m_root, x => (x is Result) ? null : x).ToString(); } }
+
+		/// <summary>
+		/// Returns a <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2"/>.
+		/// </summary>
+		/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2"/>.</returns>
+		public override string ToString()
+		{
+			return string.Join(Environment.NewLine, GetAllRoutes());
+		}
+
+		/// <summary>
+		/// Enumerates all routes and builds a path-like string for each path
+		/// </summary>
+		/// <returns>The strings representing the routes.</returns>
+		private IEnumerable<string> GetAllRoutes()
+		{
+			var s = new Stack<KeyValuePair<string, IFragment>>();
+			s.Push(new KeyValuePair<string, IFragment>(string.Empty, m_root));
+
+			while (s.Count > 0)
+			{
+				var c = s.Pop();
+				var str = c.Key;
+				if (c.Value is Literal)
+					str += ((Literal)c.Value).Value;
+				else if (c.Value is Variable)
+					str += "{" + ((Variable)c.Value).Name + "}";
+				else if (c.Value is BoundVariable)
+					str += "{" + ((BoundVariable)c.Value).Name + "}";
+				else if (c.Value is Result)
+					str += ((Result)c.Value).ToString();
+				else if (!(c.Value is Choice))
+					throw new Exception(string.Format("Unable to work with {0}", c.Value.GetType()));
+
+				if (c.Value.Children == null)
+					yield return str;
+				else
+					foreach (var n in c.Value.Children)
+						s.Push(new KeyValuePair<string, IFragment>(str, n));
+				
+
+			}
 		}
 	}
 }

@@ -61,6 +61,21 @@ namespace Ceen.Mvc
 		public string[] ControllerSuffixRemovals { get; set; } = new string[] { "Controller", "Handler" };
 
 		/// <summary>
+		/// Gets or sets the suffixes to remove from the default controller names
+		/// </summary>
+		public string[] ControllerPrefixRemovals { get; set; } = new string[] { };
+
+		/// <summary>
+		/// Gets or sets the suffixes to remove from the default interface names
+		/// </summary>
+		public string[] InterfaceSuffixRemovals { get; set; } = new string[] { };
+
+		/// <summary>
+		/// Gets or sets the suffixes to remove from the default interface names
+		/// </summary>
+		public string[] InterfacePrefixRemovals { get; set; } = new string[] { "I" };
+
+		/// <summary>
 		/// Gets or sets a value indicating whether this <see cref="T:Ceen.Mvc.ControllerRouterConfig"/> is emitting debug information.
 		/// </summary>
 		public bool Debug { get; set; } = false;

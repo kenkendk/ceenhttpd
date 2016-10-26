@@ -176,6 +176,68 @@ namespace Ceen.Mvc
 			}
 		}
 
+		/// <summary>
+		/// Gets the name of an item
+		/// </summary>
+		/// <returns>The item name.</returns>
+		/// <param name="self">The type to get the name for.</param>
+		/// <param name="config">The configuration to use</param>
+		public static string GetItemName(this Type self, ControllerRouterConfig config)
+		{
+			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			// Extract an assigned name
+			if (nameattr != null)
+				return nameattr.Name;
+			
+			var name = self.Name;
+			if (typeof(Controller).IsAssignableFrom(self) && self.IsClass)
+			{
+				if (config.ControllerSuffixRemovals != null)
+					foreach (var rm in config.ControllerSuffixRemovals)
+						while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+							name = name.Substring(0, name.Length - rm.Length);
+				if (config.ControllerPrefixRemovals != null)
+					foreach (var rm in config.ControllerPrefixRemovals)
+						while (!string.IsNullOrWhiteSpace(rm) && name.StartsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+							name = name.Substring(rm.Length);
+			}
+			else if (typeof(IControllerPrefix).IsAssignableFrom(self) && self.IsInterface)
+			{
+				if (config.InterfaceSuffixRemovals != null)
+					foreach (var rm in config.InterfaceSuffixRemovals)
+						while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+							name = name.Substring(0, name.Length - rm.Length);
+				if (config.InterfacePrefixRemovals != null)
+					foreach (var rm in config.InterfacePrefixRemovals)
+						while (!string.IsNullOrWhiteSpace(rm) && name.StartsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+							name = name.Substring(rm.Length);
+			}
+
+			if (config.LowerCaseNames)
+				name = name.ToLowerInvariant();
+
+			return name;
+		}
+
+		/// <summary>
+		/// Gets the name of an item
+		/// </summary>
+		/// <returns>The item name.</returns>
+		/// <param name="self">The type to get the name for.</param>
+		/// <param name="config">The configuration to use</param>
+		public static string GetItemName(this MethodInfo self, ControllerRouterConfig config)
+		{
+			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			// Extract an assigned name
+			if (nameattr != null)
+				return nameattr.Name;
+
+			var name = self.Name;
+			if (config.LowerCaseNames)
+				name = name.ToLowerInvariant();
+
+			return name;
+		}
 	}
 
 	/// <summary>
@@ -184,38 +246,14 @@ namespace Ceen.Mvc
 	public class ControllerRouter : IRouter, IHttpModule
 	{
 		/// <summary>
-		/// The list of possible controllers
-		/// </summary>
-		private readonly Controller[] m_controllers;
-
-		/// <summary>
 		/// The template used to locate controllers
 		/// </summary>
 		private readonly ControllerRouterConfig m_config;
 
 		/// <summary>
-		/// The fully combined regular expression
+		/// The route parser
 		/// </summary>
-		private readonly Regex m_fullre;
-
-		/// <summary>
-		/// The default controller
-		/// </summary>
-		private string m_defaultcontroller;
-
-		/// <summary>
-		/// The default action
-		/// </summary>
-		private string m_defaultaction;
-
-		/// <summary>
-		/// Lookup table for finding target methods,
-		/// outer key is &quot;prefix&quot;,
-		/// inner key is the &quot;controller&quot;,
-		/// inner key is the &quot;action&quot;
-		/// inner key is &quot;http-verb&quot;,
-		/// </summary>
-		private readonly Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, List<RouteEntry>>>>> m_targets;
+		private readonly RouteParser m_routeparser;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ControllerRouter"/> class.
@@ -262,38 +300,12 @@ namespace Ceen.Mvc
 			// Make sure the caller cannot edit the config afterwards
 			m_config = config.Clone();
 
-			var prefixes =
-				types
-					.SelectMany(x => x.GetParentInterfaces<IControllerPrefix>())
-					.Select(x => new
-					{
-						Type = x,
-					    Prefix = "/" + string.Join(
-							 "/",
-							 x.GetParentInterfaceSequence()
-							 .Where(y => y != typeof(IControllerPrefix))
-							 .Select(y => GetRouteName(y, m_config))
-							 .Reverse()
-						)
-					})
-					.Distinct()
-					.ToDictionary(x => x.Type, x => x.Prefix);
+			var variables = new RouteParser(m_config.Template, !m_config.CaseSensitive, null).Variables;
 
-			if (types.Any(x => !x.GetParentInterfaces<IControllerPrefix>().Any()) && !prefixes.Values.Contains(string.Empty))
-				prefixes[typeof(Controller)] = string.Empty;
-
-			var basetemplate = RouteParser.Append(new RouteParser("{" + m_config.PrefixGroupName + "}"), new RouteParser(m_config.Template));
-
-				//RouteParser.PrependRegex(new RouteParser(m_config.Template), m_config.PrefixGroupName, string.Join("|", prefixes.Values.Select(x => string.IsNullOrWhiteSpace(x) ? "()" : Regex.Escape(x))), string.Empty);
-			var re = new Regex(basetemplate.RegularExpression);
-
-			if (re.GetGroupNames().Count(x => x == m_config.ControllerGroupName) != 1)
+			if (variables.Count(x => x.Key == m_config.ControllerGroupName) != 1)
 				throw new ArgumentException($"The template must contain exactly 1 named group called {m_config.ControllerGroupName}");
-			if (re.GetGroupNames().Count(x => x == m_config.ActionGroupName) != 1)
+			if (variables.Count(x => x.Key == m_config.ActionGroupName) != 1)
 				throw new ArgumentException($"The template must contain exactly 1 named group called {m_config.ActionGroupName}");
-
-			m_defaultcontroller = basetemplate.GetDefaultValue(m_config.ControllerGroupName);
-			m_defaultaction = basetemplate.GetDefaultValue(m_config.ActionGroupName);
 
 			types = types.Where(x => x != null).Distinct().ToArray();
 			if (types.Count() == 0)
@@ -303,225 +315,197 @@ namespace Ceen.Mvc
 			if (wrong != null)
 				throw new ArgumentException($"The type \"{wrong.FullName}\" does not derive from {typeof(Controller).FullName}");
 
-			m_controllers = types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray();
+			m_routeparser = BuildParseV2(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
+		}
 
-			var targetmethods = m_controllers
-				.SelectMany(x =>
-							x.GetType()
+		private static RouteParser BuildParseV2(IEnumerable<Controller> controllers, ControllerRouterConfig config)
+		{
+			var controller_routes =
+				controllers.SelectMany(x =>
+				{
+					string name;
+					var nameattr = x.GetType().GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+					// Extract controller name
+					if (nameattr != null)
+						name = nameattr.Name;
+					else
+					{
+						name = x.GetType().Name;
+						if (config.ControllerSuffixRemovals != null)
+							foreach (var rm in config.ControllerSuffixRemovals)
+								while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
+									name = name.Substring(0, name.Length - rm.Length);
+
+						if (config.LowerCaseNames)
+							name = name.ToLowerInvariant();
+					}
+
+					var routes = x.GetType().GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+					
+					// Add default route, if there are no route attributes
+					if (routes.Count() == 0)
+					routes = new[] { string.Empty };
+
+					return routes.Distinct().Select(y => new
+					{
+						Controller = x,
+						ControllerRoute = y
+					});
+				}
+			).ToArray();
+
+			var interface_expanded_routes =
+				controller_routes.SelectMany(x =>
+				{
+					var interfaces = x.Controller.GetType().GetParentInterfaces<IControllerPrefix>();
+					var interfacenames = interfaces
+						.Select(y => x.Controller.GetType().GetParentInterfaceSequence(y).Reverse().Where(z => z != x.Controller.GetType() && z != typeof(IControllerPrefix)))
+						.Select(y => string.Join("/", y.Select(z => z.GetItemName(config))));
+
+					if (interfacenames.Count() == 0)
+						interfacenames = new[] { string.Empty };
+
+					return interfacenames.Distinct().Select(y => new
+					{
+						Controller = x.Controller,
+						ControllerRoute = x.ControllerRoute,
+						InterfacePath = (y ?? string.Empty)
+					});
+                }
+            ).ToArray();
+
+
+			var target_method_routes =
+				interface_expanded_routes.SelectMany(x =>
+				{
+					return
+						x.Controller.GetType()
 							.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-				   			.Where(y => y.ReturnType == typeof(void) || typeof(IResult).IsAssignableFrom(y.ReturnType) || typeof(Task).IsAssignableFrom(y.ReturnType))
-							.Select(y =>
+							.Where(y => y.ReturnType == typeof(void) || typeof(IResult).IsAssignableFrom(y.ReturnType) || typeof(Task).IsAssignableFrom(y.ReturnType))
+							.Select(y => new
 							{
-								// Extract target method name
-								string name;
-								var nameattr = y.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
-								if (nameattr != null)
-									name = nameattr.Name;
-								else
-									name = m_config.LowerCaseNames ? y.Name.ToLowerInvariant() : y.Name;
+								Controller = x.Controller,
+								ControllerRoute = x.ControllerRoute,
+								InterfacePath = x.InterfacePath,
+								Method = y
+							});
+				}
+            ).ToArray();
 
-								return new { Name = name, Item = x, Method = y };
-							})
-			);
-
-			var targetmethodroutes =
-				targetmethods.SelectMany(x =>
+			var target_routes =
+				target_method_routes.SelectMany(x =>
 				{
 					var routes = x.Method.GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
 						routes = new[] { string.Empty };
 
-					return routes.Distinct().Select(y => new
+					return routes.Select(y => new
 					{
-						Route = new RouteParser(y),
-						Name = x.Name,
-						Item = x.Item,
-						Method = x.Method
+						Controller = x.Controller,
+						ControllerRoute = x.ControllerRoute,
+						InterfacePath = x.InterfacePath,
+						Method = x.Method,
+						MethodRoute = y						
 					});
-				});
-
-			var fulllist = targetmethodroutes.SelectMany(x =>
-			{
-				var routes = x.Item.GetType().GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>();
-				if (routes.Count() == 0)
-					routes = new[] { new RouteAttribute(string.Empty) };
-
-				string name;
-				var nameattr = x.Item.GetType().GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
-				// Extract controller name
-				if (nameattr != null)
-					name = nameattr.Name;
-				else
-				{
-					name = x.Item.GetType().Name;
-					if (m_config.ControllerSuffixRemovals != null)
-						foreach (var rm in m_config.ControllerSuffixRemovals)
-							while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
-								name = name.Substring(0, name.Length - rm.Length);
-
-					if (m_config.LowerCaseNames)
-						name = name.ToLowerInvariant();
+					
 				}
+			).ToArray();
 
-				return routes.Distinct().Select(y => new
+			// Now we have the cartesian product of all route/controller/action pairs, then build the target strings
+			var tmp = new RouteParser(config.Template, !config.CaseSensitive, null);
+			var defaultcontrollername = tmp.GetDefaultValue(config.ControllerGroupName);
+			var defaultactionname = tmp.GetDefaultValue(config.ActionGroupName);
+
+			var target_strings =
+				target_routes.SelectMany(x =>
 				{
-					Route = RouteParser.Append(new RouteParser(y.Route), x.Route),
-					ControllerName = name,
-					Controller = x.Item,
-					ActionName = x.Name,
-					ActionMethod = x.Method
-				});
-			});
+					var methodverbs = x.Method.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant());
+					var entry = new RouteEntry(x.Controller, x.Method, methodverbs.ToArray(), null);
 
-			var allwithverbs = fulllist.SelectMany(x =>
-			{
-				var methodverbs = x.ActionMethod.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant());
-				if (methodverbs.Count() == 0)
-					methodverbs = new[] { string.Empty };
+					var path = new RouteParser("/", !config.CaseSensitive, entry);
 
-				return methodverbs.Distinct().Select(verb =>
-					 new RouteEntry(
-						x.Route,
-						x.Controller,
-						x.ControllerName,
-						x.ActionMethod,
-						x.ActionName,
-						verb,
-						null
-					)
-				);
-			});
-
-			var allwithprefix = prefixes
-				.SelectMany(
-					x => allwithverbs
-					.Where(y => 
-					       string.IsNullOrWhiteSpace(x.Value)
-					       ? !y.Controller.GetType().GetParentInterfaces<IControllerPrefix>().Any() 
-					       : y.Controller.GetType().GetInterfaces().Contains(x.Key)
-			        )
-			        .Select(z => new RouteEntry(
-						z.Route,
-						z.Controller,
-						z.ControllerName,
-						z.Action.Method,
-						z.ActionName,
-						z.Verb,
-						x.Value
-					)
-		       	))
-	            .OrderBy(x => x.ControllerName)
-	            .OrderByDescending(x => x.ActionName)
-	            .OrderByDescending(x => x.Route.Value.Length)
-	            .ToArray();
-
-
-			var controllernames = allwithverbs.Select(x => x.ControllerName).Where(x => !m_config.HideDefaultController || x != m_defaultcontroller).Distinct().ToList();
-			var actionnames = allwithverbs.Select(x => x.ActionName).Where(x => !m_config.HideDefaultAction || x != m_defaultaction).Distinct().ToList();
-
-			if (!string.IsNullOrWhiteSpace(m_defaultcontroller))
-				controllernames.Add(string.Empty);
-			if (!string.IsNullOrWhiteSpace(m_defaultaction))
-				actionnames.Add(string.Empty);
-
-			// Build expression with all controller/action names
-			var bound = basetemplate
-				.Bind(m_config.PrefixGroupName, string.Join("|", allwithprefix.Select(x => Regex.Escape(x.Prefix)).Distinct().Select(x => string.IsNullOrWhiteSpace(x) ? "()" : x)), true, false, true)
-				.Bind(m_config.ControllerGroupName, string.Join("|", controllernames.Select(x => $"({Regex.Escape(x)})")), true, !string.IsNullOrWhiteSpace(m_defaultcontroller))
-				.Bind(m_config.ActionGroupName, string.Join("|", actionnames.Select(x => $"({Regex.Escape(x)})")), true, !string.IsNullOrWhiteSpace(m_defaultaction));
-
-			// Build regex with all controller/action names
-			m_fullre = new Regex(bound.RegularExpression);
-
-			// Build lookup table with verb, controller, action
-			m_targets = allwithprefix
-					.GroupBy(prefix => prefix.Prefix)
-					.ToDictionary(
-						prefix => prefix.Key,
-						prefix => prefix
-							.GroupBy(controller => controller.ControllerName)
-							.ToDictionary(
-								controller => controller.Key,
-								controller => controller
-										  .GroupBy(action => action.ActionName)
-										  .ToDictionary(
-											  action => action.Key,
-											  action => action
-													.GroupBy(verb => verb.Verb)
-													.ToDictionary(
-														verb => verb.Key,
-														verb => verb.ToList()
-												   )
-										)
-							)
-					)
-			;
-
-			if (m_config.Debug)
-			{
-				Console.WriteLine("ControllerRouter debug information:");
-				Console.WriteLine("Full regex: {0}", m_fullre.ToString());
-				Console.WriteLine();
-
-				foreach (var verb in m_targets)
-				{
-					Console.WriteLine("Verb: {0}", string.IsNullOrWhiteSpace(verb.Key) ? "*" : verb.Key);
-
-					var rt = basetemplate;
-					foreach (var prefix in verb.Value)
+					if (!string.IsNullOrWhiteSpace(x.InterfacePath))
 					{
-						var prefix_rt = rt.Bind(m_config.PrefixGroupName, prefix.Key, skipdelimiter: true);
+						if (x.InterfacePath.StartsWith("/", StringComparison.Ordinal))
+							path = new RouteParser(x.InterfacePath, !config.CaseSensitive, entry);
+						else							
+							path = path.Append(x.InterfacePath, !config.CaseSensitive, entry);
+					}
 
-						foreach (var controller in prefix.Value)
+					var ct = string.IsNullOrWhiteSpace(x.ControllerRoute) ? config.Template : x.ControllerRoute;
+
+					if (!string.IsNullOrWhiteSpace(ct))
+					{
+						if (ct.StartsWith("/", StringComparison.Ordinal))
+							path = new RouteParser(ct, !config.CaseSensitive, entry);
+						else
 						{
-							var controller_rt = prefix_rt.Bind(m_config.ControllerGroupName, controller.Key);
-
-							foreach (var action in controller.Value)
-							{
-								var action_rt = controller_rt.Bind(m_config.ControllerGroupName, action.Key);
-
-								Console.WriteLine("Route: {0}" , action_rt.Value);
-
-								foreach (var method in action.Value)
-									Console.WriteLine("Method: {0}: {1}", method.Controller.GetType().FullName, method.Action.Method.ToString());
-
-								Console.WriteLine();
-							}
+							if (!path.Path.EndsWith("/", StringComparison.Ordinal))
+								ct = "/" + ct;
+							path = path.Append(ct, !config.CaseSensitive, entry);
 						}
 					}
 
-					Console.WriteLine();
+					var mt = x.MethodRoute;
+					if (!string.IsNullOrWhiteSpace(mt))
+					{
+						if (mt.StartsWith("/", StringComparison.Ordinal))
+							path = new RouteParser(mt, !config.CaseSensitive, entry);
+						else
+						{
+							path = path.Bind(config.ActionGroupName, string.Empty, !config.CaseSensitive, true);
+							if (!path.Path.EndsWith("/", StringComparison.Ordinal))
+								mt = "/" + mt;
+						
+							path = path.Append(mt, !config.CaseSensitive, entry);
+						}
+					}
+
+					var controllername = x.Controller.GetType().GetItemName(config);
+					var actionname = x.Method.GetItemName(config);
+
+					var controllernames = new List<string>();
+					var actionnames = new List<string>();
+
+					if (!config.HideDefaultController || controllername != defaultcontrollername)
+						controllernames.Add(controllername);
+					if (!config.HideDefaultAction || actionname != defaultactionname)
+						actionnames.Add(actionname);
+					if (!string.IsNullOrEmpty(defaultcontrollername) && controllername == defaultcontrollername)
+						controllernames.Add(string.Empty);
+					if (!string.IsNullOrEmpty(defaultactionname) && actionname == defaultactionname)
+						actionnames.Add(string.Empty);
+
+				// Cartesian product with controller and action names bound
+				return controllernames
+					.SelectMany(y => actionnames.Select(
+						z => path
+							.Bind(config.ControllerGroupName, y, !config.CaseSensitive, true)
+							.Bind(config.ActionGroupName, z, !config.CaseSensitive, true)
+							.PrunePath()
+							.ReplaceTarget(x.Controller, x.Method, methodverbs.ToArray())
+							)
+		                );
 				}
-			}
-		}
+			)
+            .Distinct(x => x.ToString())
+         	.ToArray();
 
-		/// <summary>
-		/// Helper method to extract the name from a routing component
-		/// </summary>
-		/// <returns>The route name.</returns>
-		/// <param name="type">The type to examine.</param>
-		/// <param name="config">The server config to use.</param>
-		/// <param name="remove_prefixes"></param>
-		private static string GetRouteName(Type type, ControllerRouterConfig config)
-		{
-			string name;
-			var nameattr = type.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
-			if (nameattr != null)
-				name = nameattr.Name;
-			else
+			var merged = RouteParser.Merge(target_strings);
+
+			if (config.Debug)
 			{
-				name = type.Name;
-				if (config.ControllerSuffixRemovals != null)
-					foreach (var rm in config.ControllerSuffixRemovals)
-						while (!string.IsNullOrWhiteSpace(rm) && name.EndsWith(rm, StringComparison.InvariantCultureIgnoreCase))
-							name = name.Substring(0, name.Length - rm.Length);
+				Console.WriteLine("All target paths:");
+				foreach (var x in target_strings)
+					Console.WriteLine(x);
 
-				if (config.LowerCaseNames)
-					name = name.ToLowerInvariant();
+				Console.WriteLine("Map structure:");
+				Console.WriteLine(merged.ToString());
 			}
 
-			return name;
+			return merged;
 		}
 
 		/// <summary>
@@ -540,123 +524,29 @@ namespace Ceen.Mvc
 		/// <param name="context">The exexcution context.</param>
 		public async Task<bool> Process(IHttpContext context)
 		{
-			var m = m_fullre.Match(context.Request.Path);
-			var prefix = m.Groups[m_config.PrefixGroupName].Value;
+			var anymatches = false;
+			var test = m_routeparser
+				.MatchRequest(context.Request.Path)
+				.Where(x => { anymatches = true; return x.Key.AcceptsVerb(context.Request.Method); })
+				.OrderBy(x => x.Value.Count)
+				.ToList();
 
-			var controller = m.Groups[m_config.ControllerGroupName].Value;
-			if (string.IsNullOrWhiteSpace(controller))
-			    controller = m_defaultcontroller ?? string.Empty;
-
-			var action = m.Groups[m_config.ActionGroupName].Value;
-			if (string.IsNullOrWhiteSpace(action))
-				action = m_defaultaction ?? string.Empty;
-
-			var verblookup = GetTargets(prefix, controller, action);
-			if (verblookup == null)
+			// If we do not handle this entry, pass the request down the stack
+			if (!anymatches)
 				return false;
 
-			List<RouteEntry> lookupres_targeted;
-			List<RouteEntry> lookupres_defaults;
-
-			verblookup.TryGetValue(context.Request.Method, out lookupres_targeted);
-			verblookup.TryGetValue(string.Empty, out lookupres_defaults);
-
-			// If we get here, it was not possible to match the verb, so we give "405 - Method not allowed"
-			if ((lookupres_targeted == null || lookupres_targeted.Count == 0) && (lookupres_defaults == null || lookupres_defaults.Count == 0))
+			// If we filtered all targets based on verb,
+			// we are handling the path, but the verb is not allowed
+			if (test.Count == 0)
 			{
 				context.Response.StatusCode = HttpStatusCode.MethodNotAllowed;
 				context.Response.StatusMessage = HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed);
 				return true;
 			}
 
-			var subpath = context.Request.Path.Substring(m.Length);
-			if (!subpath.StartsWith("/"))
-				subpath = "/" + subpath;
-
-			var candidates =
-				lookupres_targeted == null
-				? lookupres_defaults
-				: lookupres_defaults == null 
-				? lookupres_targeted
-				: lookupres_targeted.Union(lookupres_defaults);
-
-			var best = candidates.Select(x => BuildPathDictionary(x, subpath, m))
-	                .Where(x => x.Key != null)
-                    .OrderByDescending(x => x.Value == null ? 0 : x.Value.Count)
-					.FirstOrDefault();
-
-			if (best.Key == null)
-				return false;
-
-			await HandleWithMethod(context, best.Key.Action, best.Key.Controller, best.Value);
+			var handler = test.First();
+			await HandleWithMethod(context, handler.Key.Action, handler.Key.Controller, handler.Value);
 			return true;
-		}
-
-		/// <summary>
-		/// Builds a dictionary of arguments that extracted from the URL
-		/// </summary>
-		/// <returns>The argument lookup dictionary.</returns>
-		/// <param name="route">The route to build the dictionary for.</param>
-		/// <param name="subpath">The part of the path that was not parsed by the parent.</param>
-		/// <param name="parentmatch">The match from the parent matching.</param>
-		private KeyValuePair<RouteEntry, Dictionary<string, string>> BuildPathDictionary(RouteEntry route, string subpath, Match parentmatch)
-		{			
-			var match = route.RegularExpression.Match(subpath);
-			if (subpath != "/" && match.Length != subpath.Length)
-				return default(KeyValuePair<RouteEntry, Dictionary<string, string>>);
-		
-			if (route.Action.ArgumentCount == 0)
-				return new KeyValuePair<RouteEntry, Dictionary<string, string>>(route, null);
-
-			var items = new Dictionary<string, string>();
-			foreach (var p in route.Action.Parameters)
-			{
-				if (p.IsContextParameter || !p.Source.HasFlag(ParameterSource.Url))
-					continue;
-
-				var m1 = parentmatch.Groups[p.Name];
-				if (m1.Success)
-					items[p.Name] = m1.Value;
-				var m2 = match.Groups[p.Name];
-				if (m2.Success)
-					items[p.Name] = m2.Value;
-
-				var defval = m1.Success || m2.Success ? null : route.Route.GetDefaultValue(p.Name);
-				if (!string.IsNullOrWhiteSpace(defval))
-					items[p.Name] = defval;
-
-				// Skip it if it does not match
-				if (p.Required && ((p.Source & (~ParameterSource.Url)) == 0) && !m1.Success && !m2.Success && string.IsNullOrWhiteSpace(defval))
-					return default(KeyValuePair<RouteEntry, Dictionary<string, string>>);
-			}
-
-			return
-				new KeyValuePair<RouteEntry, Dictionary<string, string>>(route, items);
-		}
-
-		/// <summary>
-		/// Finds the method target for a given action
-		/// </summary>
-		/// <returns>The target methods.</returns>
-		/// <param name="verb">The HTTP verb to match.</param>
-		/// <param name="verb">The path prefix to match.</param>
-		/// <param name="controller">The controller to use.</param>
-		/// <param name="action">The action to use.</param>
-		private Dictionary<string, List<RouteEntry>> GetTargets(string prefix, string controller, string action)
-		{
-			Dictionary<string, Dictionary<string, Dictionary<string, List<RouteEntry>>>> controllerlist;
-			if (!m_targets.TryGetValue(prefix, out controllerlist))
-				return null;
-
-			Dictionary<string, Dictionary<string, List<RouteEntry>>> actionlist;
-			if (!controllerlist.TryGetValue(controller, out actionlist))
-				return null;
-
-			Dictionary<string, List<RouteEntry>> methodlist;
-			if (!actionlist.TryGetValue(action, out methodlist))
-				return null;
-
-			return methodlist;
 		}
 
 		/// <summary>
@@ -719,7 +609,7 @@ namespace Ceen.Mvc
 		/// Applies the argument to the value list.
 		/// </summary>
 		/// <param name="entry">The argument entry.</param>
-		/// <param name="name">The name of the argument.</param>
+		/// <param name="method">The method to apply to.</param>
 		/// <param name="value">The argument value.</param>
 		/// <param name="values">The list of values to process.</param>
 		private static void ApplyArgument(MethodInfo method, ParameterEntry entry, string value, object[] values)
