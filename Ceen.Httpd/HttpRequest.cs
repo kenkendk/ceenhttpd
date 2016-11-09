@@ -446,6 +446,14 @@ namespace Ceen.Httpd
 					this.Method = newmethod;					
 			}
 
+			if (!string.IsNullOrWhiteSpace(config.AllowedSourceIPHeaderValue))
+			{
+				string realip;
+				this.Headers.TryGetValue(config.AllowedSourceIPHeaderValue, out realip);
+				if (!string.IsNullOrWhiteSpace(realip))
+					this.RemoteEndPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(realip), ((System.Net.IPEndPoint)this.RemoteEndPoint).Port);
+			}
+
 
 			await ParseFormData(reader, config, idletime, timeouttask, stoptask);
 		}

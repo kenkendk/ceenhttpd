@@ -52,6 +52,14 @@ namespace Ceen.Httpd
 		public bool AllowHttpMethodOverride = true;
 
 		/// <summary>
+		/// A value indicating the name of the header, 
+		/// the proxy uses to communicate the source IP of the request.
+		/// Commonly this is set to &quot;X-Real-IP&quot; or &quot;X-Forwarded-For&quot;
+		/// Leave blank to disable.
+		/// </summary>
+		public string AllowedSourceIPHeaderValue = null;
+
+		/// <summary>
 		/// The request idle timeout in seconds.
 		/// </summary>
 		public int RequestIdleTimeoutSeconds = 5;
