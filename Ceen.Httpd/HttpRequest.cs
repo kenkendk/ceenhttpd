@@ -79,6 +79,10 @@ namespace Ceen.Httpd
 		/// The taskid used for logging and tracing the request
 		/// </summary>
 		public string LogTaskID { get; private set; }
+		/// <summary>
+		/// The taskid used for logging and tracing the request
+		/// </summary>
+		public string LogRequestID { get; private set; }
 
 		/// <summary>
 		/// The stream representing the body of the request
@@ -119,11 +123,12 @@ namespace Ceen.Httpd
 		/// <param name="remoteEndpoint">The remote endpoint.</param>
 		/// <param name="logtaskid">The logging ID for the task</param>
 		/// <param name="clientCert">The client SSL certificate.</param>
-		public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, X509Certificate clientCert)
+		public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert)
 		{
 			RemoteEndPoint = remoteEndpoint;
 			ClientCertificate = clientCert;
 			LogTaskID = logtaskid;
+			LogRequestID = logrequestid;
 			Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			QueryString = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			Form = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);

@@ -193,7 +193,101 @@ namespace Ceen.Httpd
 		public static int TotalActiveClients { get { return RunnerControl.TotalActiveClients; } }
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpServer"/> class.
+		/// The method used to set the current socket handlerID in log4net, if available.
+		/// This redirection method is used to avoid depending on log4net.
+		/// </summary>
+		private static readonly Func<string> SetLoggingSocketHandlerID;
+
+		/// <summary>
+		/// The method used to set the current taskID in log4net, if available.
+		/// This redirection method is used to avoid depending on log4net.
+		/// </summary>
+		private static readonly Func<string> SetLoggingTaskHandlerID;
+
+		/// <summary>
+		/// The method used to set the current requestID in log4net, if available.
+		/// This redirection method is used to avoid depending on log4net.
+		/// </summary>
+		private static readonly Func<string> SetLoggingRequestID;
+
+		/// <summary>
+		/// The name of the log4net property that has the socket handler ID
+		/// </summary>
+		public static readonly string Log4Net_SocketHandlerID = "ceen-socket-handler-id";
+		/// <summary>
+		/// The name of the log4net property that has the task handler ID
+		/// </summary>
+		public static readonly string Log4Net_TaskHandlerID = "ceen-task-handler-id";
+		/// <summary>
+		/// The name of the log4net property that has the request ID
+		/// </summary>
+		public static readonly string Log4Net_RequestID = "ceen-request-id";
+
+		/// <summary>
+		/// Static initialization for the HttpServer class,
+		/// used to check for log4net dynamically
+		/// </summary>
+		static HttpServer()
+		{
+			Func<string> socketId = () => Guid.NewGuid().ToString("N");
+			Func<string> taskId = () => Guid.NewGuid().ToString("N");
+			Func<string> requestId = () => Guid.NewGuid().ToString("N");
+
+			// Slowly probe through to get the method
+			var t = Type.GetType("log4net.LogicalThreadContext, log4net");
+
+			var index_socket = new object[] { Log4Net_SocketHandlerID };
+			var index_task = new object[] { Log4Net_TaskHandlerID };
+			var index_request = new object[] { Log4Net_RequestID };
+
+			if (t != null)
+			{
+				var m = t.GetProperty("Properties");
+				if (m != null)
+				{
+					var ins = m.GetValue(null, null);
+					if (ins != null)
+					{
+						var rm = ins.GetType().GetProperties().Where(x => x.GetIndexParameters().Length > 0).FirstOrDefault();
+						if (rm != null)
+						{
+							// We have a default indexer, set up the helper methods
+							socketId = () =>
+							{
+								var g = Guid.NewGuid().ToString("N");
+								rm.SetValue(ins, g, index_socket);
+								return g;
+							};
+
+							taskId = () =>
+							{
+								var g = Guid.NewGuid().ToString("N");
+								rm.SetValue(ins, g, index_task);
+								return g;
+							};
+
+							requestId = () =>
+							{
+								var g = Guid.NewGuid().ToString("N");
+								rm.SetValue(ins, g, index_request);
+								return g;
+							};
+
+						}
+					}
+
+				}
+			}
+
+			// Assign whatever value we had
+			SetLoggingSocketHandlerID = socketId;
+			SetLoggingTaskHandlerID = taskId;
+			SetLoggingRequestID = requestId;
+
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.HttpServer"/> class.
 		/// </summary>
 		/// <param name="config">The server config.</param>
 		public HttpServer(ServerConfig config)
@@ -214,7 +308,7 @@ namespace Ceen.Httpd
 			listener.Start(Config.SocketBacklog);
 
 			var rc = new RunnerControl(stoptoken, Config.MaxActiveRequests, Config.DebugLogHandler);
-			var taskid = Guid.NewGuid().ToString("N");
+			var taskid = SetLoggingSocketHandlerID();
 
 			while (!stoptoken.IsCancellationRequested)
 			{
@@ -228,7 +322,7 @@ namespace Ceen.Httpd
 				{
 					if (Config.DebugLogHandler != null) Config.DebugLogHandler("Re-waiting for socket", taskid, null);
 					var client = await ls;
-					var newtaskid = Guid.NewGuid().ToString("N");
+					var newtaskid = SetLoggingTaskHandlerID();
 
 					int wt, cpt;
 					ThreadPool.GetAvailableThreads(out wt, out cpt);
@@ -322,7 +416,7 @@ namespace Ceen.Httpd
 				}
 				catch (Exception aex)
 				{
-					await LogMessage(new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, null), null), aex, DateTime.Now, new TimeSpan());
+					await LogMessage(new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, logtaskid, null), null), aex, DateTime.Now, new TimeSpan());
 				}
 
 				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Run SSL", logtaskid, client);
@@ -377,10 +471,11 @@ namespace Ceen.Httpd
 				{
 					do
 					{
+						var reqid = SetLoggingRequestID();
 						bs.ResetReadLength(Config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
-							cur = new HttpRequest(endpoint, logtaskid, clientcert),
+							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert),
 							resp = new HttpResponse(stream, Config)
 						);
 
