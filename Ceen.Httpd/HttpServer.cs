@@ -11,13 +11,93 @@ using System.Net.Security;
 
 namespace Ceen.Httpd
 {
-	public class HttpServer
+	/// <summary>
+	/// The Http server implementation
+	/// </summary>
+	public static class HttpServer
 	{
+		/// <summary>
+		/// Handler class that encapsulates a configured server setup,
+		/// in a way that is callable from another AppDomain
+		/// </summary>
+		public class AppDomainBridge : MarshalByRefObject
+		{
+			/// <summary>
+			/// The controller instance
+			/// </summary>
+			private RunnerControl Controller;
+			/// <summary>
+			/// The stop token source
+			/// </summary>
+			private CancellationTokenSource StopToken;
+
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpServer.AppDomainBridge"/> class.
+			/// </summary>
+			public AppDomainBridge() { }
+
+			/// <summary>
+			/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpServer.AppDomainBridge"/> class.
+			/// </summary>
+			/// <param name="usessl">If set to <c>true</c> use ssl.</param>
+			/// <param name="config">The server config.</param>
+			public AppDomainBridge(bool usessl, ServerConfig config) { Setup(usessl, config); }
+
+			/// <summary>
+			/// Setup this instance
+			/// </summary>
+			/// <param name="usessl">If set to <c>true</c> usessl.</param>
+			/// <param name="config">Config.</param>
+			public void Setup(bool usessl, ServerConfig config)
+			{
+				if (StopToken != null)
+					throw new Exception("Cannot call setup more than once");
+				if (config == null)
+					throw new ArgumentNullException(nameof(config));
+				
+				StopToken = new CancellationTokenSource();
+				Controller = new RunnerControl(StopToken.Token, usessl, config);
+			}
+
+			/// <summary>
+			/// Handles a request
+			/// </summary>
+			/// <param name="socket">The socket handle.</param>
+			/// <param name="logtaskid">The task ID to use.</param>
+			public void HandleRequest(SocketInformation socket, string logtaskid)
+			{				
+				RunClient(socket, logtaskid, Controller);
+			}
+
+			/// <summary>
+			/// Requests that this instance stops serving requests
+			/// </summary>
+			public void Stop()
+			{
+				StopToken.Cancel();
+			}
+
+			/// <summary>
+			/// Waits for all clients to finish processing
+			/// </summary>
+			/// <returns><c>true</c>, if for stop succeeded, <c>false</c> otherwise.</returns>
+			/// <param name="waitdelay">The maximum time to wait for the clients to stop.</param>
+			public bool WaitForStop(TimeSpan waitdelay)
+			{
+				return Controller.FinishedTask.Wait(waitdelay);
+			}
+
+			/// <summary>
+			/// Gets the number of active clients.
+			/// </summary>
+			public int ActiveClients { get { return Controller.ActiveClients; } }
+		}
+
 		/// <summary>
 		/// Helper class to keep track of all active requests and potentially abort them
 		/// </summary>
 		private class RunnerControl
-		{
+		{			
 			/// <summary>
 			/// Backing field for the total number of active clients
 			/// </summary>
@@ -50,15 +130,28 @@ namespace Ceen.Httpd
 			/// </summary>
 			/// <value>The throttle task.</value>
 			public Task ThrottleTask { get { return m_throttletask.Task; } }
+			/// <summary>
+			/// Gets the server configuration
+			/// </summary>
+			/// <value>The config.</value>
+			public ServerConfig Config { get; private set; }
 
 			/// <summary>
 			/// The stop token
 			/// </summary>
 			public readonly CancellationToken StopToken;
 			/// <summary>
+			/// A flag indicating if SSL is used
+			/// </summary>
+			public readonly bool m_useSSL;
+			/// <summary>
 			/// A value indicating if the server is stopped
 			/// </summary>
 			public volatile bool m_isStopped = false;
+			/// <summary>
+			/// Gets a value indicating whether this <see cref="T:Ceen.Httpd.HttpServer.RunnerControl"/> is stopped.
+			/// </summary>
+			public bool IsStopped { get { return m_isStopped; } }
 			/// <summary>
 			/// The maximum number of active handlers
 			/// </summary>
@@ -87,17 +180,23 @@ namespace Ceen.Httpd
 			private DebugLogDelegate m_debuglogger;
 
 			/// <summary>
-			/// Initializes a new instance of the <see cref="Ceenhttpd.HttpServer+RunnerControl"/> class.
+			/// Initializes a new instance of the <see cref="Ceen.Httpd+RunnerControl"/> class.
 			/// </summary>
 			/// <param name="stoptoken">The stoptoken.</param>
-			/// <param name="maxactive">The maximum number of active handlers.</param>
-			public RunnerControl(CancellationToken stoptoken, int maxactive, DebugLogDelegate debuglogger) 
+			/// <param name="usessl">A flag indicating if this runner is using SSL</param>
+			/// <param name="config">The server config.</param>
+			public RunnerControl(CancellationToken stoptoken, bool usessl, ServerConfig config) 
 			{
+				if (config == null)
+					throw new ArgumentNullException(nameof(config));
+				
 				StopToken = stoptoken;
 				StopToken.Register(() => m_stoptask.TrySetCanceled());
-				m_maxactive = maxactive;
+				Config = config;
+				m_maxactive = config.MaxActiveRequests;
 				m_throttletask.SetResult(true);
-				m_debuglogger = debuglogger;
+				m_debuglogger = config.DebugLogHandler;
+				m_useSSL = usessl;
 			}
 
 			/// <summary>
@@ -179,12 +278,6 @@ namespace Ceen.Httpd
 				}
 			}
 		}
-
-		/// <summary>
-		/// Gets the server config.
-		/// </summary>
-		/// <value>The config.</value>
-		public ServerConfig Config { get; private set; }
 
 		/// <summary>
 		/// Gets the total number of active clients
@@ -283,16 +376,17 @@ namespace Ceen.Httpd
 			SetLoggingSocketHandlerID = socketId;
 			SetLoggingTaskHandlerID = taskId;
 			SetLoggingRequestID = requestId;
-
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceen.Httpd.HttpServer"/> class.
+		/// Creates and initializes a new AppDomain bridge
 		/// </summary>
+		/// <returns>The app domain bridge.</returns>
+		/// <param name="usessl">If set to <c>true</c> use ssl.</param>
 		/// <param name="config">The server config.</param>
-		public HttpServer(ServerConfig config)
+		public static AppDomainBridge CreateAppDomainBridge(bool usessl, ServerConfig config)
 		{
-			Config = config;
+			return new AppDomainBridge(usessl, config);
 		}
 
 		/// <summary>
@@ -300,48 +394,65 @@ namespace Ceen.Httpd
 		/// </summary>
 		/// <returns>Awaitable task.</returns>
 		/// <param name="addr">The address to listen to.</param>
+		/// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
 		/// <param name="stoptoken">The stoptoken.</param>
+		/// <param name="config">The server configuration</param>
 		/// <param name="spawner">The method handling the new connection.</param>
-		private async Task ListenInternalAsync(IPEndPoint addr, CancellationToken stoptoken, Action<TcpClient, string, RunnerControl> spawner)
+		public static Task ListenToSocketAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, string> spawner)
 		{
-			var listener = new TcpListener(addr);
-			listener.Start(Config.SocketBacklog);
+			return ListenToSocketInternalAsync(addr, usessl, stoptoken, config, (TcpClient arg1, string arg2, RunnerControl arg3) => spawner(arg1, arg2));
+		}
 
-			var rc = new RunnerControl(stoptoken, Config.MaxActiveRequests, Config.DebugLogHandler);
+		/// <summary>
+		/// Listens to incoming connections and calls the spawner method for each new connection
+		/// </summary>
+		/// <returns>Awaitable task.</returns>
+		/// <param name="addr">The address to listen to.</param>
+		/// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
+		/// <param name="stoptoken">The stoptoken.</param>
+		/// <param name="config">The server configuration</param>
+		/// <param name="spawner">The method handling the new connection.</param>
+		private static async Task ListenToSocketInternalAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, string, RunnerControl> spawner)
+		{
+			var rc = new RunnerControl(stoptoken, usessl, config);
+
+			var listener = new TcpListener(addr);
+			listener.Start(config.SocketBacklog);
+
 			var taskid = SetLoggingSocketHandlerID();
 
 			while (!stoptoken.IsCancellationRequested)
 			{
 				// Wait if there are too many active
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Waiting for throttle", taskid, null);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for throttle", taskid, null);
 				await rc.ThrottleTask;
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Waiting for socket", taskid, null);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for socket", taskid, null);
 				var ls = listener.AcceptTcpClientAsync();
 
 				if (await Task.WhenAny(rc.StopTask, ls) == ls)
 				{
-					if (Config.DebugLogHandler != null) Config.DebugLogHandler("Re-waiting for socket", taskid, null);
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Re-waiting for socket", taskid, null);
 					var client = await ls;
 					var newtaskid = SetLoggingTaskHandlerID();
 
 					int wt, cpt;
 					ThreadPool.GetAvailableThreads(out wt, out cpt);
-					if (Config.DebugLogHandler != null) Config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
+					if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
 
-					if (Config.DebugLogHandler != null) Config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
+					if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
 					ThreadPool.QueueUserWorkItem(x => spawner(client, newtaskid, rc));
 				}
 			}
 
-			if (Config.DebugLogHandler != null) Config.DebugLogHandler("Stopping", taskid, null);
+			if (config.DebugLogHandler != null) config.DebugLogHandler("Stopping", taskid, null);
 
 			listener.Stop();
 			rc.Stop(taskid);
 
-			if (Config.DebugLogHandler != null) Config.DebugLogHandler("Socket stopped, waiting for workers ...", taskid, null);
+			if (config.DebugLogHandler != null) config.DebugLogHandler("Socket stopped, waiting for workers ...", taskid, null);
 			await rc.FinishedTask;
 
-			if (Config.DebugLogHandler != null) Config.DebugLogHandler("Stopped", taskid, null);
+			if (config.DebugLogHandler != null) config.DebugLogHandler("Stopped", taskid, null);
 		}
 
 		/// <summary>
@@ -352,93 +463,95 @@ namespace Ceen.Httpd
 		/// <param name="ex">Exception data, if any.</param>
 		/// <param name="start">The request start time.</param>
 		/// <param name="duration">The request duration.</param>
-		private Task LogMessage(HttpContext context, Exception ex, DateTime start, TimeSpan duration)
+		private static Task LogMessageAsync(RunnerControl controller, HttpContext context, Exception ex, DateTime start, TimeSpan duration)
 		{
-			if (Config.Loggers == null)
+			var config = controller.Config;
+			if (config.Loggers == null)
 				return Task.FromResult(true);
 
-			var count = Config.Loggers.Count;
+			var count = config.Loggers.Count;
 			if (count == 0)
 				return Task.FromResult(true);
 			else if (count == 1)
-				return Config.Loggers[0].LogRequest(context, ex, start, duration);
+				return config.Loggers[0].LogRequest(context, ex, start, duration);
 			else
-				return Task.WhenAll(Config.Loggers.Select(x => x.LogRequest(context, ex, start, duration)));
+				return Task.WhenAll(config.Loggers.Select(x => x.LogRequest(context, ex, start, duration)));
 		}
 
 		/// <summary>
 		/// Listens to a port, using the given endpoint. 
-		/// Note that this method does not use SSL.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
 		/// <param name="addr">The address to listen to.</param>
+		/// <param name="usessl">A flag indicating if this instance should use SSL</param>
+		/// <param name="config">The server configuration</param>
 		/// <param name="stoptoken">The stoptoken.</param>
-		public Task ListenAsync(IPEndPoint addr, CancellationToken stoptoken = default(CancellationToken))
+		public static Task ListenAsync(IPEndPoint addr, bool usessl, ServerConfig config, CancellationToken stoptoken = default(CancellationToken))
 		{
-			return ListenInternalAsync(addr, stoptoken, RunClient);
-		}
-
-		/// <summary>
-		/// Listens to a port, using the given endpoint
-		/// </summary>
-		/// <returns>The awaitable task.</returns>
-		/// <param name="addr">The address to listen to.</param>
-		/// <param name="stoptoken">The stoptoken.</param>
-		public Task ListenSSLAsync(IPEndPoint addr, CancellationToken stoptoken = default(CancellationToken))
-		{
-			if (Config.SSLCertificate as X509Certificate2 == null || !(Config.SSLCertificate as X509Certificate2).HasPrivateKey)
+			if (usessl && (config.SSLCertificate as X509Certificate2 == null || !(config.SSLCertificate as X509Certificate2).HasPrivateKey))
 				throw new Exception("Certificate does not have a private key and cannot be used for signing");
-
-			return ListenInternalAsync(addr, stoptoken, (ls, taskid, rc) => {
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Running SSL", taskid, ls);
-				RunSslClient(ls, taskid, rc);
-			});
+			
+			return ListenToSocketInternalAsync(addr, usessl, stoptoken, config, RunClient);
 		}
 
 		/// <summary>
-		/// Handler method for SSL connections
+		/// Runs a client, using a socket handle from DuplicatiAndClose
+		/// </summary>
+		/// <param name="socketinfo">The socket handle.</param>
+		/// <param name="logtaskid">The log task ID.</param>
+		/// <param name="controller">The controller instance</param>
+		private static void RunClient(SocketInformation socketinfo, string logtaskid, RunnerControl controller)
+		{
+			var client = new TcpClient() { Client = new Socket(socketinfo) };
+			RunClient(client, logtaskid, controller);
+		}
+
+		/// <summary>
+		/// Handler method for connections
 		/// </summary>
 		/// <param name="client">The new connection.</param>
 		/// <param name="logtaskid">The task id for logging and tracing</param>
 		/// <param name="controller">The runner controller.</param>
-		private async void RunSslClient(TcpClient client, string logtaskid, RunnerControl controller)
+		private static async void RunClient(TcpClient client, string logtaskid, RunnerControl controller)
 		{
+			var config = controller.Config;
+
 			using (var s = client.GetStream())
-			using (var ssl = new SslStream(s, false))
+			using (var ssl = controller.m_useSSL ? new SslStream(s, false) : null)
 			{
-				try
-				{
-					// Slightly higher value here to avoid races with the other timeout mechanisms
-					s.ReadTimeout = s.WriteTimeout = (Config.RequestIdleTimeoutSeconds + 1) * 1000;
+				if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Running {0}", controller.m_useSSL ? "SSL" : "plain"), logtaskid, client);
 
-					if (Config.DebugLogHandler != null) Config.DebugLogHandler("Authenticate SSL", logtaskid, client);
-					await ssl.AuthenticateAsServerAsync(Config.SSLCertificate, Config.SSLRequireClientCert, Config.SSLEnabledProtocols, Config.SSLCheckCertificateRevocation);
-				}
-				catch (Exception aex)
-				{
-					await LogMessage(new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, logtaskid, null), null), aex, DateTime.Now, new TimeSpan());
-				}
-
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Run SSL", logtaskid, client);
-				await Runner(ssl, client.Client.RemoteEndPoint, logtaskid, ssl.RemoteCertificate, controller);
-			}
-
-			if (Config.DebugLogHandler != null) Config.DebugLogHandler("Done running", logtaskid, client);
-		}
-
-		/// <summary>
-		/// Handler method for Non-SSL connections
-		/// </summary>
-		/// <param name="client">The new connection.</param>
-		/// <param name="logtaskid">The task id for logging and tracing</param>
-		/// <param name="controller">The runner controller.</param>
-		private async void RunClient(TcpClient client, string logtaskid, RunnerControl controller)
-		{
-			using (var s = client.GetStream())
-			{
 				// Slightly higher value here to avoid races with the other timeout mechanisms
-				s.ReadTimeout = s.WriteTimeout = (Config.RequestIdleTimeoutSeconds + 1) * 1000;
-				await Runner(s, client.Client.RemoteEndPoint, logtaskid, null, controller);
+				s.ReadTimeout = s.WriteTimeout = (controller.Config.RequestIdleTimeoutSeconds + 1) * 1000;
+
+				X509Certificate clientcert = null;
+
+				// For SSL only: negotiate the connection
+				if (ssl != null)
+				{
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Authenticate SSL", logtaskid, client);
+
+					try
+					{
+						await ssl.AuthenticateAsServerAsync(config.SSLCertificate, config.SSLRequireClientCert, config.SSLEnabledProtocols, config.SSLCheckCertificateRevocation);
+					}
+					catch (Exception aex)
+					{
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, client);
+
+						// Log a message indicating that we failed setting up SSL
+						await LogMessageAsync(controller, new HttpContext(new HttpRequest(client.Client.RemoteEndPoint, logtaskid, logtaskid, null), null), aex, DateTime.Now, new TimeSpan());
+
+						return;
+					}
+
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Run SSL", logtaskid, client);
+					clientcert = ssl.RemoteCertificate;
+				}
+
+				await Runner(ssl == null ? (Stream)s : ssl, client.Client.RemoteEndPoint, logtaskid, clientcert, controller);
+
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, client);
 			}
 		}
 
@@ -450,9 +563,10 @@ namespace Ceen.Httpd
 		/// <param name="logtaskid">The task id for logging and tracing</param>
 		/// <param name="clientcert">The client certificate if any.</param>
 		/// <param name="controller">The runner controller.</param>
-		private async Task Runner(Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
+		private static async Task Runner(Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
 		{
-			var requests = Config.KeepAliveMaxRequests;
+			var config = controller.Config;
+			var requests = config.KeepAliveMaxRequests;
 
 			bool keepingalive = false;
 
@@ -463,7 +577,7 @@ namespace Ceen.Httpd
 
 			try
 			{
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Running task", logtaskid, endpoint);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Running task", logtaskid, endpoint);
 				if (!controller.RegisterActive(logtaskid))
 					return;
 
@@ -472,20 +586,20 @@ namespace Ceen.Httpd
 					do
 					{
 						var reqid = SetLoggingRequestID();
-						bs.ResetReadLength(Config.MaxPostSize);
+						bs.ResetReadLength(config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
 							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert),
-							resp = new HttpResponse(stream, Config)
+							resp = new HttpResponse(stream, config)
 						);
 
-						var timeouttask = Task.Delay(TimeSpan.FromSeconds(keepingalive ? Config.KeepAliveTimeoutSeconds : Config.RequestIdleTimeoutSeconds));
-						var idletime = TimeSpan.FromSeconds(Config.RequestHeaderReadTimeoutSeconds);
+						var timeouttask = Task.Delay(TimeSpan.FromSeconds(keepingalive ? config.KeepAliveTimeoutSeconds : config.RequestIdleTimeoutSeconds));
+						var idletime = TimeSpan.FromSeconds(config.RequestHeaderReadTimeoutSeconds);
 
-						if (Config.DebugLogHandler != null) Config.DebugLogHandler("Parsing headers", logtaskid, endpoint);
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Parsing headers", logtaskid, endpoint);
 						try
 						{
-							await cur.Parse(bs, Config, idletime, timeouttask, controller.StopTask);
+							await cur.Parse(bs, config, idletime, timeouttask, controller.StopTask);
 						}
 						catch (EmptyStreamClosedException)
 						{
@@ -509,26 +623,26 @@ namespace Ceen.Httpd
 						{
 							resp.KeepAlive = true;
 							if (!keepingalive)
-								resp.AddHeader("Keep-Alive", string.Format("timeout={0}, max={1}", Config.KeepAliveTimeoutSeconds, Config.KeepAliveMaxRequests));
+								resp.AddHeader("Keep-Alive", string.Format("timeout={0}, max={1}", config.KeepAliveTimeoutSeconds, config.KeepAliveMaxRequests));
 						}
 						else
 							resp.KeepAlive = false;
 
 
-						if (Config.Loggers != null)
+						if (config.Loggers != null)
 						{
-							var count = Config.Loggers.Count;
+							var count = config.Loggers.Count;
 							if (count == 1)
 							{
-								var sl = Config.Loggers[0] as IStartLogger;
+								var sl = config.Loggers[0] as IStartLogger;
 								if (sl != null)
 									await sl.LogRequestStarted(cur);
 							}
 							else if (count != 0)
-								await Task.WhenAll(Config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));								
+								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));								
 						}
 
-						if (Config.DebugLogHandler != null) Config.DebugLogHandler("Running handler", logtaskid, cur);
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Running handler", logtaskid, cur);
 
 						try
 						{
@@ -537,7 +651,7 @@ namespace Ceen.Httpd
 							// TODO: Abort processing if the client closes?
 
 							// Process the request
-							if (!await Config.Router.Process(context))
+							if (!await config.Router.Process(context))
 								throw new HttpException(Ceen.HttpStatusCode.NotFound);
 						}
 						catch (HttpException hex)
@@ -550,7 +664,7 @@ namespace Ceen.Httpd
 							resp.StatusMessage = hex.StatusMessage;
 						}
 
-						if (Config.DebugLogHandler != null) Config.DebugLogHandler("Flushing response", logtaskid, cur);
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Flushing response", logtaskid, cur);
 
 						// If the handler has not flushed, we do it
 						await resp.FlushAndSetLengthAsync();
@@ -559,7 +673,7 @@ namespace Ceen.Httpd
 						keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength;
 						requests--;
 
-						await LogMessage(context, null, started, DateTime.Now - started);
+						await LogMessageAsync(controller, context, null, started, DateTime.Now - started);
 					
 					} while(keepingalive);
 				}
@@ -582,16 +696,16 @@ namespace Ceen.Httpd
 				try { stream.Close(); }
 				catch {}
 
-				try { await LogMessage(context, ex, started, DateTime.Now - started); }
+				try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
 				catch { }
 
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Failed handler", logtaskid, cur);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Failed handler", logtaskid, cur);
 
 			}
 			finally
 			{
 				controller.RegisterStopped(logtaskid);
-				if (Config.DebugLogHandler != null) Config.DebugLogHandler("Terminating handler", logtaskid, cur);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Terminating handler", logtaskid, cur);
 			}
 		}
 	}
