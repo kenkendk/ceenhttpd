@@ -327,7 +327,7 @@ namespace Ceen.Httpd
 			Func<string> requestId = () => Guid.NewGuid().ToString("N");
 
 			// Slowly probe through to get the method
-			var t = Type.GetType("log4net.LogicalThreadContext, log4net");
+			var t = Type.GetType("log4net.LogicalThreadContext, log4net, Culture=neutral");
 
 			var index_socket = new object[] { Log4Net_SocketHandlerID };
 			var index_task = new object[] { Log4Net_TaskHandlerID };
