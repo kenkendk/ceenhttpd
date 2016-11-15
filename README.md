@@ -236,7 +236,7 @@ public class ApiExampleController : Controller, IApiV1
 }
 ```
 
-Then provide a configuration file ([see example-config file for more options](Ceen.Http.Cli/example_config.txt):
+Then provide a configuration file ([see example-config file for more options](Ceen.Httpd.Cli/example_config.txt):
 ```
 httpport 80
 httpaddress any
