@@ -33,17 +33,26 @@ namespace Ceen.Httpd.Handler
 		private readonly string[] m_indexfiles;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.FileHandler"/> class.
+		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
+		/// </summary>
+		/// <param name="sourcefolder">The folder to server files from.</param>
+		public FileHandler(string sourcefolder)
+			: this(sourcefolder, new string[] { "index.htm", "index.html" }, null)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
-		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup = null)
+		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup)
 			: this(sourcefolder, new string[] {"index.htm", "index.html"}, mimetypelookup)
 		{
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.FileHandler"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		/// <param name="indexfiles">List of filenames allowed as index files.</param>
@@ -52,7 +61,7 @@ namespace Ceen.Httpd.Handler
 		{
 			m_indexfiles = indexfiles ?? new string[0];
 			m_sourcefolder = Path.GetFullPath(sourcefolder);
-			if (!m_sourcefolder.StartsWith(DIRSEP))
+			if (!m_sourcefolder.StartsWith(DIRSEP, StringComparison.Ordinal))
 				m_sourcefolder = DIRSEP + m_sourcefolder;
 
 			m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
@@ -63,8 +72,7 @@ namespace Ceen.Httpd.Handler
 		/// Handles the request.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
-		/// <param name="request">The request.</param>
-		/// <param name="response">The response.</param>
+		/// <param name="context">The http context.</param>
 		public async Task<bool> HandleAsync(IHttpContext context)
 		{
 			foreach(var c in FORBIDDENCHARS)
@@ -137,7 +145,7 @@ namespace Ceen.Httpd.Handler
 		/// Returns the default mime type for a path
 		/// </summary>
 		/// <returns>The mime type.</returns>
-		/// <param name="request">The path.</param>
+		/// <param name="path">The path.</param>
 		public static string DefaultMimeTypes(string path)
 		{
 			var ext = path.Substring(path.LastIndexOf('.') + 1).ToLowerInvariant();
