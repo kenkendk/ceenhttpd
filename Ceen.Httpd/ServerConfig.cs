@@ -15,41 +15,41 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// The socket backlog.
 		/// </summary>
-		public int SocketBacklog = 5;
+		public int SocketBacklog { get; set; } = 5;
 		/// <summary>
 		/// The maximum size of the request line.
 		/// </summary>
-		public int MaxRequestLineSize = 8 * 1024;
+		public int MaxRequestLineSize { get; set; } = 8 * 1024;
 		/// <summary>
 		/// The maximum size of the request header.
 		/// </summary>
-		public int MaxRequestHeaderSize = 64 * 1024;
+		public int MaxRequestHeaderSize { get; set; } = 64 * 1024;
 		/// <summary>
 		/// The maximum number of active requests.
 		/// </summary>
-		public int MaxActiveRequests = 500000;
+		public int MaxActiveRequests { get; set; } = 500000;
 
 		/// <summary>
 		/// The maximum size of a POST request with url encoded data.
 		/// This is also the maximum size allowed for automatically
 		/// decoding multipart form data.
 		/// </summary>
-		public int MaxUrlEncodedFormSize = 5 * 1024 * 1025;
+		public int MaxUrlEncodedFormSize { get; set; } = 5 * 1024 * 1024;
 
 		/// <summary>
 		/// Allow automatic parsing of multipart form data
 		/// </summary>
-		public bool AutoParseMultipartFormData = true;
+		public bool AutoParseMultipartFormData { get; set; } = true;
 
 		/// <summary>
 		/// The maximum size of a POST request
 		/// </summary>
-		public long MaxPostSize = 100 * 1024 * 1024;
+		public long MaxPostSize { get; set; } = 100 * 1024 * 1024;
 
 		/// <summary>
 		/// A flag indicating if the X-HTTP-Method-Override header is supported
 		/// </summary>
-		public bool AllowHttpMethodOverride = true;
+		public bool AllowHttpMethodOverride { get; set; } = true;
 
 		/// <summary>
 		/// A value indicating the name of the header, 
@@ -57,58 +57,68 @@ namespace Ceen.Httpd
 		/// Commonly this is set to &quot;X-Real-IP&quot; or &quot;X-Forwarded-For&quot;
 		/// Leave blank to disable.
 		/// </summary>
-		public string AllowedSourceIPHeaderValue = null;
+		public string AllowedSourceIPHeaderValue { get; set; } = null;
 
 		/// <summary>
 		/// The request idle timeout in seconds.
 		/// </summary>
-		public int RequestIdleTimeoutSeconds = 5;
+		public int RequestIdleTimeoutSeconds { get; set; } = 5;
 		/// <summary>
 		/// The request header read timeout in seconds.
 		/// </summary>
-		public int RequestHeaderReadTimeoutSeconds = 10;
+		public int RequestHeaderReadTimeoutSeconds { get; set; } = 10;
 		/// <summary>
 		/// The maximum number of requests to server with a single connection.
 		/// </summary>
-		public int KeepAliveMaxRequests = 30;
+		public int KeepAliveMaxRequests { get; set; } = 30;
 		/// <summary>
 		/// The keep-alive timeout in seconds
 		/// </summary>
-		public int KeepAliveTimeoutSeconds = 10;
+		public int KeepAliveTimeoutSeconds { get; set; } = 10;
 		/// <summary>
 		/// The router instance to use for handling requests
 		/// </summary>
-		public IRouter Router;
+		public IRouter Router { get; set; }
 		/// <summary>
 		/// The logger instance to use
 		/// </summary>
-		public IList<ILogger> Loggers;
+		public IList<ILogger> Loggers { get; set; }
 		/// <summary>
 		/// A callback method for injecting headers into the responses
 		/// </summary>
-		public Action<IHttpResponse> AddDefaultResponseHeaders = DefaultHeaders;
+		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; } = DefaultHeaders;
 
 		/// <summary>
 		/// The server certificate if used for serving SSL requests
 		/// </summary>
-		public X509Certificate SSLCertificate;
+		public X509Certificate SSLCertificate { get; set; }
 		/// <summary>
 		/// True if a client SSL certificate should be requested
 		/// </summary>
-		public bool SSLRequireClientCert = false;
+		public bool SSLRequireClientCert { get; set; } = false;
 		/// <summary>
 		/// List the allowed SSL versions
 		/// </summary>
-		public SslProtocols SSLEnabledProtocols = SslProtocols.Tls12;
+		public SslProtocols SSLEnabledProtocols { get; set; } = SslProtocols.Tls12;
 		/// <summary>
 		/// Value indicating if SSL certificates are checked against a revocation list
 		/// </summary>
-		public bool SSLCheckCertificateRevocation = true;
+		public bool SSLCheckCertificateRevocation { get; set; } = true;
 
 		/// <summary>
 		/// A callback handler for debugging the internal server state
 		/// </summary>
 		public DebugLogDelegate DebugLogHandler;
+
+		/// <summary>
+		/// Loads a certificate instance
+		/// </summary>
+		/// <param name="path">The path to the file with the certificate.</param>
+		/// <param name="password">The certificate password.</param>
+		public void LoadCertificate(string path, string password)
+		{
+			this.SSLCertificate = new X509Certificate2(path, password ?? "");
+		}
 
 		/// <summary>
 		/// Adds default headers to the output.
