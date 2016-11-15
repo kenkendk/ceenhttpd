@@ -32,9 +32,13 @@
     <Reference Include="nunit.framework">
       <HintPath>..\packages\NUnit.3.5.0\lib\net45\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.9.0.2-beta1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MvcTests.cs" />
+    <Compile Include="CliTests.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -50,8 +54,15 @@
       <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
       <Name>Ceen.Mvc</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Ceen.Httpd.Cli\Ceen.Httpd.Cli.csproj">
+      <Project>{AF13A77D-FD50-4ED1-943B-266E577CB28B}</Project>
+      <Name>Ceen.Httpd.Cli</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="test1.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
