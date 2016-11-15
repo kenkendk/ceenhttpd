@@ -1,0 +1,172 @@
+﻿# This is an example config file for the Ceen CLI module
+# All lines starting with a # are comments, and # marks the rest of the line as a comment
+# Blank lines are ignored
+
+#
+# Core properties
+#
+
+# The path where relative paths are treated, defaults to CWD
+#basepath .
+
+# Additional paths to use when attempting to load assemblies
+# Only works if using isolated domain to execute
+#assemblypath /test:/test2
+
+# Use app-domains to load executing assemblies, 
+# such that they can be reloaded without restarting
+# the server
+#isolatedappdomain true
+
+# To create a self-signed certificate with OpenSSL:
+# > openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout privkey.key -out certificate.crt
+#
+# Then convert it to pcks12 for use with Ceen.Httpd
+# > openssl pkcs12 -export -in certificate.crt -inkey privkey.key -out certificate.pfx
+
+# Path to the certificate to use for SSL requests, environment variables are expanded
+#certificatepath
+
+# The password used to open the SSL certificate, environment variables are expanded
+#certificatepassword
+
+# The ports the server listens on
+#httpport 80
+#httpsport 443
+
+# The IP address to listen on, can also be "any" or "loopback"
+#httpaddress loopback
+
+# The IP adress to listen on for HTTPS, can also be "any" or "loopback"
+#httpsaddress loopback
+
+
+#
+# HTTP configuration
+#
+
+# Number of unacked requests
+# Beware: changing the backlog causes the socket 
+#   to rebind and may cause lost requests during the restart
+#SocketBacklog 5
+
+# The maxximum number of request header lines
+#MaxRequestLineSize 8192
+# The maximum size of a HTTP request header
+#MaxRequestHeaderSize 65536
+# Maximum number of active requests, will throttle new requests after this
+#MaxActiveRequests 50000
+
+# The maximum size of a form post when using url encoding (5mb)
+#MaxUrlEncodedFormSize 5242880
+
+# Automatically parse form data into a multipart stream
+#AutoParseMultipartFormData true
+
+# Maximum size of a post request, including header (100mb)
+#MaxPostSize 104857600
+
+# Support the X-HTTP-Method header
+#AllowHttpMethodOverride "true"
+
+# Support proxy redirect headers
+#AllowedSourceIPHeaderValue "X-Forwarded-For"
+#AllowedSourceIPHeaderValue "X-Real-IP"
+
+# Number of seconds to allow a request to linger
+#RequestIdleTimeoutSeconds 5
+# Number of seconds to wait for the client to finish the header
+#RequestHeaderReadTimeoutSeconds 10
+# Maximum HTTP requests from a client over the same TCP connection
+#KeepAliveMaxRequests 30
+# Maximum number of seconds between each HTTP request on the same connection
+#KeepAliveTimeoutSeconds "10"
+
+# Require that the client has a valid SSL certificate
+#SSLRequireClientCert false
+# Check if the client certificate has been revoked, if supplied
+#SSLCheckCertificateRevocation true
+
+# The allowed SSL protocols
+#SSLEnabledProtocols "Tls11|Tls12"
+
+# Suppress default mime types
+#IgnoreDefaultMimeTypes false
+
+# Suppress default headers
+#SupressDefaultHeaders false
+
+# Set a new mime type
+#mime .xyz "application/xyz"
+
+# Set a default header
+#header "X-My-Header" "Special Header Value"
+
+# Set the default documents
+#index index.html
+#index index.htm
+
+#
+# Set up loggers
+#
+
+# Log Common Log Format output to stdout
+#logger Ceen.Httpd Ceen.Httpd.CLFStdOut
+# Log Common Log Format output to stderr
+#logger Ceen.Httpd Ceen.Httpd.CLFStdErr
+
+# Log exceptions to stderr
+#logger Ceen.Httpd Ceen.Httpd.StdErrErrors
+# Log exceptions to stdout
+#logger Ceen.Httpd Ceen.Httpd.StdOutErrors
+
+# Log CLF to syslog
+#logger Ceen.Httpd.Cli Ceen.Httpd.Cli.SyslogLogger
+
+# Log CLF to a file
+#logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file"
+# Log CLF to a file, setting combinedformat = true and logcookies to false
+#logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file" true false
+
+# Custom log method, must implement Ceen.Httpd.ILogger
+#logger MyAssemblyName MyNamespace.MyLogger "constructor arg1" "constructor arg2" "..."
+# Setting a property on the logger
+#set ExtendedLogging true
+#set maxfilesize 1024
+
+#
+# Set up routes and handlers
+#
+
+# A custom handler, must implement Ceen.IHttpModule
+#handler "/data" MyAssemblyName MyNamespace.MyHandler "constructor arg1" "constructor arg2" "..."
+#set ExtendedLogging true
+#set maxfilesize 1024
+
+# Serve local files
+#serve "" "/path/to/files"
+# Or manually invoked
+#handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
+
+# A custom route using Ceen.Mvc, loading an assembly
+#route MyAssemblyName
+
+# A custom route using Ceen.Mvc, loading an assembly with a default type
+#route MyAssemblyName MyNamespace.MyClass
+
+# Name of the controller group in the template
+#set ControllerGroupName "controller"
+# Name of the action group in the template
+#set ActionGroupName "action"
+# The default routing match template
+#set Template "{controller}/{action=index}"
+# Routes are case-sensitive by default
+#set CaseSensitive false
+# Names are converted to lower-case
+#set LowerCaseNames true
+# Hide the default controller so it cannot be reached directly
+#set HideDefaultController true
+# Hide the default action so it cannot be reached directly
+#set HideDefaultAction true
+# Turn on debug printing to stdout after building the route map
+#set Debug false
