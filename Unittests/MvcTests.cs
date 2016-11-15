@@ -129,17 +129,21 @@ namespace Unittests
 
 	internal class ServerRunner : IDisposable
 	{
-		public Ceen.Httpd.HttpServer Server;
+		public Ceen.Httpd.ServerConfig Config;
 
 		public System.Threading.CancellationTokenSource StopToken;
 		public Task ServerTask;
 		public readonly int Port;
 
-		public ServerRunner(Ceen.Httpd.HttpServer server, int port = 8900)
+		public ServerRunner(Ceen.Httpd.ServerConfig config, int port = 8900)
 		{
-			Server = server;
+			Config = config;
 			StopToken = new System.Threading.CancellationTokenSource();
-			ServerTask = Server.ListenAsync(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, port), StopToken.Token);
+			ServerTask = Ceen.Httpd.HttpServer.ListenAsync(
+				new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, port),
+				false,
+				config,
+				StopToken.Token);
 			Port = port;
 		}
 
@@ -194,16 +198,15 @@ namespace Unittests
 			Assert.Throws<Exception>(() =>
 			{
 				using (var server = new ServerRunner(
-					new Ceen.Httpd.HttpServer(
-						new Ceen.Httpd.ServerConfig()
-						.AddRoute(
-							typeof(ConflictControllerItems1)
-							.GetNestedTypes()
-							.ToRoute(
-								new ControllerRouterConfig()
-								{ Debug = true }
-							))
-					)))
+					new Ceen.Httpd.ServerConfig()
+					.AddRoute(
+						typeof(ConflictControllerItems1)
+						.GetNestedTypes()
+						.ToRoute(
+							new ControllerRouterConfig()
+							{ Debug = true }
+						))
+					))
 				{ }
 			});
 		}
@@ -214,16 +217,15 @@ namespace Unittests
 			Assert.Throws<Exception>(() =>
 			{
 				using (var server = new ServerRunner(
-					new Ceen.Httpd.HttpServer(
-						new Ceen.Httpd.ServerConfig()
-						.AddRoute(
-							typeof(ConflictControllerItems2)
-							.GetNestedTypes()
-							.ToRoute(
-								new ControllerRouterConfig()
-								{ Debug = true }
-							))
-					)))
+					new Ceen.Httpd.ServerConfig()
+					.AddRoute(
+						typeof(ConflictControllerItems2)
+						.GetNestedTypes()
+						.ToRoute(
+							new ControllerRouterConfig()
+							{ Debug = true }
+						))
+					))
 				{ }
 			});
 		}
@@ -232,17 +234,16 @@ namespace Unittests
 		public void TestRoutingWithDefaultHiddenController()
 		{
 			using (var server = new ServerRunner(
-				new Ceen.Httpd.HttpServer(
-					new Ceen.Httpd.ServerConfig()
-					.AddRoute(
-						typeof(ControllerItems)
-						.GetNestedTypes()
-						.ToRoute(
-							new ControllerRouterConfig(
-								typeof(ControllerItems.HomeController)) 
-								{ HideDefaultController = true, Debug = true }
-						))
-				)))
+				new Ceen.Httpd.ServerConfig()
+				.AddRoute(
+					typeof(ControllerItems)
+					.GetNestedTypes()
+					.ToRoute(
+						new ControllerRouterConfig(
+							typeof(ControllerItems.HomeController)) 
+							{ HideDefaultController = true, Debug = true }
+					))
+				))
 			{
 				Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/"));
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/home"));
@@ -279,17 +280,16 @@ namespace Unittests
 		public void TestRoutingWithDefaultController()
 		{
 			using (var server = new ServerRunner(
-				new Ceen.Httpd.HttpServer(
-					new Ceen.Httpd.ServerConfig()
-					.AddRoute(
-						typeof(ControllerItems)
-						.GetNestedTypes()
-						.ToRoute(
-							new ControllerRouterConfig(
-								typeof(ControllerItems.HomeController)) 
-								{ HideDefaultController = false, Debug = true }
-						))
-				)))
+				new Ceen.Httpd.ServerConfig()
+				.AddRoute(
+					typeof(ControllerItems)
+					.GetNestedTypes()
+					.ToRoute(
+						new ControllerRouterConfig(
+							typeof(ControllerItems.HomeController)) 
+							{ HideDefaultController = false, Debug = true }
+					))
+				))
 			{
 				Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/"));
 				Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/home"));
@@ -327,13 +327,12 @@ namespace Unittests
 		public void TestRoutingWithoutDefaultController()
 		{
 			using (var server = new ServerRunner(
-				new Ceen.Httpd.HttpServer(
-					new Ceen.Httpd.ServerConfig()
-					.AddRoute(
-						typeof(ControllerItems)
-						.GetNestedTypes()
-						.ToRoute())
-				)))
+				new Ceen.Httpd.ServerConfig()
+				.AddRoute(
+					typeof(ControllerItems)
+					.GetNestedTypes()
+					.ToRoute())
+				))
 			{
 				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/"));
 				Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/home"));
