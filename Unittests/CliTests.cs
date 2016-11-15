@@ -55,6 +55,21 @@ namespace Unittests
 			Assert.AreEqual(c1.HttpsPort, 333);
 			Assert.AreEqual(c1.HttpAddress, "0.0.0.0");
 			Assert.AreEqual(c1.HttpsAddress, "any");
-}
+		}
+
+		[Test()]
+		public void TestConfigSetup()
+		{
+			var filepath = System.IO.Path.Combine(
+				System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+				, "test2.txt");
+			var c1 = Ceen.Httpd.Cli.ConfigParser.ParseTextFile(filepath);
+			var c2 = Ceen.Httpd.Cli.ConfigParser.ValidateConfig(c1);
+
+			Assert.AreEqual(c2.MaxActiveRequests, 999);
+			Assert.AreEqual(c2.AllowHttpMethodOverride, true);
+
+			Assert.AreEqual(c2.Loggers.Count, 4);
+		}
 	}
 }

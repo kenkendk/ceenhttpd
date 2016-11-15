@@ -1,11 +1,7 @@
 ﻿basepath .
-certificatepath "xyz"
-certificatepassword "pass"
 httpport 22
-httpsport 333
 
 httpaddress 0.0.0.0
-httpsaddress any
 
 # Number of unacked requests
 #SocketBacklog 10
@@ -17,10 +13,11 @@ AllowedSourceIPHeaderValue "X-Real-IP" #And a comment
 # The allowed SSL protocols
 SSLEnabledProtocols "Tls11|Tls12"
 
-logger Ceen.Httpd Ceen.Httpd.CLFStdOut
-logger Ceen.Httpd Ceen.Httpd.StdErrErrors
+logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
+logger Ceen.Httpd Ceen.Httpd.Logging.StdErrErrors
 logger Ceen.Httpd.Cli Ceen.Httpd.Cli.SyslogLogger
-logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file" true false
+#logger Ceen.Httpd Ceen.Httpd.Logging.CLFLogger "log.txt" true false
+
 logger Unittests Unittests.TestLogger
 set TestProp true
 
@@ -30,19 +27,20 @@ set ExtendedLogging true
 set maxfilesize 1024
 
 # Serve local files
-handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
+handler "" Ceen.Httpd Ceen.Httpd.Handler.FileHandler "."
+serve "" "."
 
 # A custom route using Ceen.Mvc, loading an assembly
-route MyAssemblyName
+#route Unittests
 
 # A custom route using Ceen.Mvc, loading an assembly with a default type
-route MyClass MyAssemblyName
+#route Unittests Unittests.ControllerItems.WaitExample
 
-set ControllerGroupName "controller"
-set ActionGroupName "action"
+#set ControllerGroupName "controller"
+#set ActionGroupName "action"
 #set Template "{controller}/{action=index}"
 #set CaseSensitive false
-set LowerCaseNames true
+#set LowerCaseNames true
 #set HideDefaultController true
 #set HideDefaultAction true
-set Debug false
+#set Debug false

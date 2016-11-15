@@ -266,7 +266,7 @@ namespace Ceen.Httpd.Cli
 						if (args.Length < 2)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
 
-						cfg.ServerOptions[args.Skip(1).First()] = args.Skip(2).FirstOrDefault();
+						lastitemprops[args.Skip(1).First()] = args.Skip(2).FirstOrDefault();
 					}
 					else if (string.Equals(cmd, "serve", StringComparison.OrdinalIgnoreCase))
 					{
@@ -486,7 +486,11 @@ namespace Ceen.Httpd.Cli
 					{
 						Type defaulttype = null;
 						if (!string.IsNullOrWhiteSpace(route.Classname))
-							defaulttype = Type.GetType($"{route.Classname}, {route.Assembly}", true);
+						{
+							defaulttype = Type.GetType($"{route.Classname}, {route.Assembly}", false);
+							if (defaulttype == null)
+								throw new Exception($"Failed to find class {route.Classname} in {route.Assembly}");
+						}
 
 						var rt = new Ceen.Mvc.ControllerRouterConfig(defaulttype);
 						if (route.RouteOptions != null)
