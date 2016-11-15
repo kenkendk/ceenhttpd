@@ -16,11 +16,6 @@ namespace Ceen.Mvc
 		public const string DEFAULT_ROUTING_TEMPLATE = @"{controller}/{action=index}";
 
 		/// <summary>
-		/// Gets or sets the name of the prefix group in the template.
-		/// </summary>
-		public string PrefixGroupName { get; set; } = "prefix";
-
-		/// <summary>
 		/// Gets or sets the name of the controller group in the template.
 		/// </summary>
 		public string ControllerGroupName { get; set; } = "controller";
