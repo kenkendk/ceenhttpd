@@ -51,7 +51,7 @@ namespace Ceen.Httpd
 			if (string.IsNullOrWhiteSpace(value))
 				return null;
 			
-			if (value.StartsWith("[") && value.EndsWith("]"))
+			if (value.StartsWith("[", StringComparison.Ordinal) && value.EndsWith("]", StringComparison.Ordinal))
 				return new Regex(value.Substring(1, value.Length - 2));
 			else
 				return new Regex(Regex.Escape(value));
