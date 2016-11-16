@@ -140,7 +140,7 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.ResponseCookie"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.ResponseCookie"/> class.
 		/// </summary>
 		/// <param name="name">The cookie name.</param>
 		/// <param name="value">The cookie value.</param>

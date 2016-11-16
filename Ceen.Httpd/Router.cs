@@ -33,7 +33,7 @@ namespace Ceen.Httpd
 		{
 		}
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.Router"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Router"/> class.
 		/// </summary>
 		/// <param name="rules">The routing rules.</param>
 		public Router(IEnumerable<KeyValuePair<string, IHttpModule>> rules)
@@ -80,8 +80,7 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// Process the specified request.
 		/// </summary>
-		/// <param name="request">Request.</param>
-		/// <param name="response">Response.</param>
+		/// <param name="context">The http context.</param>
 		/// <returns><c>True</c> if the processing was handled, false otherwise</returns>
 		public async Task<bool> Process(IHttpContext context)
 		{

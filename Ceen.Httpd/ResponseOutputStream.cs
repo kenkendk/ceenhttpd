@@ -44,7 +44,7 @@ namespace Ceen.Httpd
 		private const int MAX_RESPONSE_BUFFER = 5 * 1024 * 1024;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.ResponseOutputStream"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.ResponseOutputStream"/> class.
 		/// </summary>
 		/// <param name="parent">The stream where data is written to.</param>
 		/// <param name="response">The response instance that this stream is attached to.</param>
