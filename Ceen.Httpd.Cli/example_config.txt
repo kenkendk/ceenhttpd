@@ -139,6 +139,9 @@
 # Set up routes and handlers
 #
 
+# Add session state
+#handler "" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
+
 # A custom handler, must implement Ceen.IHttpModule
 #handler "/data" MyAssemblyName MyNamespace.MyHandler "constructor arg1" "constructor arg2" "..."
 #set ExtendedLogging true
