@@ -95,10 +95,11 @@ namespace Ceen.Httpd.Cli
 			/// Handles a request
 			/// </summary>
 			/// <param name="socket">The socket handle.</param>
+			/// <param name="remoteEndPoint">The remote endpoint.</param>
 			/// <param name="logtaskid">The task ID to use.</param>
-			public void HandleRequest(SocketInformation socket, string logtaskid)
+			public void HandleRequest(SocketInformation socket, EndPoint remoteEndPoint, string logtaskid)
 			{
-				m_handleRequest.Invoke(m_wrapped, new object[] { socket, logtaskid });
+				m_handleRequest.Invoke(m_wrapped, new object[] { socket, remoteEndPoint, logtaskid });
 			}
 
 			/// <summary>
@@ -221,7 +222,8 @@ namespace Ceen.Httpd.Cli
 					usessl,
 					m_token.Token,
 					config,
-					(socket, id) => Wrapper.HandleRequest(socket.Client.DuplicateAndClose(pid), id));
+					(socket, addr, id) => Wrapper.HandleRequest(socket.Client.DuplicateAndClose(pid), addr, id)
+				);
 			}
 		}
 
