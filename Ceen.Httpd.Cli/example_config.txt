@@ -120,8 +120,9 @@
 # Log exceptions to stdout
 #logger Ceen.Httpd Ceen.Httpd.StdOutErrors
 
-# Log CLF to syslog
-#logger Ceen.Httpd.Cli Ceen.Httpd.Cli.SyslogLogger
+# Log CLF to syslog, requires SyslogNet.Client in GAC or assembly path
+# Only works on Linux
+#logger Ceen.Httpd Ceen.Httpd.Logging.SyslogLogger
 
 # Log CLF to a file
 #logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file"
@@ -130,7 +131,7 @@
 
 # Custom log method, must implement Ceen.Httpd.ILogger
 #logger MyAssemblyName MyNamespace.MyLogger "constructor arg1" "constructor arg2" "..."
-# Setting a property on the logger
+# Setting some properties on the logger
 #set ExtendedLogging true
 #set maxfilesize 1024
 

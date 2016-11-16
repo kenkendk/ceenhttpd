@@ -30,23 +30,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="SyslogNet.Client">
-      <HintPath>..\packages\SyslogNet.Client.0.3.2\lib\net40\SyslogNet.Client.dll</HintPath>
-    </Reference>
     <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SyslogLogger.cs" />
     <Compile Include="CLIServerConfiguration.cs" />
     <Compile Include="ConfigParser.cs" />
     <Compile Include="AppDomainHandler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj">
       <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>

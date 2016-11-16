@@ -54,6 +54,7 @@
     <Compile Include="DefaultableDictionary.cs" />
     <Compile Include="ResponseCookie.cs" />
     <Compile Include="Logging\LogHelpers.cs" />
+    <Compile Include="Logging\SyslogLogger.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
