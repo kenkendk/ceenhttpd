@@ -362,8 +362,21 @@ namespace Ceen.Httpd
 
 				foreach (var cookie in Cookies)
 				{
-					Func<string, string> cookievalue = x => string.IsNullOrWhiteSpace(x) ? "" : string.Format("=\"{0}\"", x);
-					line = Encoding.ASCII.GetBytes(string.Format("Set-Cookie: {0}{1}{2}", cookie.Name, string.Join("; ", new string[] { cookievalue(cookie.Value) }.Union(cookie.Settings.Select(x => string.Format("{0}{1}", x.Key, cookievalue(x.Value)))).Where(x => !string.IsNullOrWhiteSpace(x))), CRLF));
+					// URL encoding not required, but common practice
+					Func<string, string> cookievalue = x => string.IsNullOrWhiteSpace(x) ? "" : string.Format("=\"{0}\"", Uri.EscapeDataString(x));
+
+					line = 
+						Encoding.ASCII.GetBytes(
+							string.Format("Set-Cookie: {0}{1}{2}", 
+							              Uri.EscapeDataString(cookie.Name), 
+							              string.Join("; ", 
+							                          new string[] { cookievalue(cookie.Value) }
+							                          .Union(
+								                          cookie.Settings
+								                          .Select(x => string.Format("{0}{1}", x.Key, cookievalue(x.Value))))
+							                          .Where(x => !string.IsNullOrWhiteSpace(x))),
+							              CRLF));
+					
 					await m_stream.WriteAsync(line, 0, line.Length);
 				}
 
@@ -509,7 +522,7 @@ namespace Ceen.Httpd
 		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
 		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false)
 		{
-			return new ResponseCookie(name, value) 
+			var cookie = new ResponseCookie(name, value) 
 			{
 				Path = path,
 				Domain = domain,
@@ -518,6 +531,10 @@ namespace Ceen.Httpd
 				Secure = secure,
 				HttpOnly = httponly
 			};
+			this.Cookies.Add(cookie);
+
+			return cookie;
+
 		}
 
 	}
