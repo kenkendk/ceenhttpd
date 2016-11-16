@@ -11,7 +11,7 @@ namespace Ceen.Httpd.Cli
 	/// <summary>
 	/// Handler class for running a server split across appdomains
 	/// </summary>
-	public class AppDomainHandler : IDisposable
+	internal class AppDomainHandler : IDisposable
 	{
 		/// <summary>
 		/// Bridge to call methods across an App Domain
@@ -28,9 +28,22 @@ namespace Ceen.Httpd.Cli
 			/// </summary>
 			/// <param name="usessl">If set to <c>true</c> usessl.</param>
 			/// <param name="path">Path to the configuration file.</param>
-			public void SetupFromFile(bool usessl, string path)
+			/// <param name="storage">The storage instance or null.</param>
+			public void SetupFromFile(bool usessl, string path, IStorageCreator storage)
 			{
-				base.Setup(usessl, ConfigParser.ValidateConfig(ConfigParser.ParseTextFile(path)));
+				var config = ConfigParser.ValidateConfig(ConfigParser.ParseTextFile(path));
+				if (storage != null)
+				{
+					// Inject a wrapper to support async via callbacks
+					if (AppDomain.CurrentDomain.IsDefaultAppDomain())
+						config.Storage = storage;
+					else
+						config.Storage = new StorageCreatorAccessor(storage);
+				}
+				else
+					config.Storage = new MemoryStorageCreator();
+				
+				base.Setup(usessl, config);
 			}
 		}
 
@@ -71,11 +84,11 @@ namespace Ceen.Httpd.Cli
 			public AppDomainWrapper(AppDomain domain)
 			{
 				m_wrapped = domain.CreateInstanceAndUnwrap(typeof(AppDomainHandler.AppDomainBridge).Assembly.FullName, typeof(AppDomainHandler.AppDomainBridge).FullName);
-				m_setupFromFile = m_wrapped.GetType().GetMethod("SetupFromFile");
-				m_handleRequest = m_wrapped.GetType().GetMethod("HandleRequest");
-				m_stop = m_wrapped.GetType().GetMethod("Stop");
-				m_waitforstop = m_wrapped.GetType().GetMethod("WaitForStop");
-				m_activeclients = m_wrapped.GetType().GetProperty("ActiveClients");
+				m_setupFromFile = m_wrapped.GetType().GetMethod(nameof(AppDomainHandler.AppDomainBridge.SetupFromFile));
+				m_handleRequest = m_wrapped.GetType().GetMethod(nameof(AppDomainHandler.AppDomainBridge.HandleRequest));
+				m_stop = m_wrapped.GetType().GetMethod(nameof(AppDomainHandler.AppDomainBridge.Stop));
+				m_waitforstop = m_wrapped.GetType().GetMethod(nameof(AppDomainHandler.AppDomainBridge.WaitForStop));
+				m_activeclients = m_wrapped.GetType().GetProperty(nameof(AppDomainHandler.AppDomainBridge.ActiveClients));
 
 				if (new[] { m_wrapped, m_setupFromFile, m_handleRequest, m_stop, m_waitforstop }.Any(x => x == null) || m_activeclients == null)
 					throw new Exception($"Something changed in {typeof(AppDomainBridge)}");
@@ -86,9 +99,10 @@ namespace Ceen.Httpd.Cli
 			/// </summary>
 			/// <param name="usessl">If set to <c>true</c> usessl.</param>
 			/// <param name="configfile">Path to the configuration file</param>
-			public void SetupFromFile(bool usessl, string configfile)
+			/// <param name="storage">The storage instance or null</param>
+			public void SetupFromFile(bool usessl, string configfile, IStorageCreator storage)
 			{
-				m_setupFromFile.Invoke(m_wrapped, new object[] { usessl, configfile });
+				m_setupFromFile.Invoke(m_wrapped, new object[] { usessl, configfile, storage });
 			}
 
 			/// <summary>
@@ -255,6 +269,11 @@ namespace Ceen.Httpd.Cli
 		public event Action<string, bool, Exception> InstanceCrashed;
 
 		/// <summary>
+		/// The storage creator
+		/// </summary>
+		private readonly IStorageCreator m_storage = new MemoryStorageCreator();
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.AppDomainHandler"/> class.
 		/// </summary>
 		/// <param name="configfile">The path to the configuration file.</param>
@@ -270,6 +289,7 @@ namespace Ceen.Httpd.Cli
 		{
 			var cfg = ConfigParser.ParseTextFile(m_path);
 			var config = ConfigParser.CreateServerConfig(cfg);
+			config.Storage = m_storage;
 
 			var domain = AppDomain.CreateDomain(
 				"CeenRunner-" + Guid.NewGuid().ToString(),
@@ -340,7 +360,7 @@ namespace Ceen.Httpd.Cli
 			{
 				var addcrashhandler = true;
 				var wrapper = new AppDomainWrapper(domain);
-				wrapper.SetupFromFile(usessl, m_path);
+				wrapper.SetupFromFile(usessl, m_path, config.Storage);
 				if (prev == null)
 				{
 					prev = new RunnerInstance(wrapper, address, port, usessl, config);

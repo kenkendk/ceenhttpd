@@ -111,6 +111,11 @@ namespace Ceen.Httpd
 		public DebugLogDelegate DebugLogHandler;
 
 		/// <summary>
+		/// The storage creator
+		/// </summary>
+		public IStorageCreator Storage { get; set; }
+
+		/// <summary>
 		/// Loads a certificate instance
 		/// </summary>
 		/// <param name="path">The path to the file with the certificate.</param>

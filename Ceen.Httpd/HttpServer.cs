@@ -491,7 +491,10 @@ namespace Ceen.Httpd
 		{
 			if (usessl && (config.SSLCertificate as X509Certificate2 == null || !(config.SSLCertificate as X509Certificate2).HasPrivateKey))
 				throw new Exception("Certificate does not have a private key and cannot be used for signing");
-			
+
+			if (config.Storage == null)
+				config.Storage = new MemoryStorageCreator();
+
 			return ListenToSocketInternalAsync(addr, usessl, stoptoken, config, RunClient);
 		}
 
@@ -521,6 +524,7 @@ namespace Ceen.Httpd
 		private static async void RunClient(TcpClient client, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
 		{
 			var config = controller.Config;
+			var storage = config.Storage;
 
 			using (var s = client.GetStream())
 			using (var ssl = controller.m_useSSL ? new SslStream(s, false) : null)
@@ -572,6 +576,7 @@ namespace Ceen.Httpd
 		private static async Task Runner(Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
 		{
 			var config = controller.Config;
+			var storage = config.Storage;
 			var requests = config.KeepAliveMaxRequests;
 
 			bool keepingalive = false;
@@ -596,7 +601,8 @@ namespace Ceen.Httpd
 						started = DateTime.Now;
 						context = new HttpContext(
 							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert),
-							resp = new HttpResponse(stream, config)
+							resp = new HttpResponse(stream, config),
+							storage
 						);
 
 						var timeouttask = Task.Delay(TimeSpan.FromSeconds(keepingalive ? config.KeepAliveTimeoutSeconds : config.RequestIdleTimeoutSeconds));

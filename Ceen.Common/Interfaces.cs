@@ -348,6 +348,17 @@ namespace Ceen
 		/// Gets the response
 		/// </summary>
 		IHttpResponse Response { get; }
+
+		/// <summary>
+		/// Gets the storage creator
+		/// </summary>
+		IStorageCreator Storage { get; }
+	
+		/// <summary>
+		/// Gets or sets the session storage.
+		/// Note that this can be null if there is no session module loaded.
+		/// </summary>
+		IDictionary<string, string> Session { get; set; }
 	}
 
 	/// <summary>
@@ -374,5 +385,36 @@ namespace Ceen
 		/// <param name="context">The context to use.</param>
 		/// <returns>A value indicating if the request is now processed</returns>
 		Task<bool> HandleAsync(IHttpContext context);
+	}
+
+	/// <summary>
+	/// Interface for implementing a storage creator
+	/// </summary>
+	public interface IStorageCreator
+	{
+		/// <summary>
+		/// Gets or creates a storage module with the given name
+		/// </summary>
+		/// <returns>The storage module or null.</returns>
+		/// <param name="name">The name of the module to get.</param>
+		/// <param name="key">The session key of the module, or null.</param>
+		/// <param name="ttl">The module time-to-live, zero or less means no expiration.</param>
+		/// <param name="autocreate">Automatically create storage if not found</param>
+		Task<IStorageEntry> GetStorageAsync(string name, string key, int ttl, bool autocreate);
+	}
+
+	/// <summary>
+	/// Interface for storing data
+	/// </summary>
+	public interface IStorageEntry : IDictionary<string, string>
+	{
+		/// <summary>
+		/// Gets the name of the storage element
+		/// </summary>
+		string Name { get; }
+		/// <summary>
+		/// Gets or sets the time the dictionary expires
+		/// </summary>
+		DateTime Expires { get; set; }
 	}
 }

@@ -35,6 +35,8 @@
     <Compile Include="Exceptions.cs" />
     <Compile Include="Interfaces.cs" />
     <Compile Include="HttpProtocolDefinitions.cs" />
+    <Compile Include="AsyncLock.cs" />
+    <Compile Include="AppDomainTask.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -55,6 +55,7 @@
     <Compile Include="ResponseCookie.cs" />
     <Compile Include="Logging\LogHelpers.cs" />
     <Compile Include="Logging\SyslogLogger.cs" />
+    <Compile Include="StorageImplementation.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
