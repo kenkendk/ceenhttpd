@@ -37,7 +37,7 @@ namespace Ceen.Httpd
 		public Stream Data { get; set; }
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.MultipartItem"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.MultipartItem"/> class.
 		/// </summary>
 		public MultipartItem()
 		{
@@ -45,7 +45,7 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.MultipartItem"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.MultipartItem"/> class.
 		/// </summary>
 		/// <param name="headers">The headers present on the multipart entry.</param>
 		public MultipartItem(IDictionary<string, string> headers)

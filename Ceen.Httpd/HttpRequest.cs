@@ -118,7 +118,7 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpRequest"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.HttpRequest"/> class.
 		/// </summary>
 		/// <param name="remoteEndpoint">The remote endpoint.</param>
 		/// <param name="logtaskid">The logging ID for the task</param>
@@ -157,7 +157,7 @@ namespace Ceen.Httpd
 
 				string qs = null;
 				var path = components[1];
-				var qix = path.IndexOf("?");
+				var qix = path.IndexOf("?", StringComparison.Ordinal);
 				if (qix >= 0)
 				{
 					qs = path.Substring(qix);
@@ -181,7 +181,7 @@ namespace Ceen.Httpd
 				// Setup cookie collection automatically
 				if (string.Equals(components[0].Trim(), "cookie", StringComparison.OrdinalIgnoreCase))
 					foreach(var k in SplitHeaderLine((components[1] ?? string.Empty).Trim()))
-						Cookies[k.Key] = k.Value;
+						Cookies[Uri.UnescapeDataString(k.Key)] = Uri.UnescapeDataString(k.Value);
 
 				var key = components[0].Trim();
 				var value = (components[1] ?? string.Empty).Trim();
@@ -198,7 +198,7 @@ namespace Ceen.Httpd
 		private static void ParseQueryString(string qs, IDictionary<string, string> target)
 		{
 			var fr = qs ?? string.Empty;
-			if (fr.StartsWith("?"))
+			if (fr.StartsWith("?", StringComparison.Ordinal))
 				fr = fr.Substring(1);
 
 			foreach (var frag in fr.Split(new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries))
@@ -210,14 +210,14 @@ namespace Ceen.Httpd
 
 		private async Task ParseMultiPart(Func<IDictionary<string, string>, Stream, Task> itemparser, BufferedStreamReader reader, ServerConfig config, TimeSpan idletime, Task timeouttask, Task stoptask)
 		{
-			if ((this.ContentType ?? "").StartsWith("multipart/form-data"))
+			if ((this.ContentType ?? "").StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))
 			{
 				if (this.ContentLength > config.MaxPostSize)
 					throw new HttpException(HttpStatusCode.PayloadTooLarge);
 				
 				var trail = new byte[2];
 				var parts = this.ContentType.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-				var bndpart = parts.Where(x => x.Trim().StartsWith("boundary")).FirstOrDefault() ?? string.Empty;
+				var bndpart = parts.Where(x => x.Trim().StartsWith("boundary", StringComparison.OrdinalIgnoreCase)).FirstOrDefault() ?? string.Empty;
 				var boundary = bndpart.Split(new char[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
 				if (string.IsNullOrWhiteSpace(boundary))
 					throw new HttpException(HttpStatusCode.BadRequest);

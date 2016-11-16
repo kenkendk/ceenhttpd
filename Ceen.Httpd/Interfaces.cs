@@ -23,6 +23,14 @@ namespace Ceen.Httpd
 	/// </summary>
 	public interface ILogger
 	{
+		/// <summary>
+		/// Logs a request.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="context">The execution context.</param>
+		/// <param name="ex">The exception being logged, may be null.</param>
+		/// <param name="started">The time the request started.</param>
+		/// <param name="duration">The request duration.</param>
 		Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
 	}
 
@@ -31,7 +39,13 @@ namespace Ceen.Httpd
 	/// </summary>
 	public interface IStartLogger : ILogger
 	{
+		/// <summary>
+		/// Logs the start of a request.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="request">The request being started.</param>
 		Task LogRequestStarted(IHttpRequest request);
 	}
+
 
 }

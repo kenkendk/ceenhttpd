@@ -13,7 +13,7 @@ namespace Ceen.Httpd.Logging
 		/// </summary>
 		private readonly LogDelegate m_func;
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.Logging.FunctionLogger"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Logging.FunctionLogger"/> class.
 		/// </summary>
 		/// <param name="func">The logging function.</param>
 		public FunctionLogger(LogDelegate func)
@@ -27,8 +27,7 @@ namespace Ceen.Httpd.Logging
 		/// Logs the request by calling the function.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
-		/// <param name="request">The request.</param>
-		/// <param name="response">The response.</param>
+		/// <param name="context">The http context.</param>
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>

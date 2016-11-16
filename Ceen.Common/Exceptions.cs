@@ -21,7 +21,7 @@ namespace Ceen
 		public string StatusMessage { get; private set; }
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpException"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
 		/// </summary>
 		public HttpException()
 			: this(HttpStatusCode.InternalServerError)
@@ -29,7 +29,7 @@ namespace Ceen
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpException"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
 		/// </summary>
 		/// <param name="statuscode">The statuscode.</param>
 		public HttpException(HttpStatusCode statuscode)
@@ -38,7 +38,7 @@ namespace Ceen
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpException"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
 		/// </summary>
 		/// <param name="statuscode">The statuscode.</param>
 		/// <param name="statusmessage">The statusmessage.</param>

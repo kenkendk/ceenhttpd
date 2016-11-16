@@ -39,7 +39,7 @@ namespace Ceen.Mvc
 		public string Name { get; set; }
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceenhttpd.Routing.RoutingAttribute"/> class.
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.NameAttribute"/> class.
 		/// </summary>
 		/// <param name="name">The name to use</param>
 		public NameAttribute(string name)

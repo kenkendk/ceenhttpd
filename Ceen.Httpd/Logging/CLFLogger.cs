@@ -43,7 +43,7 @@ namespace Ceen.Httpd.Logging
 
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.Logging.CLFLogger"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Logging.CLFLogger"/> class.
 		/// </summary>
 		/// <param name="filename">The file to write log data into.</param>
 		/// <param name="useCombinedFormat"><c>True</c> if the logging should be in combined format, <c>false</c> otherwise.</param>
@@ -54,7 +54,7 @@ namespace Ceen.Httpd.Logging
 		}
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.Logging.CLFLogger"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Logging.CLFLogger"/> class.
 		/// </summary>
 		/// <param name="destination">The stream to write to.</param>
 		/// <param name="useCombinedFormat"><c>True</c> if the logging should be in combined format, <c>false</c> otherwise.</param>
@@ -79,8 +79,7 @@ namespace Ceen.Httpd.Logging
 		/// Gets the log line in the combined log format.
 		/// </summary>
 		/// <returns>The combined log line.</returns>
-		/// <param name="request">The request.</param>
-		/// <param name="response">The response.</param>
+		/// <param name="context">The http context.</param>
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>
@@ -150,12 +149,12 @@ namespace Ceen.Httpd.Logging
 		#region IDisposable implementation
 
 		/// <summary>
-		/// Releases all resource used by the <see cref="Ceenhttpd.Logging.CLFLogger"/> object.
+		/// Releases all resource used by the <see cref="Ceen.Httpd.Logging.CLFLogger"/> object.
 		/// </summary>
-		/// <remarks>Call <see cref="Dispose"/> when you are finished using the <see cref="Ceenhttpd.Logging.CLFLogger"/>. The
-		/// <see cref="Dispose"/> method leaves the <see cref="Ceenhttpd.Logging.CLFLogger"/> in an unusable state. After
-		/// calling <see cref="Dispose"/>, you must release all references to the <see cref="Ceenhttpd.Logging.CLFLogger"/> so
-		/// the garbage collector can reclaim the memory that the <see cref="Ceenhttpd.Logging.CLFLogger"/> was occupying.</remarks>
+		/// <remarks>Call <see cref="Dispose"/> when you are finished using the <see cref="Ceen.Httpd.Logging.CLFLogger"/>. The
+		/// <see cref="Dispose"/> method leaves the <see cref="Ceen.Httpd.Logging.CLFLogger"/> in an unusable state. After
+		/// calling <see cref="Dispose"/>, you must release all references to the <see cref="Ceen.Httpd.Logging.CLFLogger"/> so
+		/// the garbage collector can reclaim the memory that the <see cref="Ceen.Httpd.Logging.CLFLogger"/> was occupying.</remarks>
 		public void Dispose()
 		{
 			Dispose(true);
@@ -169,8 +168,7 @@ namespace Ceen.Httpd.Logging
 		/// Logs the request to the stream.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
-		/// <param name="request">The request.</param>
-		/// <param name="response">The response.</param>
+		/// <param name="context">The http context.</param>
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>

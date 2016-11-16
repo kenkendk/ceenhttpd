@@ -58,11 +58,11 @@ namespace Ceen.Httpd
 		private System.Threading.CancellationTokenSource m_cs;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.DelimitedSubStream"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.DelimitedSubStream"/> class.
 		/// </summary>
 		/// <param name="parent">The parent stream.</param>
 		/// <param name="delimiter">The stream delimiter.</param>
-		/// <param name="idletimeout">The time to wait while idle</param>
+		/// <param name="idletime">The time to wait while idle</param>
 		/// <param name="timeouttask">The task that signals request timeout</param>
 		/// <param name="stoptask">The task that signals stop for the server</param>
 		public DelimitedSubStream(BufferedStreamReader parent, byte[] delimiter, TimeSpan idletime, Task timeouttask, Task stoptask)

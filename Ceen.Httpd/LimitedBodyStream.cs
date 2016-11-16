@@ -44,13 +44,13 @@ namespace Ceen.Httpd
 		private bool m_passthrough;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.LimitedBodyStream"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.LimitedBodyStream"/> class.
 		/// </summary>
-		/// <param name="parent">Parent.</param>
-		/// <param name="delimiter">Delimiter.</param>
-		/// <param name="idletime">Idletime.</param>
-		/// <param name="timeouttask">Timeouttask.</param>
-		/// <param name="stoptask">Stoptask.</param>
+		/// <param name="parent">The parent stream.</param>
+		/// <param name="totalbytes">The number of bytes to limit to.</param>
+		/// <param name="idletime">The maximum idle time.</param>
+		/// <param name="timeouttask">The timeout wait task.</param>
+		/// <param name="stoptask">The stop signal task.</param>
 		public LimitedBodyStream(BufferedStreamReader parent, long totalbytes, TimeSpan idletime, Task timeouttask, Task stoptask)
 		{
 			m_bytesleft = totalbytes;

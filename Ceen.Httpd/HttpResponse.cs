@@ -208,7 +208,7 @@ namespace Ceen.Httpd
 		private const string CRLF = "\r\n";
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.HttpResponse"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.HttpResponse"/> class.
 		/// </summary>
 		/// <param name="stream">The underlying stream.</param>
 		/// <param name="config">The server configuration.</param>

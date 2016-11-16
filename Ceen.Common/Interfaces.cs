@@ -339,7 +339,14 @@ namespace Ceen
 	/// </summary>
 	public interface IHttpContext
 	{
+		/// <summary>
+		/// Gets the request.
+		/// </summary>
 		IHttpRequest Request { get; }
+
+		/// <summary>
+		/// Gets the response
+		/// </summary>
 		IHttpResponse Response { get; }
 	}
 
@@ -348,6 +355,11 @@ namespace Ceen
 	/// </summary>
 	public interface IRouter
 	{
+		/// <summary>
+		/// Process the request for the specified context.
+		/// </summary>
+		/// <param name="context">The context to use.</param>
+		/// <returns>A value indicating if the request is now processed</returns>
 		Task<bool> Process(IHttpContext context);
 	}
 
@@ -356,6 +368,11 @@ namespace Ceen
 	/// </summary>
 	public interface IHttpModule
 	{
+		/// <summary>
+		/// Process the request for the specified context.
+		/// </summary>
+		/// <param name="context">The context to use.</param>
+		/// <returns>A value indicating if the request is now processed</returns>
 		Task<bool> HandleAsync(IHttpContext context);
 	}
 }
