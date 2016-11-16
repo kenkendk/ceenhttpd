@@ -94,7 +94,7 @@ namespace Ceen.Httpd.Cli
 			{
 				var entries = Environment.ExpandEnvironmentVariables(value ?? "")
 				                         .Split('|')
-				                         .Select(x => Enum.Parse(targettype, x))
+				                         .Select(x => Enum.Parse(targettype, x, true))
 				                         .ToArray();
 				if (entries.Length == 1)
 					return entries.First();
