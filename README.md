@@ -236,7 +236,7 @@ public class ApiExampleController : Controller, IApiV1
 }
 ```
 
-Then provide a configuration file ([see example-config file for more options](Ceen.Http.Cli/example_config.txt):
+Then provide a configuration file ([see example-config file for more options](Ceen.Httpd.Cli/example_config.txt)):
 ```
 httpport 80
 httpaddress any
@@ -244,7 +244,7 @@ httpaddress any
 # send combined-log-format data to stdout
 logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
 
-# load the mvc based assembly, set hthe ApiExampleController as default route
+# load the mvc based assembly, set the ApiExampleController as default route
 route MyAssembly MyAssembly.MyNamespace.ApiExampleController
 
 # serve files from a local folder
