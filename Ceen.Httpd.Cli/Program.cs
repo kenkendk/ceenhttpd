@@ -13,7 +13,7 @@ namespace Ceen.Httpd.Cli
 		{
 			if (args.Length != 1)
 			{
-				Console.WriteLine("Usage: Ceenhttpd-cli [path-to-config-file]");
+				Console.WriteLine("Usage: Ceen.Httpd.Cli [path-to-config-file]");
 				return 1;
 			}
 

@@ -49,15 +49,14 @@ namespace Ceen.Httpd
 		private long m_maxread = 0;
 
 		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceenhttpd.BufferedStreamReader"/> class.
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.BufferedStreamReader"/> class.
 		/// </summary>
 		/// <param name="parent">The parent stream.</param>
-		/// <param name="maxreadsize">The maximum number of bytes to read</param>
 		/// <param name="initialbuffersize">Intitial size of the read-ahead buffer.</param>
 		public BufferedStreamReader(Stream parent, int initialbuffersize = 1024)
 		{
 			if (parent == null)
-				throw new ArgumentNullException("parent");
+				throw new ArgumentNullException(nameof(parent));
 			
 			m_parent = parent;
 			m_buffer = new byte[initialbuffersize];
