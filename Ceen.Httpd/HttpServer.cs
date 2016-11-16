@@ -507,10 +507,7 @@ namespace Ceen.Httpd
 		/// <param name="controller">The controller instance</param>
 		private static void RunClient(SocketInformation socketinfo, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
 		{
-			var client = new TcpClient() { Client = new Socket(socketinfo) };
-			if (client.Client.Available == 0)
-				Console.WriteLine();
-				
+			var client = new TcpClient() { Client = new Socket(socketinfo) };				
 			RunClient(client, remoteEndPoint, logtaskid, controller);
 		}
 
