@@ -5,11 +5,11 @@ using System.Runtime.CompilerServices;
 // Change them to the values specific to your project.
 
 [assembly: AssemblyTitle("Ceen.Httpd.Cli")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Ceen Httpd Commandline Host")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("HexaD")]
 [assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("kenneth")]
+[assembly: AssemblyCopyright("(c) Kenneth Skovhede 2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
