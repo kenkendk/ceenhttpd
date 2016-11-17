@@ -114,29 +114,51 @@ namespace Ceen.Httpd.Cli
 		/// Create an instance of an object, using constructor arguments and properties
 		/// </summary>
 		/// <returns>The created instance.</returns>
+		/// <param name="itemtype">The type to create.</param>
+		/// <param name="constructorargs">Arguments to pass to the constructor.</param>
+		/// <param name="targettype">The type the instance should be assignable to.</param>
+		private static object CreateInstance(Type itemtype, List<string> constructorargs, Type targettype)
+		{
+			constructorargs = constructorargs ?? new List<string>();
+
+			if (!targettype.IsAssignableFrom(itemtype))
+				throw new Exception($"Found class {itemtype.FullName} in assembly {itemtype.Assembly.FullName}, but it does not implement ${typeof(ILogger).FullName}");
+
+			var cons = itemtype.GetConstructors().Where(x => x.GetParameters().Length == constructorargs.Count).ToArray();
+			if (cons.Length == 0)
+				throw new Exception($"Failed to load the class named {itemtype.FullName} from assembly {itemtype.Assembly.FullName} as there were no matching constructors");
+			if (cons.Length != 1)
+				throw new Exception($"Failed to load the class named {itemtype.FullName} from assembly {itemtype.Assembly.FullName} as there were {cons.Length} matching constructors");
+
+			var args = cons.First().GetParameters().Zip(constructorargs, (arg1, arg2) => ArgumentFromString(arg2, arg1.ParameterType)).ToArray();
+			return Activator.CreateInstance(itemtype, args);		
+		}
+
+		/// <summary>
+		/// Create an instance of an object, using constructor arguments and properties
+		/// </summary>
+		/// <returns>The created instance.</returns>
 		/// <param name="assemblyname">The name of the assembly where the type is in.</param>
 		/// <param name="classname">The name of the class to create.</param>
 		/// <param name="constructorargs">Arguments to pass to the constructor.</param>
 		/// <param name="targettype">The type the instance should be assignable to.</param>
 		private static object CreateInstance(string assemblyname, string classname, List<string> constructorargs, Type targettype)
 		{
-			constructorargs = constructorargs ?? new List<string>();
+			return CreateInstance(ResolveType(assemblyname, classname), constructorargs, targettype);
+		}
 
+		/// <summary>
+		/// Resolves the type given the class and assembly names.
+		/// </summary>
+		/// <returns>The resolved type.</returns>
+		/// <param name="assemblyname">The name of the assembly where the type is in.</param>
+		/// <param name="classname">The name of the class to create.</param>
+		private static Type ResolveType(string assemblyname, string classname)
+		{
 			var itemtype = Type.GetType($"{classname}, {assemblyname}", false);
 			if (itemtype == null)
 				throw new Exception($"Failed to find the class named {classname} in assembly {assemblyname}");
-
-			if (!targettype.IsAssignableFrom(itemtype))
-				throw new Exception($"Found class {classname} in assembly {assemblyname}, but it does not implement ${typeof(ILogger).FullName}");
-
-			var cons = itemtype.GetConstructors().Where(x => x.GetParameters().Length == constructorargs.Count).ToArray();
-			if (cons.Length == 0)
-				throw new Exception($"Failed to load the class named {classname} from assembly {assemblyname} as there were no matching constructors");
-			if (cons.Length != 1)
-				throw new Exception($"Failed to load the class named {classname} from assembly {assemblyname} as there were {cons.Length} matching constructors");
-
-			var args = cons.First().GetParameters().Zip(constructorargs, (arg1, arg2) => ArgumentFromString(arg2, arg1.ParameterType)).ToArray();
-			return Activator.CreateInstance(itemtype, args);
+			return itemtype;
 		}
 
 		/// <summary>
@@ -426,8 +448,9 @@ namespace Ceen.Httpd.Cli
 					// Check if this is a module
 					if (route.RoutePrefix != null)
 					{
-						var handler = CreateInstance(route.Assembly, route.Classname, route.ConstructorArguments, typeof(IHttpModule));
-						if (handler is Ceen.Httpd.Handler.FileHandler)
+						object handler;
+						var moduletype = ResolveType(route.Assembly, route.Classname);
+						if (typeof(Ceen.Httpd.Handler.FileHandler).IsAssignableFrom(moduletype))
 						{
 							Func<IHttpRequest, string, string> mimehandler = null;
 							if (config.MimeTypes != null && config.MimeTypes.Count > 0)
@@ -472,6 +495,10 @@ namespace Ceen.Httpd.Cli
 									config.IndexDocuments.ToArray(),
 									mimehandler
 								);
+						}
+						else
+						{
+							handler = CreateInstance(moduletype, route.ConstructorArguments, typeof(IHttpModule));
 						}
 
 						if (route.RouteOptions != null)
