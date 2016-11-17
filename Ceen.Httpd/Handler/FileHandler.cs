@@ -33,6 +33,11 @@ namespace Ceen.Httpd.Handler
 		private readonly string[] m_indexfiles;
 
 		/// <summary>
+		/// Gets or sets the path prefix
+		/// </summary>
+		public string PathPrefix { get; set; } = "";
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
@@ -79,7 +84,13 @@ namespace Ceen.Httpd.Handler
 				if (context.Request.Path.Contains(c))
 					throw new HttpException(HttpStatusCode.BadRequest);
 
-			var path = MapToLocalPath(context.Request.Path);
+			var pathrequest = context.Request.Path;
+			if (!pathrequest.StartsWith(PathPrefix, StringComparison.Ordinal))
+				return false;
+
+			pathrequest = pathrequest.Substring(PathPrefix.Length);
+
+			var path = MapToLocalPath(pathrequest);
 			if (!path.StartsWith(m_sourcefolder, StringComparison.Ordinal))
 				throw new HttpException(HttpStatusCode.BadRequest);
 

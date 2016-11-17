@@ -297,16 +297,27 @@ namespace Ceen.Httpd.Cli
 						if (args.Length > 3)
 							throw new Exception($"Too many arguments in line {lineindex}: {line}");
 
+						var routearg = args.Skip(1).First();
+						if (!routearg.StartsWith("/", StringComparison.Ordinal))
+							throw new Exception($"The route must start with a forward slash in line {lineindex}: {line}");
+						while (routearg.Length > 1 && routearg.EndsWith("/", StringComparison.Ordinal))
+							routearg = routearg.Substring(0, routearg.Length - 1);
+					
+						var pathprefix = routearg;
+						
+						routearg = $"[{routearg}(/.*)?]";
+
 						var route = new RouteDefinition()
 						{
-							RoutePrefix = args.Skip(1).First(),
-							Assembly = typeof(Ceen.Httpd.Handler.FileHandler).Assembly.FullName,
+							RoutePrefix = routearg,
+							Assembly = typeof(Ceen.Httpd.Handler.FileHandler).Assembly.GetName().Name,
 							Classname = typeof(Ceen.Httpd.Handler.FileHandler).FullName,
 							ConstructorArguments = args.Skip(2).ToList()
 						};
 
 						cfg.Routes.Add(route);
 						lastitemprops = route.RouteOptions;
+						lastitemprops.Add(nameof(Ceen.Httpd.Handler.FileHandler.PathPrefix), pathprefix);
 					}
 					else if (string.Equals(cmd, "mime", StringComparison.OrdinalIgnoreCase))
 					{
