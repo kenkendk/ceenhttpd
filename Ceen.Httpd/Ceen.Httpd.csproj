@@ -55,8 +55,10 @@
     <Compile Include="ResponseCookie.cs" />
     <Compile Include="Logging\LogHelpers.cs" />
     <Compile Include="Logging\SyslogLogger.cs" />
+    <Compile Include="Handler\VerifyXSRFHandler.cs" />
     <Compile Include="StorageImplementation.cs" />
     <Compile Include="Handler\SessionHandler.cs" />
+    <Compile Include="Handler\SetXSRFCookieHandler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
