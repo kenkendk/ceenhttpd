@@ -113,6 +113,11 @@ namespace Ceen.Httpd.Cli
 		public bool IsolatedAppDomain { get; set; } = true;
 
 		/// <summary>
+		/// Gets or sets the number of seconds between each storage expiration check.
+		/// </summary>
+		public int StorageExpirationCheckIntervalSeconds { get; set; } = 60 * 10;
+
+		/// <summary>
 		/// Gets or sets the server options.
 		/// </summary>
 		public Dictionary<string, string> ServerOptions { get; set; } = new Dictionary<string, string>();

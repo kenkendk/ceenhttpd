@@ -291,6 +291,8 @@ namespace Ceen.Httpd.Cli
 			var config = ConfigParser.CreateServerConfig(cfg);
 			config.Storage = m_storage;
 
+			((MemoryStorageCreator)m_storage).ExpireCheckInterval = TimeSpan.FromSeconds(cfg.StorageExpirationCheckIntervalSeconds);
+
 			var domain = AppDomain.CreateDomain(
 				"CeenRunner-" + Guid.NewGuid().ToString(),
 				null,

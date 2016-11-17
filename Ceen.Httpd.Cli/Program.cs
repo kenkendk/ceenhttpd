@@ -31,6 +31,11 @@ namespace Ceen.Httpd.Cli
 			if (!config.IsolatedAppDomain)
 			{
 				var serverconfig = ConfigParser.ValidateConfig(config);
+				serverconfig.Storage = new MemoryStorageCreator() 
+				{ 
+					ExpireCheckInterval = TimeSpan.FromSeconds(config.StorageExpirationCheckIntervalSeconds) 
+				};
+
 				if (!string.IsNullOrWhiteSpace(config.HttpAddress))
 					tasks.Add(HttpServer.ListenAsync(
 						new IPEndPoint(ConfigParser.ParseIPAddress(config.HttpAddress), config.HttpPort),
