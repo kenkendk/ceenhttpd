@@ -147,6 +147,9 @@ namespace Ceen.Httpd.Cli
 		/// </summary>
 		public Dictionary<string, string> DefaultHeaders { get; set; } = new Dictionary<string, string>();
 
+		/// <summary>
+		/// Gets or sets the allowed index documents.
+		/// </summary>
 		public List<string> IndexDocuments { get; set; } = new List<string>();
 	}
 }
