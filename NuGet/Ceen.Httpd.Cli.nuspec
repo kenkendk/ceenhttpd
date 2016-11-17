@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>Ceen.Httpd.Cli</id>
+    <version>0.9</version>
+    <authors>Kenneth Skovhede</authors>
+    <owners>Kenneth Skovhede</owners>
+    <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A commandline host for Ceen.Httpd</description>
+    <releaseNotes>Initial NuGet package</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2016</copyright>
+    <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
+    <dependencies>
+        <dependency id="Ceen.Httpd" version="0.9" />
+        <!-- <dependency id="SyslogNet.Client" version="0.3.2" /> -->
+      </dependencies>
+  </metadata>
+  <files>
+    <file src="Ceen.Httpd.Cli.exe" target="lib/net45" />
+  </files>
+</package>

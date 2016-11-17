@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>Ceen.Httpd</id>
+    <version>0.9</version>
+    <authors>Kenneth Skovhede</authors>
+    <owners>Kenneth Skovhede</owners>
+    <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A lightweight HTTP compliant web server written in C# with full async/await implementation</description>
+    <releaseNotes>Initial NuGet package</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2016</copyright>
+    <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
+    <dependencies />
+  </metadata>
+  <files>
+    <file src="Ceen.Common.dll" target="lib/net45" />
+    <file src="Ceen.Httpd.dll" target="lib/net45" />
+  </files>
+</package>
