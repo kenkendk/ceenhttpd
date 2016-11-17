@@ -6,7 +6,7 @@
     <ProjectGuid>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Ceen.Mvc</RootNamespace>
-    <AssemblyName>Ceenhttpd.Mvc</AssemblyName>
+    <AssemblyName>Ceen.Mvc</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <ReleaseVersion>0.9</ReleaseVersion>
   </PropertyGroup>
