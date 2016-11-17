@@ -201,6 +201,14 @@ namespace Ceen.Httpd
 		/// The server configuration
 		/// </summary>
 		private readonly ServerConfig m_serverconfig;
+		/// <summary>
+		/// The internal redirect path
+		/// </summary>
+		private string m_internalredirectpath;
+		/// <summary>
+		/// The number of internal redirects used
+		/// </summary>
+		private int m_internalredirects;
 
 		/// <summary>
 		/// The CRLF line termination string
@@ -534,9 +542,42 @@ namespace Ceen.Httpd
 			this.Cookies.Add(cookie);
 
 			return cookie;
-
 		}
 
+		/// <summary>
+		/// Gets a value indicating whether this <see cref="T:Ceen.Httpd.HttpResponse"/> is redirecting internally.
+		/// </summary>
+		public bool IsRedirectingInternally { get { return !string.IsNullOrWhiteSpace(m_internalredirectpath); } }
+
+		/// <summary>
+		/// Performs an internal redirect
+		/// </summary>
+		/// <param name="path">The new path to use.</param>
+		public void InternalRedirect(string path)
+		{
+			if (HasSentHeaders)
+				throw new Exception("Cannot redirect after headers have been sent");
+			if (IsRedirectingInternally)
+				throw new Exception("An internal redirect is already in progress");
+			if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("/", StringComparison.Ordinal))
+				throw new ArgumentException("The path must start with a forward slash '/'", nameof(path));
+			if (m_internalredirects >= m_serverconfig.MaxInternalRedirects)
+				throw new Exception($"Cannot perform more than {m_serverconfig.MaxInternalRedirects} redirects");
+
+			m_internalredirects++;
+			m_internalredirectpath = path;
+		}
+
+		/// <summary>
+		/// Clears the internal redirect status.
+		/// </summary>
+		/// <returns>The redirected path</returns>
+		public string ClearInternalRedirect()
+		{
+			var prev = m_internalredirectpath;
+			m_internalredirectpath = null;
+			return prev;
+		}
 	}
 }
 

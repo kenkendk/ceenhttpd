@@ -26,7 +26,12 @@ namespace Ceen.Httpd
 		/// The path of the query, not including the query string
 		/// </summary>
 		/// <value>The path.</value>
-		public string Path { get; private set; }
+		public string Path { get; internal set; }
+		/// <summary>
+		/// The original path of the request, before internal path rewriting
+		/// </summary>
+		/// <value>The path.</value>
+		public string OriginalPath { get; internal set; }
 		/// <summary>
 		/// The query string
 		/// </summary>
@@ -166,7 +171,7 @@ namespace Ceen.Httpd
 
 				this.RawHttpRequestLine = line;
 				this.Method = components[0];
-				this.Path = path;
+				this.OriginalPath = this.Path = path;
 				this.RawQueryString = qs;
 				this.HttpVersion = components[2];
 

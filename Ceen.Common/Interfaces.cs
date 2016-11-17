@@ -114,6 +114,11 @@ namespace Ceen
 		/// <value>The path.</value>
 		string Path { get; }
 		/// <summary>
+		/// Gets the original path before internal rewrite.
+		/// </summary>
+		/// <value>The original path.</value>
+		string OriginalPath { get; }
+		/// <summary>
 		/// The query string
 		/// </summary>
 		/// <value>The query string, including the leading question mark.</value>
@@ -247,6 +252,17 @@ namespace Ceen
 		/// <param name="key">The header name.</param>
 		/// <param name="value">The header value.</param>
 		void AddHeader(string key, string value);
+
+		/// <summary>
+		/// Performs an internal redirect
+		/// </summary>
+		/// <param name="path">The new path to use.</param>
+		void InternalRedirect(string path);
+
+		/// <summary>
+		/// Gets a value indicating if an internal redirect has been requested
+		/// </summary>
+		bool IsRedirectingInternally { get; }
 
 		/// <summary>
 		/// Gets or sets the Content-Type header

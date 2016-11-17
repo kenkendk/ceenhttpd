@@ -660,8 +660,16 @@ namespace Ceen.Httpd
 							// TODO: Abort processing if the client closes?
 
 							// Process the request
-							if (!await config.Router.Process(context))
-								throw new HttpException(Ceen.HttpStatusCode.NotFound);
+							do
+							{
+								var target = resp.ClearInternalRedirect();
+								if (target != null)
+									cur.Path = target;
+
+								if (!await config.Router.Process(context))
+									throw new HttpException(Ceen.HttpStatusCode.NotFound);
+							}
+							while (resp.IsRedirectingInternally);
 						}
 						catch (HttpException hex)
 						{
