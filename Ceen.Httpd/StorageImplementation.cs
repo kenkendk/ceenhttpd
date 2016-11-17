@@ -450,11 +450,6 @@ namespace Ceen.Httpd
 		private readonly AsyncLock m_lock = new AsyncLock();
 
 		/// <summary>
-		/// The next time an item expires in ticks
-		/// </summary>
-		private long m_next_expiry = 0;
-
-		/// <summary>
 		/// The storage item
 		/// </summary>
 		private readonly Dictionary<string, Dictionary<string, IStorageEntry>> m_storage = new Dictionary<string, Dictionary<string, IStorageEntry>>();
@@ -466,14 +461,13 @@ namespace Ceen.Httpd
 		public Func<string, string, int, Task<IStorageEntry>> ExternalCreator { get; set; }
 
 		/// <summary>
-		/// A task to signal checking for expiration
-		/// </summary>
-		private TaskCompletionSource<bool> m_check_expires { get; set; } = new TaskCompletionSource<bool>();
-
-		/// <summary>
 		/// Gets or sets the expiration check interval.
 		/// </summary>
-		public TimeSpan ExpireCheckInterval { get; set; } = TimeSpan.FromMinutes(10);
+		public TimeSpan ExpireCheckInterval
+		{
+			get { return m_expirationHandler.Interval; }
+			set { m_expirationHandler.Interval = value; }
+		}
 
 		/// <summary>
 		/// Gets or sets the high water mark, where expires are triggered.
@@ -481,14 +475,10 @@ namespace Ceen.Httpd
 		public long HighWaterMark { get; set; } = 10000;
 
 		/// <summary>
-		/// A token to signal stopping the check for expiration
+		/// The expiration handler.
 		/// </summary>
-		private CancellationTokenSource m_stop_token = new CancellationTokenSource();
+		private PeriodicTask m_expirationHandler;
 
-		/// <summary>
-		/// The task signaling expiration completion
-		/// </summary>
-		private readonly Task m_expireTask;
 		/// <summary>
 		/// The minimum high water mark
 		/// </summary>
@@ -505,35 +495,13 @@ namespace Ceen.Httpd
 		public MemoryStorageCreator()
 		{
 			m_minhighwater = HighWaterMark;
-			m_expireTask = Task.Run(async () => await ExpireLoopAsync());
-		}
-
-		/// <summary>
-		/// Runs an expire loop
-		/// </summary>
-		/// <returns>The loop.</returns>
-		private async Task ExpireLoopAsync()
-		{
-			while (true)
-			{
-				await Task.WhenAny(Task.Delay(ExpireCheckInterval), m_check_expires.Task);
-				m_check_expires = new TaskCompletionSource<bool>();
-
-				if (m_stop_token.IsCancellationRequested)
-					return;
-
-				var count = await DoExpireAsync();
-				if (count * 1.1 > HighWaterMark)
-					HighWaterMark = HighWaterMark * 2;
-				else if (count < HighWaterMark / 4)
-					HighWaterMark = Math.Max(m_minhighwater, HighWaterMark / 2);
-			}
+			m_expirationHandler = new PeriodicTask(DoExpireAsync, TimeSpan.FromMinutes(10));
 		}
 
 		/// <summary>
 		/// Perform the actual expiration
 		/// </summary>
-		private async Task<long> DoExpireAsync()
+		private async Task<long> DoExpireAsync(bool forced)
 		{
 			var count = 0L;
 			using (await m_lock.LockAsync())
@@ -551,28 +519,16 @@ namespace Ceen.Httpd
 				}
 
 				m_createcount = count;
+
+				if (count * 1.1 > HighWaterMark)
+					HighWaterMark = HighWaterMark * 2;
+				else if (count < HighWaterMark / 4)
+					HighWaterMark = Math.Max(m_minhighwater, HighWaterMark / 2);
 			}
 
 			return count;
 		}
 
-		/// <summary>
-		/// Triggers an expire now
-		/// </summary>
-		public void Expire()
-		{
-			m_check_expires.TrySetResult(true);
-		}
-
-		/// <summary>
-		/// Stop this instance.
-		/// </summary>
-		public Task StopAsync()
-		{
-			m_stop_token.Cancel();
-			m_check_expires.TrySetResult(true);
-			return m_expireTask;
-		}
 
 		/// <summary>
 		/// Gets or creates a storage module with the given name
@@ -644,13 +600,10 @@ namespace Ceen.Httpd
 				}
 
 				if (ttl > 0)
-				{
 					res.Expires = DateTime.Now.AddSeconds(ttl);
-					m_next_expiry = Math.Min(res.Expires.Ticks, m_next_expiry);
-				}
 
 				if (m_createcount > HighWaterMark)
-					Expire();
+					m_expirationHandler.RunNow();
 
 				return res;
 			}
@@ -666,7 +619,8 @@ namespace Ceen.Httpd
 		/// <see cref="T:Ceen.Httpd.MemoryStorageCreator"/> was occupying.</remarks>
 		public void Dispose()
 		{
-			StopAsync();
+			if (m_expirationHandler != null)
+				m_expirationHandler.Dispose();
 		}
 
 		/// <summary>
@@ -675,7 +629,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		~MemoryStorageCreator()
 		{
-			StopAsync();
+			Dispose();
 			GC.SuppressFinalize(this);
 		}
 	}

@@ -37,6 +37,7 @@
     <Compile Include="HttpProtocolDefinitions.cs" />
     <Compile Include="AsyncLock.cs" />
     <Compile Include="AppDomainTask.cs" />
+    <Compile Include="PeriodicTask.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
