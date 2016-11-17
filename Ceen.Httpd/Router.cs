@@ -12,6 +12,11 @@ namespace Ceen.Httpd
 	public class Router : IRouter
 	{
 		/// <summary>
+		/// Regex for mathcing wildcard/globbing characters
+		/// </summary>
+		private static readonly Regex WILDCARD_MATCHER = new Regex("\\*|\\?|[^\\*\\?]+");
+
+		/// <summary>
 		/// List of rules
 		/// </summary>
 		public IList<KeyValuePair<Regex, IHttpModule>> Rules { get; set; }
@@ -54,8 +59,22 @@ namespace Ceen.Httpd
 			if (value.StartsWith("[", StringComparison.Ordinal) && value.EndsWith("]", StringComparison.Ordinal))
 				return new Regex(value.Substring(1, value.Length - 2));
 			else
-				return new Regex(Regex.Escape(value));
+				return WildcardExpandToRegex(value);
 		}
+
+
+		public static Regex WildcardExpandToRegex(string value)
+		{
+			return new Regex(WILDCARD_MATCHER.Replace(value, (match) => {
+				if (match.Value == "*")
+					return ".*";
+				else if (match.Value == "?")
+					return ".";
+				else
+					return Regex.Escape(match.Value);
+			}));
+		}
+
 
 		/// <summary>
 		/// Add the specified route and handler.
