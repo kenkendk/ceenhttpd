@@ -142,14 +142,34 @@
 # Add session state
 #handler "" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
 
+# Or, add session state only to .htm and .html documents
+#handler "*.htm" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
+#handler "*.html" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
+
+# To use XSRF protection, set the cookie on all htm(l) documents
+#handler "[.*\.html?]" Ceen.Httpd Ceen.Httpd.Handler.SetXSRFCookieHandler
+#set cookiename xsrf-token
+#set expirationseconds 3600
+
+# Then protect the api entries with an XSRF guard
+#handler "/api/*" Ceen.Httpd Ceen.Httpd.Handler.VerifyXSRFHandler
+#set headername "X-XSRF-Token"
+#set errorstatuscode 403
+#set errorstatusmessage "Expired or missing XSRF token"
+
+
 # A custom handler, must implement Ceen.IHttpModule
 #handler "/data" MyAssemblyName MyNamespace.MyHandler "constructor arg1" "constructor arg2" "..."
 #set ExtendedLogging true
 #set maxfilesize 1024
 
 # Serve local files
-#serve "" "/path/to/files"
-# Or manually invoked
+#serve "/index" "/path/to/index"
+#serve "/" "/path/to/files"
+
+# Or manually invoked, useful when deriving from FileHandler
+#handler "[/index(/.*)?]" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/index"
+#set pathprefix /index
 #handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
 
 # A custom route using Ceen.Mvc, loading an assembly
