@@ -28,6 +28,10 @@ namespace Ceen.Httpd
 		/// The maximum number of active requests.
 		/// </summary>
 		public int MaxActiveRequests { get; set; } = 500000;
+		/// <summary>
+		/// The maximum number of internal redirects
+		/// </summary>
+		public int MaxInternalRedirects { get; set; } = 5;
 
 		/// <summary>
 		/// The maximum size of a POST request with url encoded data.
