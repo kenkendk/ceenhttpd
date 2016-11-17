@@ -52,9 +52,9 @@ namespace Ceen.Httpd
 			if (iface == null)
 				throw new Exception($"The given type ${m_wrapped.GetType()} does not implement {typeof(IStorageEntry)}");
 
-			m_index = iface.GetProperties().FirstOrDefault(x => x.GetIndexParameters().Length == 1);
+			m_index = typeof(IDictionary<string, string>).GetProperties().FirstOrDefault(x => x.GetIndexParameters().Length == 1);
 
-			if (new[] { m_wrapped, m_expires, m_name }.Any(x => x == null))
+			if (new[] { m_wrapped, m_expires, m_name, m_index }.Any(x => x == null))
 				throw new Exception($"Something changed in {typeof(IStorageEntry)}");
 		}
 
