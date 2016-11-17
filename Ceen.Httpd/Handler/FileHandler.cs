@@ -96,7 +96,10 @@ namespace Ceen.Httpd.Handler
 
 				var ix = m_indexfiles.Where(p => File.Exists(Path.Combine(path, p))).FirstOrDefault();
 				if (!string.IsNullOrWhiteSpace(ix))
-					path = Path.Combine(path, ix);
+				{
+					context.Response.InternalRedirect(context.Request.Path + ix);
+					return true;
+				}
 			}
 
 			if (!File.Exists(path))
