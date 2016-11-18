@@ -556,7 +556,7 @@ namespace Ceen.Httpd
 					clientcert = ssl.RemoteCertificate;
 				}
 
-				await Runner(ssl == null ? (Stream)s : ssl, remoteEndPoint, logtaskid, clientcert, controller);
+				await Runner(client, ssl == null ? (Stream)s : ssl, remoteEndPoint, logtaskid, clientcert, controller);
 
 				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, client);
 			}
@@ -565,12 +565,13 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// Dispatcher method for handling a request
 		/// </summary>
+		/// <param name="client">The underlying socket</param>
 		/// <param name="stream">The underlying stream.</param>
 		/// <param name="endpoint">The remote endpoint.</param>
 		/// <param name="logtaskid">The task id for logging and tracing</param>
 		/// <param name="clientcert">The client certificate if any.</param>
 		/// <param name="controller">The runner controller.</param>
-		private static async Task Runner(Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
+		private static async Task Runner(TcpClient client, Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
 		{
 			var config = controller.Config;
 			var storage = config.Storage;
@@ -589,6 +590,7 @@ namespace Ceen.Httpd
 				if (!controller.RegisterActive(logtaskid))
 					return;
 
+				using (client)
 				using (var bs = new BufferedStreamReader(stream))
 				{
 					do
