@@ -231,12 +231,27 @@ namespace Ceen.Httpd.Cli
 
 				var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
 
+				var safe_handle_field = typeof(Socket).GetField("safe_handle", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+				if (safe_handle_field == null)
+					safe_handle_field = typeof(Socket).GetField("m_Handle", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
 				RunnerTask = HttpServer.ListenToSocketAsync(
 					new IPEndPoint(ConfigParser.ParseIPAddress(address), port),
 					usessl,
 					m_token.Token,
 					config,
-					(socket, addr, id) => Wrapper.HandleRequest(socket.Client.DuplicateAndClose(pid), addr, id)
+					(socket, addr, id) =>
+					{
+						// Bugfix workaround for: https://bugzilla.xamarin.com/show_bug.cgi?id=47425
+						var prev_sh = safe_handle_field == null ? null : safe_handle_field.GetValue(socket.Client);
+
+						var s = socket.Client.DuplicateAndClose(pid);
+
+						if (prev_sh != null)
+							GC.SuppressFinalize(prev_sh);
+
+						Wrapper.HandleRequest(s, addr, id);
+					}
 				);
 			}
 		}
