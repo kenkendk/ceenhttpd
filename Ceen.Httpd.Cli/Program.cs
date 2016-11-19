@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace Ceen.Httpd.Cli
 {
-	class MainClass
+	public class MainClass
 	{
 		public static int Main(string[] args)
 		{
