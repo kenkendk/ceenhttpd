@@ -85,6 +85,14 @@ namespace Ceen.Httpd.Logging
 			m_logsource = logsource;
 		}
 
+		/// <summary>
+		/// Logs the request to syslog.
+		/// </summary>
+		/// <returns>The awaitable task.</returns>
+		/// <param name="context">The http context.</param>
+		/// <param name="ex">The exception.</param>
+		/// <param name="started">Timestamp for when the request started.</param>
+		/// <param name="duration">Duration of the request processing.</param>
 		public override Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
 		{
 			return Task.Run(() =>
