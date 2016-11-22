@@ -110,7 +110,7 @@ namespace Ceen.Httpd.Cli
 		/// <summary>
 		/// Gets or sets a value indicating if app domains are created to handle reloads
 		/// </summary>
-		public bool IsolatedAppDomain { get; set; } = true;
+		public bool IsolatedAppDomain { get; set; } = false;
 
 		/// <summary>
 		/// Gets or sets the number of seconds between each storage expiration check.
