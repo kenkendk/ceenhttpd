@@ -130,6 +130,9 @@
 # Only works on Linux
 #logger Ceen.Httpd Ceen.Httpd.Logging.SyslogLogger
 
+# Log CLF to log4net, requires log4net in GAC or assembly path
+#logger Ceen.Httpd Ceen.Httpd.Logging.Log4netCLFLogger
+
 # Log CLF to a file
 #logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file"
 # Log CLF to a file, setting combinedformat = true and logcookies to false
