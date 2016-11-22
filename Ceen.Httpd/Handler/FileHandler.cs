@@ -91,6 +91,9 @@ namespace Ceen.Httpd.Handler
 		/// <param name="context">The http context.</param>
 		public virtual async Task<bool> HandleAsync(IHttpContext context)
 		{
+			if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal))
+				throw new HttpException(HttpStatusCode.MethodNotAllowed);
+
 			foreach(var c in FORBIDDENCHARS)
 				if (context.Request.Path.Contains(c))
 					throw new HttpException(HttpStatusCode.BadRequest);
