@@ -72,13 +72,24 @@ namespace Ceen.Httpd.Handler
 			m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
 		}
 
+		/// <summary>
+		/// An overrideable method to hook in logic before
+		/// flushing the headers and sending content, allows
+		/// an overriding class to alter the response
+		/// </summary>
+		/// <param name="context">Context.</param>
+		public virtual Task BeforeResponseAsync(IHttpContext context)
+		{
+			return Task.FromResult(true);
+		}
+
 		#region IHttpModule implementation
 		/// <summary>
 		/// Handles the request.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
 		/// <param name="context">The http context.</param>
-		public async Task<bool> HandleAsync(IHttpContext context)
+		public virtual async Task<bool> HandleAsync(IHttpContext context)
 		{
 			foreach(var c in FORBIDDENCHARS)
 				if (context.Request.Path.Contains(c))
@@ -123,6 +134,8 @@ namespace Ceen.Httpd.Handler
 			context.Response.ContentType = mimetype;
 			context.Response.StatusCode = HttpStatusCode.OK;
 			context.Response.AddHeader("Last-Modified", File.GetLastWriteTime(path).ToString("R", CultureInfo.InvariantCulture));
+
+			await BeforeResponseAsync(context);
 
 			try
 			{
