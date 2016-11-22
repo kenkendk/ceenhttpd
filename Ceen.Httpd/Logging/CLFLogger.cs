@@ -18,7 +18,7 @@ namespace Ceen.Httpd.Logging
 		/// <summary>
 		/// The lock used to provide exclusive access to the stream
 		/// </summary>
-		protected readonly object m_lock = new object();
+		protected readonly AsyncLock m_lock = new AsyncLock();
 		/// <summary>
 		/// <c>True</c>if the stream should be closed when the logger is disposed
 		/// </summary>
@@ -174,14 +174,17 @@ namespace Ceen.Httpd.Logging
 		/// <param name="duration">Duration of the request processing.</param>
 		public virtual Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
 		{
-			return Task.Run(() => {
+			return Task.Run(async () => {
 				if (m_stream == null)
 					throw new ObjectDisposedException(this.GetType().FullName);
 
 				var logmsg = GetCombinedLogLine(context, ex, started, duration);
 
-				lock(m_lock)
-					m_stream.WriteLine(logmsg);
+				using (await m_lock.LockAsync())
+				{
+					await m_stream.WriteLineAsync(logmsg);
+					await m_stream.FlushAsync();
+				}
 			});
 		}
 
