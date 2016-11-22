@@ -92,7 +92,7 @@ namespace Ceen.Httpd.Cli
 		{
 			if (targettype.IsEnum)
 			{
-				var entries = Environment.ExpandEnvironmentVariables(value ?? "")
+				var entries = ExpandEnvironmentVariables(value ?? "")
 				                         .Split('|')
 				                         .Select(x => Enum.Parse(targettype, x, true))
 				                         .ToArray();
@@ -106,8 +106,7 @@ namespace Ceen.Httpd.Cli
 					
 			}
 				
-			// TODO: Better conversions here?
-			return Convert.ChangeType(Environment.ExpandEnvironmentVariables(value), targettype);
+			return Convert.ChangeType(ExpandEnvironmentVariables(value), targettype);
 		}
 
 		/// <summary>
@@ -202,7 +201,7 @@ namespace Ceen.Httpd.Cli
 					var args = re.Matches(line)
 								 .Cast<System.Text.RegularExpressions.Match>()
 								 .Where(x => x.Groups["value"].Success && !string.IsNullOrWhiteSpace(x.Value))
-								 .Select(x => x.Groups["value"].Value)
+				                 .Select(x => x.Groups["value"].Value)
 								 .ToArray();
 					lineindex++;
 					if (args.Length == 0)
@@ -358,7 +357,7 @@ namespace Ceen.Httpd.Cli
 
 
 			cfg.Basepath = Path.GetFullPath(cfg.Basepath ?? ".");
-			cfg.Assemblypath = string.Join(Path.PathSeparator.ToString(), (cfg.Assemblypath ?? "").Split(new char[] { Path.PathSeparator }).Select(x => Path.GetFullPath(Path.Combine(cfg.Basepath, Environment.ExpandEnvironmentVariables(x)))));
+			cfg.Assemblypath = string.Join(Path.PathSeparator.ToString(), (cfg.Assemblypath ?? "").Split(new char[] { Path.PathSeparator }).Select(x => Path.GetFullPath(Path.Combine(cfg.Basepath, ExpandEnvironmentVariables(x)))));
 
 			return cfg;
 		}
@@ -497,12 +496,12 @@ namespace Ceen.Httpd.Cli
 
 							if (config.IndexDocuments.Count == 0)
 								handler = new Ceen.Httpd.Handler.FileHandler(
-									route.ConstructorArguments.First(),
+									ExpandEnvironmentVariables(route.ConstructorArguments.First()),
 									mimehandler
 								);
 							else
 								handler = new Ceen.Httpd.Handler.FileHandler(
-									route.ConstructorArguments.First(),
+									ExpandEnvironmentVariables(route.ConstructorArguments.First()),
 									config.IndexDocuments.ToArray(),
 									mimehandler
 								);
@@ -542,6 +541,12 @@ namespace Ceen.Httpd.Cli
 			}
 
 			return cfg;
+		}
+
+		public static string ExpandEnvironmentVariables(string input)
+		{
+			// TODO: Support unix-style environment variables + default values
+			return Environment.ExpandEnvironmentVariables(input);
 		}
 	}
 }
