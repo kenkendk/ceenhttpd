@@ -14,7 +14,7 @@ namespace Ceen.Httpd.Handler
 		/// <summary>
 		/// The folder where files are served from
 		/// </summary>
-		private string m_sourcefolder;
+		protected readonly string m_sourcefolder;
 		/// <summary>
 		/// Cached copy of the directory separator as a string
 		/// </summary>
@@ -245,7 +245,7 @@ namespace Ceen.Httpd.Handler
 			}
 		}	
 
-		private string MapToLocalPath(string path)
+		protected virtual string MapToLocalPath(string path)
 		{
 			path = path.Replace("/", DIRSEP);
 			while (path.StartsWith(DIRSEP, StringComparison.Ordinal))
