@@ -90,8 +90,14 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// A callback method for injecting headers into the responses
 		/// </summary>
-		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; } = DefaultHeaders;
+		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
 
+		/// <summary>
+		/// Gets or sets the default name of the server reported in response headers.
+		/// </summary>
+		/// <value>The default name of the server.</value>
+		public string DefaultServerName { get; set; } = SERVER_NAME;
+			
 		/// <summary>
 		/// The server certificate if used for serving SSL requests
 		/// </summary>
@@ -120,6 +126,29 @@ namespace Ceen.Httpd
 		public IStorageCreator Storage { get; set; }
 
 		/// <summary>
+		/// A cached copy of the server name and version,
+		/// for use in the output headers.
+		/// </summary>
+		public static readonly string SERVER_NAME;
+
+		/// <summary>
+		/// Static initializer for the <see cref="T:Ceen.Httpd.ServerConfig"/> class.
+		/// </summary>
+		static ServerConfig()
+		{
+			var version = typeof(ServerConfig).Assembly.GetName().Version;
+			SERVER_NAME = string.Format("ceenhttpd/{0}.{1}", version.Major, version.Minor);
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.ServerConfig"/> class.
+		/// </summary>
+		public ServerConfig()
+		{
+			AddDefaultResponseHeaders = DefaultHeaders;
+		}
+
+		/// <summary>
 		/// Loads a certificate instance
 		/// </summary>
 		/// <param name="path">The path to the file with the certificate.</param>
@@ -133,10 +162,12 @@ namespace Ceen.Httpd
 		/// Adds default headers to the output.
 		/// </summary>
 		/// <param name="response">The response to update.</param>
-		private static void DefaultHeaders(IHttpResponse response)
+		public void DefaultHeaders(IHttpResponse response)
 		{
 			response.AddHeader("Date", DateTime.UtcNow.ToString("R", CultureInfo.InvariantCulture));
-			response.AddHeader("Server", "ceenhttpd/0.1");
+
+			if (!string.IsNullOrWhiteSpace(DefaultServerName))
+				response.AddHeader("Server", DefaultServerName);
 		}
 
 		/// <summary>
