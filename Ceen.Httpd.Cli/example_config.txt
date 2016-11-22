@@ -99,6 +99,12 @@
 # Set a new mime type
 #mime .xyz "application/xyz"
 
+# Set a mime type to serve files without extensions
+#mime "" "application/octet-stream"
+
+# Set a default mime type to serve all
+#mime "*" "application/octet-stream"
+
 # Set a default header
 #header "X-My-Header" "Special Header Value"
 

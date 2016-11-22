@@ -465,27 +465,37 @@ namespace Ceen.Httpd.Cli
 							Func<IHttpRequest, string, string> mimehandler = null;
 							if (config.MimeTypes != null && config.MimeTypes.Count > 0)
 							{
+								string default_mimetype;
+								config.MimeTypes.TryGetValue("*", out default_mimetype);
+								if (string.IsNullOrWhiteSpace(default_mimetype))
+									default_mimetype = null;
+
 								if (config.IgnoreDefaultMimeTypes)
 								{
-									mimehandler = (req, path) =>
+									mimehandler = (req, mappedpath) =>
 									{
-										var ext = path.Substring(path.LastIndexOf('.') + 1).ToLowerInvariant();
+										var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
 										string mime;
 										config.MimeTypes.TryGetValue(ext, out mime);
+										if (default_mimetype != null && string.IsNullOrWhiteSpace(mime))
+											return default_mimetype;
+										
 										return mime;
 									};
 								}
 								else
 								{
-									mimehandler = (req, path) =>
+									mimehandler = (req, mappedpath) =>
 									{
-										var ext = path.Substring(path.LastIndexOf('.') + 1).ToLowerInvariant();
+										var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
 										string mime;
 										config.MimeTypes.TryGetValue(ext, out mime);
 										if (!string.IsNullOrWhiteSpace(mime))
 											return mime;
+										else if (default_mimetype != null && string.IsNullOrWhiteSpace(mime))
+											return default_mimetype;
 										else
-											return Ceen.Httpd.Handler.FileHandler.DefaultMimeTypes(path);
+											return Ceen.Httpd.Handler.FileHandler.DefaultMimeTypes(mappedpath);
 									};
 								}
 							}

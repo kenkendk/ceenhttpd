@@ -165,20 +165,20 @@ namespace Ceen.Httpd.Handler
 		/// </summary>
 		/// <returns>The mime type.</returns>
 		/// <param name="request">The request.</param>
-		/// <param name="request">The path.</param>
-		public static string DefaultMimeTypes(IHttpRequest request, string path)
+		/// <param name="mappedpath">The mapped filepath.</param>
+		public static string DefaultMimeTypes(IHttpRequest request, string mappedpath)
 		{
-			return DefaultMimeTypes(path);
+			return DefaultMimeTypes(mappedpath);
 		}
 
 		/// <summary>
 		/// Returns the default mime type for a path
 		/// </summary>
 		/// <returns>The mime type.</returns>
-		/// <param name="path">The path.</param>
-		public static string DefaultMimeTypes(string path)
+		/// <param name="mappedpath">The mapped file path.</param>
+		public static string DefaultMimeTypes(string mappedpath)
 		{
-			var ext = path.Substring(path.LastIndexOf('.') + 1).ToLowerInvariant();
+			var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
 
 			switch (ext)
 			{
