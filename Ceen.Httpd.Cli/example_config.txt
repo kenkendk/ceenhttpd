@@ -117,14 +117,14 @@
 #
 
 # Log Common Log Format output to stdout
-#logger Ceen.Httpd Ceen.Httpd.CLFStdOut
+#logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
 # Log Common Log Format output to stderr
-#logger Ceen.Httpd Ceen.Httpd.CLFStdErr
+#logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdErr
 
 # Log exceptions to stderr
-#logger Ceen.Httpd Ceen.Httpd.StdErrErrors
+#logger Ceen.Httpd Ceen.Httpd.Logging.StdErrErrors
 # Log exceptions to stdout
-#logger Ceen.Httpd Ceen.Httpd.StdOutErrors
+#logger Ceen.Httpd Ceen.Httpd.Logging.StdOutErrors
 
 # Log CLF to syslog, requires SyslogNet.Client in GAC or assembly path
 # Only works on Linux
