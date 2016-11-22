@@ -304,7 +304,7 @@ namespace Ceen.Httpd.Cli
 					
 						var pathprefix = routearg;
 						
-						routearg = $"[{routearg}(/.*)?]";
+						routearg = routearg == "/" ? "[/.*]" : $"[{routearg}(/.*)?]";
 
 						var route = new RouteDefinition()
 						{
