@@ -28,7 +28,17 @@ namespace Ceen.Httpd.Cli
 			var config = ConfigParser.ParseTextFile(args[0]);
 			var tasks = new List<Task>();
 
-			if (!config.IsolatedAppDomain)
+
+			if (config.IsolatedProcesses)
+			{
+				throw new Exception("Isolated processes not yet implemented");
+			}
+			else if (config.IsolatedAppDomain)
+			{
+				app = new AppDomainHandler(args[0]);
+				tasks.Add(app.StoppedAsync);
+			}
+			else
 			{
 				var serverconfig = ConfigParser.ValidateConfig(config);
 				serverconfig.Storage = new MemoryStorageCreator() 
@@ -49,11 +59,6 @@ namespace Ceen.Httpd.Cli
 						true,
 						serverconfig,
 						tcs.Token));
-			}
-			else
-			{
-				app = new AppDomainHandler(args[0]);
-				tasks.Add(app.StoppedAsync);
 			}
 
 			var reloadevent = new TaskCompletionSource<bool>();

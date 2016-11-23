@@ -113,6 +113,11 @@ namespace Ceen.Httpd.Cli
 		public bool IsolatedAppDomain { get; set; } = true;
 
 		/// <summary>
+		/// Gets or sets a value indicating if isolated processes are used to handle reloads
+		/// </summary>
+		public bool IsolatedProcesses { get; set; } = false;
+
+		/// <summary>
 		/// Gets or sets the number of seconds between each storage expiration check.
 		/// </summary>
 		public int StorageExpirationCheckIntervalSeconds { get; set; } = 60 * 10;
