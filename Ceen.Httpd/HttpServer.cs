@@ -92,6 +92,15 @@ namespace Ceen.Httpd
 			/// Gets the number of active clients.
 			/// </summary>
 			public int ActiveClients { get { return Controller.ActiveClients; } }
+
+			/// <summary>
+			/// Initializes the lifetime service.
+			/// </summary>
+			/// <returns>The lifetime service.</returns>
+			public override object InitializeLifetimeService()
+			{
+				return null;
+			}
 		}
 
 		/// <summary>
