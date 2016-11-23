@@ -75,6 +75,12 @@ namespace Ceen.Httpd.Cli
 		public string Assemblypath { get; set; }
 
 		/// <summary>
+		/// Gets a value indicating if the config file is monitored for changes,
+		/// and reloaded
+		/// </summary>
+		public bool WatchConfigFile { get; set; } = false;
+
+		/// <summary>
 		/// Gets or sets the certificate path.
 		/// </summary>
 		public string CertificatePath { get; set; }

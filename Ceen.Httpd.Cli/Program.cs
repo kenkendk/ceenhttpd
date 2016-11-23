@@ -65,6 +65,7 @@ namespace Ceen.Httpd.Cli
 			var stopevent = new TaskCompletionSource<bool>();
 			var hasrequestedstop = false;
 			var hasrequestedreload = false;
+			IDisposable fsw = null;
 
 			if (app == null)
 				Console.WriteLine("Server is running, press CTRL+C to stop...");
@@ -101,6 +102,18 @@ namespace Ceen.Httpd.Cli
 					e.Cancel = true;
 			};
 
+			if (config.WatchConfigFile)
+			{
+				var configname = Path.GetFullPath(args[0]);
+				var f = new FileSystemWatcher(Path.GetDirectoryName(configname));
+				f.Changed += (sender, e) => {
+					if (e.FullPath == configname)
+						reloadevent.SetResult(true);
+				};
+				f.EnableRaisingEvents = true;
+				fsw = f;
+			}
+
 			if (app != null)
 			{
 				app.InstanceCrashed += (address, ssl, ex) =>
@@ -126,6 +139,7 @@ namespace Ceen.Httpd.Cli
 			var allitems = Task.WhenAll(tasks);
 			var t = Task.WhenAny(allitems, stopevent.Task, reloadevent.Task).Result;
 
+			using(fsw)
 			while(t == reloadevent.Task)
 			{
 				reloadevent = new TaskCompletionSource<bool>();
@@ -139,6 +153,7 @@ namespace Ceen.Httpd.Cli
 						tr.Wait();
 						if (tr.IsFaulted)
 							throw tr.Exception;
+						Console.WriteLine("Configuration reloaded!");
 					}
 					catch(Exception ex)
 					{
@@ -147,7 +162,7 @@ namespace Ceen.Httpd.Cli
 				}
 				else
 				{
-					Console.WriteLine("Not reloading as we are not using isolated domains ...");
+					Console.WriteLine("Not reloading as we are not using isolated domains or processes ...");
 				}
 
 				waitdelay.Wait();
