@@ -14,6 +14,45 @@ namespace Ceen.Httpd.Cli
 	internal class AppDomainHandler : IDisposable
 	{
 		/// <summary>
+		/// Interface for sending requests over an domain or process boundary
+		/// </summary>
+		public interface IRemotingWrapper
+		{
+			/// <summary>
+			/// Setup this instance
+			/// </summary>
+			/// <param name="usessl">If set to <c>true</c> usessl.</param>
+			/// <param name="configfile">Path to the configuration file</param>
+			/// <param name="storage">The storage instance or null</param>
+			void SetupFromFile(bool usessl, string configfile, IStorageCreator storage);
+
+			/// <summary>
+			/// Handles a request
+			/// </summary>
+			/// <param name="socket">The socket handle.</param>
+			/// <param name="remoteEndPoint">The remote endpoint.</param>
+			/// <param name="logtaskid">The task ID to use.</param>
+			void HandleRequest(SocketInformation socket, EndPoint remoteEndPoint, string logtaskid);
+
+			/// <summary>
+			/// Requests that this instance stops serving requests
+			/// </summary>
+			void Stop();
+
+			/// <summary>
+			/// Waits for all clients to finish processing
+			/// </summary>
+			/// <returns><c>true</c>, if for stop succeeded, <c>false</c> otherwise.</returns>
+			/// <param name="waitdelay">The maximum time to wait for the clients to stop.</param>
+			bool WaitForStop(TimeSpan waitdelay);
+
+			/// <summary>
+			/// Gets the number of active clients.
+			/// </summary>
+			int ActiveClients { get; }
+		}
+
+		/// <summary>
 		/// Bridge to call methods across an App Domain
 		/// </summary>
 		private class AppDomainBridge : Ceen.Httpd.HttpServer.AppDomainBridge
@@ -50,7 +89,7 @@ namespace Ceen.Httpd.Cli
 		/// <summary>
 		/// Wrapper helper to invoke methods across the AppDomain boundary
 		/// </summary>
-		private class AppDomainWrapper
+		private class AppDomainWrapper : IRemotingWrapper
 		{
 			/// <summary>
 			/// The remote instance of the AppDomainBridge
@@ -167,7 +206,7 @@ namespace Ceen.Httpd.Cli
 			/// <summary>
 			/// The wrapper that is used to handle requests
 			/// </summary>
-			public AppDomainWrapper Wrapper { get; set; }
+			public IRemotingWrapper Wrapper { get; set; }
 
 			/// <summary>
 			/// The awaitable task for the current runner
@@ -193,7 +232,7 @@ namespace Ceen.Httpd.Cli
 			/// <param name="port">The port to listen on.</param>
 			/// <param name="usessl">If set to <c>true</c> use ssl.</param>
 			/// <param name="config">The server configuration.</param>
-			public RunnerInstance(AppDomainWrapper wrapper, string address, int port, bool usessl, ServerConfig config)
+			public RunnerInstance(IRemotingWrapper wrapper, string address, int port, bool usessl, ServerConfig config)
 			{
 				RestartAsync(wrapper, address, port, usessl, config);
 			}
@@ -216,7 +255,7 @@ namespace Ceen.Httpd.Cli
 			/// <param name="port">The port to listen on.</param>
 			/// <param name="usessl">If set to <c>true</c> use ssl.</param>
 			/// <param name="config">The server configuration.</param>
-			public async Task RestartAsync(AppDomainWrapper wrapper, string address, int port, bool usessl, ServerConfig config)
+			public async Task RestartAsync(IRemotingWrapper wrapper, string address, int port, bool usessl, ServerConfig config)
 			{
 				if (RunnerTask != null)
 					await StopAsync();
