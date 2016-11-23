@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 
 namespace Ceen.Httpd.Cli
 {
@@ -85,6 +86,8 @@ namespace Ceen.Httpd.Cli
 				base.Setup(usessl, config);
 			}
 		}
+
+
 
 		/// <summary>
 		/// Wrapper helper to invoke methods across the AppDomain boundary
@@ -225,6 +228,11 @@ namespace Ceen.Httpd.Cli
 			public bool UseSSL { get; private set; }
 
 			/// <summary>
+			/// The method used to handle requests
+			/// </summary>
+			private Action<TcpClient, EndPoint, string> m_handler;
+
+			/// <summary>
 			/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.AppDomainHandler.RunnerInstance"/> class.
 			/// </summary>
 			/// <param name="wrapper">The wrapper used to process requests.</param>
@@ -234,6 +242,54 @@ namespace Ceen.Httpd.Cli
 			/// <param name="config">The server configuration.</param>
 			public RunnerInstance(IRemotingWrapper wrapper, string address, int port, bool usessl, ServerConfig config)
 			{
+				FieldInfo safe_handle_field = null;
+
+				var monoRuntime = Type.GetType("Mono.Runtime");
+				var monoVersion = new Version(0, 0);
+				if (monoRuntime != null)
+				{
+					var displayName = monoRuntime.GetMethod("GetDisplayName", BindingFlags.NonPublic | BindingFlags.Static);
+					if (displayName != null)
+					{
+						var displayString = (displayName.Invoke(null, null) as string) ?? string.Empty;
+						var versionstring = displayString.Split(' ').FirstOrDefault();
+						Version.TryParse(versionstring, out monoVersion);
+					}
+				}
+
+				// This bug is fixed in mono, but we need to wait to get the version number
+				if (monoRuntime != null && monoVersion <= new Version(4, 6, 2))
+				{
+					safe_handle_field = typeof(Socket).GetField("safe_handle", BindingFlags.NonPublic | BindingFlags.Instance);
+					if (safe_handle_field == null)
+						safe_handle_field = typeof(Socket).GetField("m_Handle", BindingFlags.NonPublic | BindingFlags.Instance);
+				}
+
+				var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+
+				if (safe_handle_field == null)
+				{
+					m_handler = (socket, addr, id) =>
+					{
+						Wrapper.HandleRequest(socket.Client.DuplicateAndClose(pid), addr, id);
+					};
+				}
+				else
+				{
+					m_handler = (socket, addr, id) =>
+					{
+						// Bugfix workaround for: https://bugzilla.xamarin.com/show_bug.cgi?id=47425
+						var prev_sh = safe_handle_field.GetValue(socket.Client);
+
+						var s = socket.Client.DuplicateAndClose(pid);
+
+						if (prev_sh != null)
+							GC.SuppressFinalize(prev_sh);
+
+						Wrapper.HandleRequest(s, addr, id);
+					};
+				}
+
 				RestartAsync(wrapper, address, port, usessl, config);
 			}
 
@@ -268,29 +324,12 @@ namespace Ceen.Httpd.Cli
 				Address = address;
 				ShouldStop = false;
 
-				var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
-
-				var safe_handle_field = typeof(Socket).GetField("safe_handle", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-				if (safe_handle_field == null)
-					safe_handle_field = typeof(Socket).GetField("m_Handle", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
 				RunnerTask = HttpServer.ListenToSocketAsync(
 					new IPEndPoint(ConfigParser.ParseIPAddress(address), port),
 					usessl,
 					m_token.Token,
 					config,
-					(socket, addr, id) =>
-					{
-						// Bugfix workaround for: https://bugzilla.xamarin.com/show_bug.cgi?id=47425
-						var prev_sh = safe_handle_field == null ? null : safe_handle_field.GetValue(socket.Client);
-
-						var s = socket.Client.DuplicateAndClose(pid);
-
-						if (prev_sh != null)
-							GC.SuppressFinalize(prev_sh);
-
-						Wrapper.HandleRequest(s, addr, id);
-					}
+					m_handler
 				);
 			}
 		}
@@ -409,7 +448,6 @@ namespace Ceen.Httpd.Cli
 			var enabled = !string.IsNullOrWhiteSpace(address);
 			// Ensure it parses
 			ConfigParser.ParseIPAddress(address);
-
 
 			var prev = m_handlers.Where(x => x.UseSSL == usessl).FirstOrDefault();
 			if (enabled)
