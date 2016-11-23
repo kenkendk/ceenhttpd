@@ -326,8 +326,8 @@ namespace Ceen.Httpd.Cli
 							throw new Exception($"Too many arguments in line {lineindex}: {line}");
 
 						var key = args.Skip(1).First();
-						if (key.StartsWith(".", StringComparison.Ordinal))
-							key = key.Substring(1);
+						if (!string.IsNullOrEmpty(key) && key != "*" && !key.StartsWith(".", StringComparison.Ordinal))
+							key = "." + key;
 					
 						cfg.MimeTypes[key] = args.Skip(2).First();
 					}
@@ -474,7 +474,7 @@ namespace Ceen.Httpd.Cli
 								{
 									mimehandler = (req, mappedpath) =>
 									{
-										var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
+										var ext = Path.GetExtension(mappedpath).ToLowerInvariant();											
 										string mime;
 										config.MimeTypes.TryGetValue(ext, out mime);
 										if (default_mimetype != null && string.IsNullOrWhiteSpace(mime))

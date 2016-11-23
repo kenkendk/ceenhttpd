@@ -182,63 +182,61 @@ namespace Ceen.Httpd.Handler
 
 			switch (ext)
 			{
-				case "txt":
+				case ".txt":
 					return "text/plain";
-				case "htm":
+				case ".htm":
+				case ".html":
 					return "text/html; charset=utf-8";
-				case "html":
-					return "text/html; charset=utf-8";
-				case "jpg":
+				case ".jpg":
+				case ".jpeg":
 					return "image/jpg";
-				case "jpeg":
-					return "image/jpg";
-				case "bmp":
+				case ".bmp":
 					return "image/bmp";
-				case "gif":
+				case ".gif":
 					return "image/gif";
-				case "png":
+				case ".png":
 					return "image/png";
-				case "ico":
+				case ".ico":
 					return "image/vnd.microsoft.icon";
-				case "css":
+				case ".css":
 					return "text/css";
-				case "gzip":
+				case ".gzip":
 					return "application/x-gzip";
-				case "zip":
+				case ".zip":
 					return "application/x-zip";
-				case "tar":
+				case ".tar":
 					return "application/x-tar";
-				case "pdf":
+				case ".pdf":
 					return "application/pdf";
-				case "rtf":
+				case ".rtf":
 					return "application/rtf";
-				case "js":
+				case ".js":
 					return "application/javascript";
-				case "au":
+				case ".au":
 					return "audio/basic";
-				case "snd":
+				case ".snd":
 					return "audio/basic";
-				case "es":
+				case ".es":
 					return "audio/echospeech";
-				case "mp3":
+				case ".mp3":
 					return "audio/mpeg";
-				case "mp2":
+				case ".mp2":
 					return "audio/mpeg";
-				case "mid":
+				case ".mid":
 					return "audio/midi";
-				case "wav":
+				case ".wav":
 					return "audio/x-wav";
-				case "avi":
+				case ".avi":
 					return "video/avi";
-				case "htc":
+				case ".htc":
 					return "text/x-component";
-				case "map":
+				case ".map":
 					return "application/json";
-				case "hbs":
+				case ".hbs":
 					return "application/x-handlebars-template";
-				case "woff":
+				case ".woff":
 					return "application/font-woff";
-				case "ttf":
+				case ".ttf":
 					return "application/font-ttf";
 				default:
 					return null;
