@@ -314,17 +314,23 @@ namespace Ceen.Httpd
 		private static readonly Func<string> SetLoggingRequestID;
 
 		/// <summary>
+		/// The method used to copy logdata to log4net properties, if available.
+		/// This redirection method is used to avoid depending on log4net.
+		/// </summary>
+		private static readonly Action<IHttpContext> CopyLogData;
+
+		/// <summary>
 		/// The name of the log4net property that has the socket handler ID
 		/// </summary>
-		public static readonly string Log4Net_SocketHandlerID = "ceen-socket-handler-id";
+		public static readonly string Log4Net_SocketHandlerID = "ceen:SocketHandlerID";
 		/// <summary>
 		/// The name of the log4net property that has the task handler ID
 		/// </summary>
-		public static readonly string Log4Net_TaskHandlerID = "ceen-task-handler-id";
+		public static readonly string Log4Net_TaskHandlerID = "ceen:TaskHandlerID";
 		/// <summary>
 		/// The name of the log4net property that has the request ID
 		/// </summary>
-		public static readonly string Log4Net_RequestID = "ceen-request-id";
+		public static readonly string Log4Net_RequestID = "ceen:RequestID";
 
 		/// <summary>
 		/// Static initialization for the HttpServer class,
@@ -335,6 +341,7 @@ namespace Ceen.Httpd
 			Func<string> socketId = () => Guid.NewGuid().ToString("N");
 			Func<string> taskId = () => Guid.NewGuid().ToString("N");
 			Func<string> requestId = () => Guid.NewGuid().ToString("N");
+			Action<IHttpContext> copylogdata = null;
 
 			// Slowly probe through to get the method
 			var t = Type.GetType("log4net.LogicalThreadContext, log4net, Culture=neutral");
@@ -376,9 +383,14 @@ namespace Ceen.Httpd
 								return g;
 							};
 
+							copylogdata = (context) => 
+							{
+								if (context != null && context.LogData != null)
+									foreach (var kp in context.LogData)
+										rm.SetValue(ins, kp.Value, new object[] { kp.Key });
+							};
 						}
 					}
-
 				}
 			}
 
@@ -386,6 +398,7 @@ namespace Ceen.Httpd
 			SetLoggingSocketHandlerID = socketId;
 			SetLoggingTaskHandlerID = taskId;
 			SetLoggingRequestID = requestId;
+			CopyLogData = copylogdata;
 		}
 
 		/// <summary>
@@ -478,6 +491,9 @@ namespace Ceen.Httpd
 			var config = controller.Config;
 			if (config.Loggers == null)
 				return Task.FromResult(true);
+
+			if (CopyLogData != null)
+				CopyLogData(context);
 
 			var count = config.Loggers.Count;
 			if (count == 0)

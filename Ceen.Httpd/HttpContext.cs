@@ -28,6 +28,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		public IDictionary<string, string> Session { get; set; }
 
+		/// <summary>
+		/// Additional data that can be used in a logging module to tag the request or response
+		/// </summary>
+		public IDictionary<string, string> LogData { get; } = new Dictionary<string, string>();
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpContext"/> class.

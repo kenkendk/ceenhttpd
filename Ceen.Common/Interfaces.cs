@@ -375,6 +375,11 @@ namespace Ceen
 		/// Note that this can be null if there is no session module loaded.
 		/// </summary>
 		IDictionary<string, string> Session { get; set; }
+
+		/// <summary>
+		/// Additional data that can be used in a logging module to tag the request or response
+		/// </summary>
+		IDictionary<string, string> LogData { get; }
 	}
 
 	/// <summary>
