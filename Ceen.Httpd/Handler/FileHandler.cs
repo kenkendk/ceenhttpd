@@ -94,11 +94,12 @@ namespace Ceen.Httpd.Handler
 			if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal))
 				throw new HttpException(HttpStatusCode.MethodNotAllowed);
 
+			var pathrequest = Uri.UnescapeDataString(context.Request.Path);
+
 			foreach(var c in FORBIDDENCHARS)
-				if (context.Request.Path.Contains(c))
+				if (pathrequest.Contains(c))
 					throw new HttpException(HttpStatusCode.BadRequest);
 
-			var pathrequest = context.Request.Path;
 			if (!pathrequest.StartsWith(PathPrefix, StringComparison.Ordinal))
 				return false;
 
