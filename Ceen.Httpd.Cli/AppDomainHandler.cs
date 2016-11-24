@@ -155,7 +155,14 @@ namespace Ceen.Httpd.Cli
 			/// <param name="logtaskid">The task ID to use.</param>
 			public void HandleRequest(SocketInformation socket, EndPoint remoteEndPoint, string logtaskid)
 			{
-				m_handleRequest.Invoke(m_wrapped, new object[] { socket, remoteEndPoint, logtaskid });
+				try
+				{
+					m_handleRequest.Invoke(m_wrapped, new object[] { socket, remoteEndPoint, logtaskid });
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Failed to process request: {0}", ex);
+				}
 			}
 
 			/// <summary>
