@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Ceen.Httpd.Handler
 {
@@ -19,6 +20,10 @@ namespace Ceen.Httpd.Handler
 		/// Cached copy of the directory separator as a string
 		/// </summary>
 		private static readonly string DIRSEP = Path.DirectorySeparatorChar.ToString();
+		/// <summary>
+		/// Parser to match Range requests
+		/// </summary>
+		private static readonly Regex RANGE_MATCHER = new Regex("bytes=(?<start>\\d*)-(?<end>\\d*)");
 		/// <summary>
 		/// Chars that are not allowed in the path
 		/// </summary>
@@ -91,7 +96,7 @@ namespace Ceen.Httpd.Handler
 		/// <param name="context">The http context.</param>
 		public virtual async Task<bool> HandleAsync(IHttpContext context)
 		{
-			if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal))
+			if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
 				throw new HttpException(HttpStatusCode.MethodNotAllowed);
 
 			var pathrequest = Uri.UnescapeDataString(context.Request.Path);
@@ -135,20 +140,117 @@ namespace Ceen.Httpd.Handler
 			if (mimetype == null)
 				throw new HttpException(HttpStatusCode.NotFound);
 
-			context.Response.ContentType = mimetype;
-			context.Response.StatusCode = HttpStatusCode.OK;
-			context.Response.AddHeader("Last-Modified", File.GetLastWriteTime(path).ToString("R", CultureInfo.InvariantCulture));
-
-			await BeforeResponseAsync(context);
-
 			try
 			{
 				using (var fs = File.OpenRead(path))
 				{
-					context.Response.ContentLength = fs.Length;
+					var startoffset = 0L;
+					var bytecount = fs.Length;
+					var endoffset = bytecount - 1;
 
-					using(var os = context.Response.GetResponseStream())
-						await fs.CopyToAsync(os);
+					var rangerequest = context.Request.Headers["Range"];
+					if (!string.IsNullOrWhiteSpace(rangerequest))
+					{
+						var m = RANGE_MATCHER.Match(rangerequest);
+						if (!m.Success || m.Length != rangerequest.Length)
+						{
+							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+							return true;
+						}
+
+						if (m.Groups["start"].Length != 0)
+							if (!long.TryParse(m.Groups["start"].Value, out startoffset))
+							{
+								context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+								context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+								return true;
+							}
+
+						if (m.Groups["end"].Length != 0)
+							if (!long.TryParse(m.Groups["end"].Value, out endoffset))
+							{
+								context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+								context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+								return true;
+							}
+
+						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length == 0)
+						{
+							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+							return true;
+						}
+
+						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length != 0)
+						{
+							startoffset = bytecount - endoffset;
+							endoffset = bytecount - 1;
+						}
+
+						if (endoffset > bytecount - 1)
+							endoffset = bytecount - 1;
+
+						if (endoffset < startoffset)
+						{
+							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+							return true;
+						}
+					}
+
+					var lastmodified = File.GetLastWriteTimeUtc(path);
+					context.Response.ContentType = mimetype;
+					context.Response.StatusCode = HttpStatusCode.OK;
+					context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
+					context.Response.AddHeader("Accept-Ranges", "bytes");
+
+					DateTime modifiedsincedate;
+					DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
+
+					if (modifiedsincedate == lastmodified)
+					{
+						context.Response.StatusCode = HttpStatusCode.NotModified;
+						context.Response.ContentLength = 0;
+					}
+					else
+					{
+						context.Response.ContentLength = endoffset - startoffset + 1;
+						if (context.Response.ContentLength != bytecount)
+						{
+							context.Response.StatusCode = HttpStatusCode.PartialContent;
+							context.Response.AddHeader("Content-Range", string.Format("bytes {0}-{1}/{2}", startoffset, endoffset, bytecount));
+						}
+					}
+
+					await BeforeResponseAsync(context);
+
+					if (context.Response.StatusCode == HttpStatusCode.NotModified)
+						return true;
+
+					if (string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+					{
+						if (context.Response.ContentLength != 0)
+						{
+							context.Response.KeepAlive = false;
+							await context.Response.FlushHeadersAsync();
+						}
+						return true;
+					}
+
+					fs.Position = startoffset;
+					var remain = context.Response.ContentLength;
+					var buf = new byte[8 * 1024];
+
+					using (var os = context.Response.GetResponseStream())
+					{
+						while (remain > 0)
+						{
+							var r = await fs.ReadAsync(buf, 0, (int)Math.Min(buf.Length, remain));
+							await os.WriteAsync(buf, 0, r);
+							remain -= r;
+						}
+					}
 				}
 			}
 			catch
