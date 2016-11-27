@@ -108,7 +108,7 @@ namespace Ceen.Httpd.Cli
 				var f = new FileSystemWatcher(Path.GetDirectoryName(configname));
 				f.Changed += (sender, e) => {
 					if (e.FullPath == configname)
-						reloadevent.SetResult(true);
+						Task.Delay(TimeSpan.FromSeconds(1)).ContinueWith( _ => reloadevent.SetResult(true));
 				};
 				f.EnableRaisingEvents = true;
 				fsw = f;
