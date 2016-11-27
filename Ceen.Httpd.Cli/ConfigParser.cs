@@ -318,6 +318,26 @@ namespace Ceen.Httpd.Cli
 						lastitemprops = route.RouteOptions;
 						lastitemprops.Add(nameof(Ceen.Httpd.Handler.FileHandler.PathPrefix), pathprefix);
 					}
+					else if (string.Equals(cmd, "redirect", StringComparison.OrdinalIgnoreCase))
+					{
+						if (args.Length < 3)
+							throw new Exception($"Too few arguments in line {lineindex}: {line}");
+						if (args.Length > 3)
+							throw new Exception($"Too many arguments in line {lineindex}: {line}");
+
+						var routearg = args.Skip(1).First();
+
+						var route = new RouteDefinition()
+						{
+							RoutePrefix = routearg,
+							Assembly = typeof(Ceen.Httpd.Handler.RedirectHandler).Assembly.GetName().Name,
+							Classname = typeof(Ceen.Httpd.Handler.RedirectHandler).FullName,
+							ConstructorArguments = args.Skip(2).ToList()
+						};
+
+						cfg.Routes.Add(route);
+						lastitemprops = route.RouteOptions;
+					}
 					else if (string.Equals(cmd, "mime", StringComparison.OrdinalIgnoreCase))
 					{
 						if (args.Length < 3)

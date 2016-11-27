@@ -192,6 +192,15 @@
 #set pathprefix /index
 #handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
 
+# Redirect paths
+#redirect "/about" "http://www.example.com"
+#set statuscode 301
+#set statusmessage "Moved Permanently"
+
+# Internal redirects, invisible to the client, are also supported
+#redirect "/example" "/html/example.html"
+#set internalredirect true
+
 # A custom route using Ceen.Mvc, loading an assembly
 #route MyAssemblyName
 
