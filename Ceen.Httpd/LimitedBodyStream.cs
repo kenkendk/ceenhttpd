@@ -14,19 +14,19 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// The maximum idle time
 		/// </summary>
-		private TimeSpan m_idletime;
+		private readonly TimeSpan m_idletime;
 		/// <summary>
 		/// The timeout task
 		/// </summary>
-		private Task m_timeouttask;
+		private readonly Task m_timeouttask;
 		/// <summary>
 		/// The stop task
 		/// </summary>
-		private Task m_stoptask;
+		private readonly Task m_stoptask;
 		/// <summary>
 		/// The cancellation token
 		/// </summary>
-		private System.Threading.CancellationTokenSource m_cs;
+		private readonly System.Threading.CancellationTokenSource m_cs;
 
 		/// <summary>
 		/// The number of bytes to read
@@ -41,7 +41,7 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// Value indicating if the requests are just passed through
 		/// </summary>
-		private bool m_passthrough;
+		private readonly bool m_passthrough;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="Ceen.Httpd.LimitedBodyStream"/> class.
@@ -53,11 +53,16 @@ namespace Ceen.Httpd
 		/// <param name="stoptask">The stop signal task.</param>
 		public LimitedBodyStream(BufferedStreamReader parent, long totalbytes, TimeSpan idletime, Task timeouttask, Task stoptask)
 		{
+			if (parent == null)
+				throw new ArgumentNullException(nameof(parent));
+			
+			m_parent = parent;
 			m_bytesleft = totalbytes;
 			m_idletime = idletime;
 			m_timeouttask = timeouttask;
 			m_stoptask = stoptask;
 			m_passthrough = totalbytes < 0;
+			m_cs = new System.Threading.CancellationTokenSource();
 		}
 
 		/// <summary>
