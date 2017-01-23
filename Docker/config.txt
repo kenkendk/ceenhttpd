@@ -1,0 +1,28 @@
+﻿# This is an example config file to be used with the Docker setup
+
+isolatedappdomain true
+watchconfigfile true
+
+httpport %LISTEN_PORT%
+httpaddress any
+
+# This accepts the headers added by nginx, 
+# such that it is more transparent to the Ceen
+# handlers that there is an nginx proxy
+AllowedSourceIPHeaderValue "X-Real-IP"
+
+# Depending on requirements, you can use one of these loggers instead of the nginx logs
+#logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
+#logger Ceen.Httpd Ceen.Httpd.Logging.Log4netCLFLogger
+#logger Ceen.Httpd Ceen.Httpd.Logging.CLFLogger "%CLF_LOG_PATH%"
+
+# Add some custom handling
+#handler "" MyAssembly MyAssembly.MyHandler
+#route MyAssembly
+
+# You need one of these to make sure the LetsEncrypt challenge tokens can be read
+# Just serve the .well-known folder
+serve "/.well-known/" "%STORAGE_FOLDER%/.well-known/"
+
+# Or use the storage folder for other stuff as well
+serve "/" "%STORAGE_FOLDER%"
