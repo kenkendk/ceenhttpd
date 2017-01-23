@@ -458,12 +458,19 @@ namespace Ceen.Httpd
 					var client = await ls;
 					var newtaskid = SetLoggingTaskHandlerID();
 
-					int wt, cpt;
-					ThreadPool.GetAvailableThreads(out wt, out cpt);
-					if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
+					try
+					{
+						int wt, cpt;
+						ThreadPool.GetAvailableThreads(out wt, out cpt);
+						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
 
-					if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
-					ThreadPool.QueueUserWorkItem(x => spawner(client, client.Client.RemoteEndPoint, newtaskid, rc));
+						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
+						ThreadPool.QueueUserWorkItem(x => spawner(client, client.Client.RemoteEndPoint, newtaskid, rc));
+					}
+					catch(Exception ex)
+					{
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed to listen to socket", taskid, ex);
+					}
 				}
 			}
 
@@ -609,15 +616,15 @@ namespace Ceen.Httpd
 			HttpResponse resp = null;
 			DateTime started = new DateTime();
 
-			try
+			using (client)
+			using (var bs = new BufferedStreamReader(stream))
 			{
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Running task", logtaskid, endpoint);
-				if (!controller.RegisterActive(logtaskid))
-					return;
-
-				using (client)
-				using (var bs = new BufferedStreamReader(stream))
+				try
 				{
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Running task", logtaskid, endpoint);
+					if (!controller.RegisterActive(logtaskid))
+						return;
+
 					do
 					{
 						var reqid = SetLoggingRequestID();
@@ -718,38 +725,42 @@ namespace Ceen.Httpd
 						requests--;
 
 						await LogMessageAsync(controller, context, null, started, DateTime.Now - started);
-					
-					} while(keepingalive);
+
+					} while (keepingalive);
 				}
-			}
-			catch (Exception ex)
-			{
-				// If possible, report a 500 error to the client
-				if (resp != null)
+				catch (Exception ex)
 				{
-					if (!resp.HasSentHeaders)
+					// If possible, report a 500 error to the client
+					if (resp != null)
 					{
-						resp.StatusCode = Ceen.HttpStatusCode.InternalServerError;
-						resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.HttpStatusCode.InternalServerError);
+						try
+						{
+							if (!resp.HasSentHeaders)
+							{
+								resp.StatusCode = Ceen.HttpStatusCode.InternalServerError;
+								resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.HttpStatusCode.InternalServerError);
+							}
+						}
+						catch { }
+
+						try { await resp.FlushAsErrorAsync(); }
+						catch { }
 					}
 
-					try { await resp.FlushAsErrorAsync(); }
+					try { stream.Close(); }
 					catch { }
+
+					try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
+					catch { }
+
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Failed handler", logtaskid, cur);
+
 				}
-
-				try { stream.Close(); }
-				catch {}
-
-				try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
-				catch { }
-
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Failed handler", logtaskid, cur);
-
-			}
-			finally
-			{
-				controller.RegisterStopped(logtaskid);
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Terminating handler", logtaskid, cur);
+				finally
+				{
+					controller.RegisterStopped(logtaskid);
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Terminating handler", logtaskid, cur);
+				}
 			}
 		}
 	}
