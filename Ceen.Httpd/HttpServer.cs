@@ -54,7 +54,7 @@ namespace Ceen.Httpd
 					throw new Exception("Cannot call setup more than once");
 				if (config == null)
 					throw new ArgumentNullException(nameof(config));
-				
+
 				StopToken = new CancellationTokenSource();
 				Controller = new RunnerControl(StopToken.Token, usessl, config);
 			}
@@ -66,7 +66,7 @@ namespace Ceen.Httpd
 			/// <param name="remoteEndPoint">The remote endpoint.</param>
 			/// <param name="logtaskid">The task ID to use.</param>
 			public void HandleRequest(SocketInformation socket, EndPoint remoteEndPoint, string logtaskid)
-			{				
+			{
 				RunClient(socket, remoteEndPoint, logtaskid, Controller);
 			}
 
@@ -107,7 +107,7 @@ namespace Ceen.Httpd
 		/// Helper class to keep track of all active requests and potentially abort them
 		/// </summary>
 		private class RunnerControl
-		{			
+		{
 			/// <summary>
 			/// Backing field for the total number of active clients
 			/// </summary>
@@ -195,11 +195,11 @@ namespace Ceen.Httpd
 			/// <param name="stoptoken">The stoptoken.</param>
 			/// <param name="usessl">A flag indicating if this runner is using SSL</param>
 			/// <param name="config">The server config.</param>
-			public RunnerControl(CancellationToken stoptoken, bool usessl, ServerConfig config) 
+			public RunnerControl(CancellationToken stoptoken, bool usessl, ServerConfig config)
 			{
 				if (config == null)
 					throw new ArgumentNullException(nameof(config));
-				
+
 				StopToken = stoptoken;
 				StopToken.Register(() => m_stoptask.TrySetCanceled());
 				Config = config;
@@ -217,10 +217,10 @@ namespace Ceen.Httpd
 			public bool RegisterActive(string logtaskid)
 			{
 				if (m_debuglogger != null) m_debuglogger("RegisterActive", logtaskid, null);
-				
+
 				if (m_isStopped)
 					return false;
-				
+
 				var res = Interlocked.Increment(ref m_activeClients);
 				Interlocked.Increment(ref m_totalActiveClients);
 
@@ -383,7 +383,7 @@ namespace Ceen.Httpd
 								return g;
 							};
 
-							copylogdata = (context) => 
+							copylogdata = (context) =>
 							{
 								if (context != null && context.LogData != null)
 									foreach (var kp in context.LogData)
@@ -532,7 +532,7 @@ namespace Ceen.Httpd
 		/// <param name="controller">The controller instance</param>
 		private static void RunClient(SocketInformation socketinfo, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
 		{
-			var client = new TcpClient() { Client = new Socket(socketinfo) };				
+			var client = new TcpClient() { Client = new Socket(socketinfo) };
 			RunClient(client, remoteEndPoint, logtaskid, controller);
 		}
 
@@ -652,7 +652,7 @@ namespace Ceen.Httpd
 
 							throw;
 						}
-							
+
 						string keepalive;
 						cur.Headers.TryGetValue("Connection", out keepalive);
 						if (("keep-alive".Equals(keepalive, StringComparison.OrdinalIgnoreCase) || keepingalive) && requests > 1)
@@ -675,7 +675,7 @@ namespace Ceen.Httpd
 									await sl.LogRequestStarted(cur);
 							}
 							else if (count != 0)
-								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));								
+								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));
 						}
 
 						if (config.DebugLogHandler != null) config.DebugLogHandler("Running handler", logtaskid, cur);
@@ -753,5 +753,5 @@ namespace Ceen.Httpd
 			}
 		}
 	}
-}
 
+}
