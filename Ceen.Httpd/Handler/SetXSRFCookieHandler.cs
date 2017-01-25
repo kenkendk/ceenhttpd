@@ -31,7 +31,7 @@ namespace Ceen.Httpd.Handler
 		}
 
 		/// <summary>
-		/// The expiration internval in seconds.
+		/// The expiration interval in seconds.
 		/// </summary>
 		private int m_expirationSeconds;
 

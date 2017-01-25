@@ -15,7 +15,7 @@ SSLEnabledProtocols "Tls11|Tls12"
 
 logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
 logger Ceen.Httpd Ceen.Httpd.Logging.StdErrErrors
-logger Ceen.Httpd.Cli Ceen.Httpd.Cli.SyslogLogger
+logger Ceen.Httpd Ceen.Httpd.Logging.SyslogLogger
 #logger Ceen.Httpd Ceen.Httpd.Logging.CLFLogger "log.txt" true false
 
 logger Unittests Unittests.TestLogger

@@ -143,7 +143,6 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// Handles a line from the input stream.
 		/// </summary>
-		/// <param name="self">The request.</param>
 		/// <param name="line">The line being read.</param>
 		private void HandleLine(string line)
 		{
@@ -463,7 +462,6 @@ namespace Ceen.Httpd
 				if (!string.IsNullOrWhiteSpace(realip))
 					this.RemoteEndPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(realip), ((System.Net.IPEndPoint)this.RemoteEndPoint).Port);
 			}
-
 
 			await ParseFormData(reader, config, idletime, timeouttask, stoptask);
 		}
