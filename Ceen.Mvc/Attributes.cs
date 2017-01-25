@@ -144,6 +144,14 @@ namespace Ceen.Mvc
 	}
 
 	/// <summary>
+	/// Http HEAD verb filter attribute.
+	/// </summary>
+	public class HttpHeadAttribute : HttpVerbFilterAttribute
+	{
+		public HttpHeadAttribute() : base("HEAD") { }
+	}
+
+	/// <summary>
 	/// Http PATCH verb filter attribute.
 	/// </summary>
 	public class HttpPatchAttribute : HttpVerbFilterAttribute
