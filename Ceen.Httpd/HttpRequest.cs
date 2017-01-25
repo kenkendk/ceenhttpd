@@ -467,6 +467,63 @@ namespace Ceen.Httpd
 
 			await ParseFormData(reader, config, idletime, timeouttask, stoptask);
 		}
+
+		/// <summary>
+		/// The list of handled request modules
+		/// </summary>
+		private List<IHttpModule> m_handlerStack = new List<IHttpModule>();
+
+		/// <summary>
+		/// Gets the handlers that have processed this request
+		/// </summary>
+		public IEnumerable<IHttpModule> HandlerStack { get { return m_handlerStack; } }
+
+		/// <summary>
+		/// Clears the handler stack.
+		/// </summary>
+		internal void ClearHandlerStack()
+		{
+			m_handlerStack.Clear();
+		}
+
+		/// <summary>
+		/// Registers a handler on the request stack
+		/// </summary>
+		public void PushHandlerOnStack(IHttpModule handler)
+		{
+			m_handlerStack.Add(handler);
+		}
+
+		/// <summary>
+		/// Enforces that the handler stack obeys the requirements
+		/// </summary>
+		/// <param name="attributes">The list of attributes to check.</param>
+		public void RequireHandler(IEnumerable<RequireHandlerAttribute> attributes)
+		{
+			if (attributes == null)
+				return;
+
+			foreach (var attr in attributes)
+			{
+				var any =
+					attr.AllowDerived
+						? m_handlerStack.Any(x => attr.RequiredType.IsAssignableFrom(x.GetType()))
+						: m_handlerStack.Any(x => attr.RequiredType == x.GetType());
+
+				if (!any)
+					throw new RequirementFailedException($"Did not find any handlers of type {attr.RequiredType.FullName} while processing path {this.Path}. The handler stack contains: {string.Join(", ", m_handlerStack.Select(x => x.GetType().FullName))}");
+			}
+		}
+
+		/// <summary>
+		/// Enforces that the given type has processed the request
+		/// </summary>
+		/// <param name="handler">The type to check for.</param>
+		/// <param name="allowderived">A flag indicating if the type match must be exact, or if derived types are accepted</param>
+		public void RequireHandler(Type handler, bool allowderived = true)
+		{
+			RequireHandler(new[] { new RequireHandlerAttribute(handler) { AllowDerived = allowderived } });
+		}
 	}
 }
 

@@ -37,6 +37,7 @@
     <Compile Include="AsyncLock.cs" />
     <Compile Include="AppDomainTask.cs" />
     <Compile Include="PeriodicTask.cs" />
+    <Compile Include="Attributes.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

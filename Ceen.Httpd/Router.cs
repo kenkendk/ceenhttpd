@@ -112,8 +112,12 @@ namespace Ceen.Httpd
 						continue;
 				}
 
+				context.Request.RequireHandler(rule.Value.GetType().GetCustomAttributes(typeof(RequireHandlerAttribute), true).OfType<RequireHandlerAttribute>());
+
 				if (await rule.Value.HandleAsync(context))
 					return true;
+
+				context.Request.PushHandlerOnStack(rule.Value);
 			}
 
 			return false;

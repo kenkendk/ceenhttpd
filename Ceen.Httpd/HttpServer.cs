@@ -696,6 +696,7 @@ namespace Ceen.Httpd
 							// Process the request
 							do
 							{
+								cur.ClearHandlerStack();
 								var target = resp.ClearInternalRedirect();
 								if (target != null)
 									cur.Path = target;

@@ -559,6 +559,10 @@ namespace Ceen.Mvc
 		/// <param name="urlmatch">The parent url match</param>
 		private async Task HandleWithMethod(IHttpContext context, MethodEntry method, Controller controller, Dictionary<string, string> urlmatch)
 		{
+			// Make sure dependencies are met
+			context.Request.RequireHandler(controller.GetType().GetCustomAttributes<RequireHandlerAttribute>());
+			context.Request.RequireHandler(method.Method.GetCustomAttributes<RequireHandlerAttribute>());
+			
 			// Apply each argument in turn
 			var values = new object[method.ArgumentCount];
 

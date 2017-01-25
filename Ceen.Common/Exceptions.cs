@@ -56,5 +56,39 @@ namespace Ceen
 	public class EmptyStreamClosedException : Exception
 	{
 	}
+
+	/// <summary>
+	/// Exception indicating that a requirement failed
+	/// </summary>
+	[Serializable]
+	public class RequirementFailedException : Exception
+	{
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.RequirementFailedException"/> class.
+		/// </summary>
+		public RequirementFailedException()
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.RequirementFailedException"/> class.
+		/// </summary>
+		/// <param name="message">The message to report.</param>
+		public RequirementFailedException(string message)
+			: base(message)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.RequirementFailedException"/> class.
+		/// </summary>
+		/// <param name="message">The message to report.</param>
+		/// <param name="innerException">The inner exception.</param>
+		public RequirementFailedException(string message, Exception innerException)
+			: base(message, innerException)
+		{
+		}
+	}
+
 }
 

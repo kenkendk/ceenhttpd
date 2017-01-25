@@ -187,6 +187,29 @@ namespace Ceen
 		/// </summary>
 		/// <value>The length of the content.</value>
 		int ContentLength { get; }
+
+		/// <summary>
+		/// Gets the handlers that have processed this request
+		/// </summary>
+		IEnumerable<IHttpModule> HandlerStack { get; }
+
+		/// <summary>
+		/// Registers a handler on the request stack
+		/// </summary>
+		void PushHandlerOnStack(IHttpModule handler);
+
+		/// <summary>
+		/// Enforces that the handler stack obeys the requirements
+		/// </summary>
+		/// <param name="attributes">The list of attributes to check.</param>
+		void RequireHandler(IEnumerable<RequireHandlerAttribute> attributes);
+
+		/// <summary>
+		/// Enforces that the given type has processed the request
+		/// </summary>
+		/// <param name="handler">The type to check for.</param>
+		/// <param name="allowderived">A flag indicating if the type match must be exact, or if derived types are accepted</param>
+		void RequireHandler(Type handler, bool allowderived = true);
 	}
 
 	/// <summary>
