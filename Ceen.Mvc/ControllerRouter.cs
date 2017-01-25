@@ -315,10 +315,10 @@ namespace Ceen.Mvc
 			if (wrong != null)
 				throw new ArgumentException($"The type \"{wrong.FullName}\" does not derive from {typeof(Controller).FullName}");
 
-			m_routeparser = BuildParseV2(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
+			m_routeparser = BuildParse(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
 		}
 
-		private static RouteParser BuildParseV2(IEnumerable<Controller> controllers, ControllerRouterConfig config)
+		private static RouteParser BuildParse(IEnumerable<Controller> controllers, ControllerRouterConfig config)
 		{
 			var controller_routes =
 				controllers.SelectMany(x =>
