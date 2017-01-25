@@ -127,6 +127,46 @@ namespace Unittests
 		}
 	}
 
+	public class RequirementControllerItems
+	{
+		public const string WAIT_INDEX_GET = "GET /api/v1/wait";
+		public const string WAIT_INDEX_DETAIL_GET = "GET /api/v1/wait/detail";
+		public const string WAIT_INDEX_DETAIL_HEAD = "HEAD /api/v1/wait/detail";
+
+		public class TestHandler : IHttpModule
+		{
+			public Task<bool> HandleAsync(IHttpContext context)
+			{
+				return Task.FromResult(false);
+			}
+		}
+
+		[Name("wait")]
+		public class WaitExample : Controller, IApiV1
+		{
+			[HttpGet]
+			[RequireHandler(typeof(TestHandler))]
+			public Task<IResult> Index()
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX_GET));
+			}
+
+			[HttpHead]
+			[RequireHandler(typeof(TestHandler))]
+			[Name("detail")]
+			public Task<IResult> DetailHead()
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX_DETAIL_HEAD));
+			}
+		
+			[Name("detail")]
+			public Task<IResult> Detail()
+			{
+				return Task.FromResult(Status(HttpStatusCode.OK, WAIT_INDEX_DETAIL_GET));
+			}
+		}
+	}
+
 	internal class ServerRunner : IDisposable
 	{
 		public Ceen.Httpd.ServerConfig Config;
@@ -228,6 +268,43 @@ namespace Unittests
 					))
 				{ }
 			});
+		}
+
+
+		[Test()]
+		public void TestRoutingWithRequirements()
+		{
+			using (var server = new ServerRunner(
+				new Ceen.Httpd.ServerConfig()
+				.AddRoute("/api/v1/wait", new RequirementControllerItems.TestHandler())
+				.AddRoute(
+					new[] { typeof(RequirementControllerItems.WaitExample) } 
+					.ToRoute(
+						new ControllerRouterConfig()
+						{ Debug = true }
+					))
+				))
+			{ 
+				Assert.AreEqual(RequirementControllerItems.WAIT_INDEX_GET, server.GetStatusMessage("/api/v1/wait", "GET"));
+				Assert.AreEqual(RequirementControllerItems.WAIT_INDEX_DETAIL_GET, server.GetStatusMessage("/api/v1/wait/detail", "GET"));
+				Assert.AreEqual(HttpStatusCode.InternalServerError, server.GetStatusCode("/api/v1/wait/detail", "HEAD"));
+			}
+
+			using (var server = new ServerRunner(
+				new Ceen.Httpd.ServerConfig()
+				.AddRoute("/api/v1/wait/detail", new RequirementControllerItems.TestHandler())
+				.AddRoute(
+					new[] { typeof(RequirementControllerItems.WaitExample) }
+					.ToRoute(
+						new ControllerRouterConfig()
+						{ Debug = true }
+					))
+				))
+			{
+				Assert.AreEqual(HttpStatusCode.InternalServerError, server.GetStatusCode("/api/v1/wait", "GET"));
+				Assert.AreEqual(RequirementControllerItems.WAIT_INDEX_DETAIL_GET, server.GetStatusMessage("/api/v1/wait/detail", "GET"));
+				Assert.AreEqual(RequirementControllerItems.WAIT_INDEX_DETAIL_HEAD, server.GetStatusMessage("/api/v1/wait/detail", "HEAD"));
+			}
 		}
 
 		[Test()]
