@@ -36,6 +36,10 @@ namespace Ceen.Httpd.Handler
 		/// List of allowed index files
 		/// </summary>
 		private readonly string[] m_indexfiles;
+		/// <summary>
+		/// List of allowed index file extensions
+		/// </summary>
+		private readonly string[] m_autoprobeextensions;
 
 		/// <summary>
 		/// Gets or sets the path prefix
@@ -47,7 +51,7 @@ namespace Ceen.Httpd.Handler
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		public FileHandler(string sourcefolder)
-			: this(sourcefolder, new string[] { "index.htm", "index.html" }, null)
+			: this(sourcefolder, new string[] { "index.html", "index.htm" }, new string[] { ".html", ".htm" }, null)
 		{
 		}
 
@@ -57,7 +61,7 @@ namespace Ceen.Httpd.Handler
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
 		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup)
-			: this(sourcefolder, new string[] {"index.htm", "index.html"}, mimetypelookup)
+			: this(sourcefolder, new string[] {"index.html", "index.htm"}, new string[] { ".html", ".htm" }, mimetypelookup)
 		{
 		}
 
@@ -68,8 +72,26 @@ namespace Ceen.Httpd.Handler
 		/// <param name="indexfiles">List of filenames allowed as index files.</param>
 		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
 		public FileHandler(string sourcefolder, string[] indexfiles, Func<IHttpRequest, string, string> mimetypelookup = null)
+			: this(sourcefolder, indexfiles, new string[] { ".html", ".htm" }, mimetypelookup)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
+		/// </summary>
+		/// <param name="sourcefolder">The folder to server files from.</param>
+		/// <param name="indexfiles">List of filenames allowed as index files.</param>
+		/// <param name="autoprobeextensions">List of automatically probed extensions</param>
+		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
+		public FileHandler(string sourcefolder, string[] indexfiles, string[] autoprobeextensions, Func<IHttpRequest, string, string> mimetypelookup = null)
 		{
 			m_indexfiles = indexfiles ?? new string[0];
+			m_autoprobeextensions = 
+				(autoprobeextensions ?? new string[0])
+					.Where(x => !string.IsNullOrWhiteSpace(x))
+					.Select(x => x.StartsWith(".", StringComparison.Ordinal) ? x : "." + x)
+					.ToArray();
+			
 			m_sourcefolder = Path.GetFullPath(sourcefolder);
 			if (!m_sourcefolder.StartsWith(DIRSEP, StringComparison.Ordinal))
 				m_sourcefolder = DIRSEP + m_sourcefolder;
@@ -114,27 +136,40 @@ namespace Ceen.Httpd.Handler
 			if (!path.StartsWith(m_sourcefolder, StringComparison.Ordinal))
 				throw new HttpException(HttpStatusCode.BadRequest);
 
-			if (Directory.Exists(path))
-			{
-				if (!context.Request.Path.EndsWith("/", StringComparison.Ordinal))
-				{
-					if (!m_indexfiles.Any(p => File.Exists(Path.Combine(path, p))))
-						throw new HttpException(HttpStatusCode.NotFound);
-
-					context.Response.Redirect(context.Request.Path + "/");
-					return true;
-				}
-
-				var ix = m_indexfiles.Where(p => File.Exists(Path.Combine(path, p))).FirstOrDefault();
-				if (!string.IsNullOrWhiteSpace(ix))
-				{
-					context.Response.InternalRedirect(context.Request.Path + ix);
-					return true;
-				}
-			}
-
 			if (!File.Exists(path))
+			{
+				if (string.IsNullOrWhiteSpace(Path.GetExtension(path)) && !path.EndsWith("/", StringComparison.Ordinal) && !path.EndsWith(".", StringComparison.Ordinal))
+				{
+					var ix = m_autoprobeextensions.FirstOrDefault(p => File.Exists(path + p));
+					if (!string.IsNullOrWhiteSpace(ix))
+					{
+						context.Response.InternalRedirect(context.Request.Path + ix);
+						return true;
+					}					
+				}
+
+				if (Directory.Exists(path))
+				{
+					if (!context.Request.Path.EndsWith("/", StringComparison.Ordinal))
+					{
+						if (!m_indexfiles.Any(p => File.Exists(Path.Combine(path, p))))
+							throw new HttpException(HttpStatusCode.NotFound);
+
+						context.Response.Redirect(context.Request.Path + "/");
+						return true;
+					}
+
+					var ix = m_indexfiles.FirstOrDefault(p => File.Exists(Path.Combine(path, p)));
+					if (!string.IsNullOrWhiteSpace(ix))
+					{
+						context.Response.InternalRedirect(context.Request.Path + ix);
+						return true;
+					}
+				}
+
+				// No alternatives available
 				throw new HttpException(HttpStatusCode.NotFound);
+			}
 
 			var mimetype = m_mimetypelookup(context.Request, path);
 			if (mimetype == null)
