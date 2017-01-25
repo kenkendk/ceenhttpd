@@ -297,6 +297,9 @@ namespace Ceen.Httpd.Cli
 							throw new Exception($"Too many arguments in line {lineindex}: {line}");
 
 						var routearg = args.Skip(1).First();
+						if (routearg == string.Empty)
+							routearg = "/";
+					
 						if (!routearg.StartsWith("/", StringComparison.Ordinal))
 							throw new Exception($"The route must start with a forward slash in line {lineindex}: {line}");
 						while (routearg.Length > 1 && routearg.EndsWith("/", StringComparison.Ordinal))
