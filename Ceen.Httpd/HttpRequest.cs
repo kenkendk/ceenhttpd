@@ -349,7 +349,7 @@ namespace Ceen.Httpd
 
 				this.Body = new LimitedBodyStream(reader, 0, idletime, timeouttask, stoptask);
 			}
-			else if ((this.ContentType ?? "").StartsWith("multipart/form-data") && this.ContentLength > 0 && this.ContentLength < config.MaxUrlEncodedFormSize && config.AutoParseMultipartFormData)
+			else if ((this.ContentType ?? "").StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase) && this.ContentLength > 0 && this.ContentLength < config.MaxUrlEncodedFormSize && config.AutoParseMultipartFormData)
 			{
 				await ParseMultiPart(
 					async (headers, stream) =>
