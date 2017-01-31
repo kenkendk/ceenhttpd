@@ -73,6 +73,10 @@ namespace Ceen.Httpd
 		/// <value>The http version.</value>
 		public string HttpVersion { get; private set; }
 		/// <summary>
+		/// <summary>
+		/// Gets a value indicating what connection security is used.
+		/// </summary>
+		public SslProtocols SslProtocol { get; private set; }
 		/// Gets the remote endpoint
 		/// </summary>
 		public System.Net.EndPoint RemoteEndPoint { get; private set; }
@@ -128,10 +132,12 @@ namespace Ceen.Httpd
 		/// <param name="remoteEndpoint">The remote endpoint.</param>
 		/// <param name="logtaskid">The logging ID for the task</param>
 		/// <param name="clientCert">The client SSL certificate.</param>
-		public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert)
+		/// <param name="sslProtocol">The SSL protocol used</param>
+		public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol)
 		{
 			RemoteEndPoint = remoteEndpoint;
 			ClientCertificate = clientCert;
+			SslProtocol = sslProtocol;
 			LogTaskID = logtaskid;
 			LogRequestID = logrequestid;
 			Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);

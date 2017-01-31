@@ -579,7 +579,7 @@ namespace Ceen.Httpd
 						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, client);
 
 						// Log a message indicating that we failed setting up SSL
-						await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null), null, storage), aex, DateTime.Now, new TimeSpan());
+						await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None), null, storage), aex, DateTime.Now, new TimeSpan());
 
 						return;
 					}
@@ -588,7 +588,7 @@ namespace Ceen.Httpd
 					clientcert = ssl.RemoteCertificate;
 				}
 
-				await Runner(client, ssl == null ? (Stream)s : ssl, remoteEndPoint, logtaskid, clientcert, controller);
+				await Runner(client, ssl == null ? (Stream)s : ssl, remoteEndPoint, logtaskid, clientcert, ssl == null ? SslProtocols.None : ssl.SslProtocol, controller);
 
 				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, client);
 			}
@@ -603,7 +603,7 @@ namespace Ceen.Httpd
 		/// <param name="logtaskid">The task id for logging and tracing</param>
 		/// <param name="clientcert">The client certificate if any.</param>
 		/// <param name="controller">The runner controller.</param>
-		private static async Task Runner(TcpClient client, Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, RunnerControl controller)
+		private static async Task Runner(TcpClient client, Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, SslProtocols sslProtocol, RunnerControl controller)
 		{
 			var config = controller.Config;
 			var storage = config.Storage;
@@ -631,7 +631,7 @@ namespace Ceen.Httpd
 						bs.ResetReadLength(config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
-							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert),
+							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol),
 							resp = new HttpResponse(stream, config),
 							storage
 						);

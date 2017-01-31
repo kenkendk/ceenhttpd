@@ -159,6 +159,10 @@ namespace Ceen
 		/// <value>The http version.</value>
 		string HttpVersion { get; }
 		/// <summary>
+		/// <summary>
+		/// Gets a value indicating what connection security is used.
+		/// </summary>
+		SslProtocols SslProtocol { get; }
 		/// Gets the remote endpoint
 		/// </summary>
 		EndPoint RemoteEndPoint { get; }
