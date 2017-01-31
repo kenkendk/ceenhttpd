@@ -37,6 +37,14 @@ namespace Ceen.Security.Login
 		private AsyncLock m_lock;
 
 		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Security.Login.MemoryStorageModule"/> class.
+		/// </summary>
+		public MemoryStorageModule()
+		{
+			new LoginSettingsModule().ShortTermStorage = this;
+		}
+
+		/// <summary>
 		/// Adds a new session record
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
