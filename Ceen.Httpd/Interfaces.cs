@@ -17,35 +17,4 @@ namespace Ceen.Httpd
 	/// A delegate for handling a HTTP request
 	/// </summary>
 	public delegate Task<bool> HttpHandlerDelegate(IHttpContext context);
-
-	/// <summary>
-	/// Interface for implementing a logging provider
-	/// </summary>
-	public interface ILogger
-	{
-		/// <summary>
-		/// Logs a request.
-		/// </summary>
-		/// <returns>An awaitable task.</returns>
-		/// <param name="context">The execution context.</param>
-		/// <param name="ex">The exception being logged, may be null.</param>
-		/// <param name="started">The time the request started.</param>
-		/// <param name="duration">The request duration.</param>
-		Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
-	}
-
-	/// <summary>
-	/// Interface for logging requests before they are processed
-	/// </summary>
-	public interface IStartLogger : ILogger
-	{
-		/// <summary>
-		/// Logs the start of a request.
-		/// </summary>
-		/// <returns>An awaitable task.</returns>
-		/// <param name="request">The request being started.</param>
-		Task LogRequestStarted(IHttpRequest request);
-	}
-
-
 }
