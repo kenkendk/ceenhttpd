@@ -188,9 +188,9 @@
 #serve "/" "/path/to/files"
 
 # Or manually invoked, useful when deriving from FileHandler
-#handler "[/index(/.*)?]" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/index"
+#handler "[/index(/.*)?]" Ceen.Httpd Ceen.Httpd.Handler.FileHandler "/path/to/index"
 #set pathprefix /index
-#handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
+#handler "" Ceen.Httpd Ceen.Httpd.Handler.FileHandler "/path/to/files"
 
 # Redirect paths
 #redirect "/about" "http://www.example.com"
