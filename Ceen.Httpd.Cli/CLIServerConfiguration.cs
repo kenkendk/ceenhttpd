@@ -3,11 +3,12 @@ using System.Collections.Generic;
 
 namespace Ceen.Httpd.Cli
 {
+
 	/// <summary>
-	/// A definition of a CLI defined route
+	/// A definition of a CLI defined module
 	/// </summary>
 	[Serializable]
-	public class RouteDefinition
+	public class ModuleDefinition
 	{
 		/// <summary>
 		/// The name of the assembly to load
@@ -20,10 +21,6 @@ namespace Ceen.Httpd.Cli
 		/// <value>The assembly.</value>
 		public string Classname { get; set; }
 		/// <summary>
-		/// Using a route prefix on the class
-		/// </summary>
-		public string RoutePrefix { get; set; }
-		/// <summary>
 		/// A list of route options to apply
 		/// </summary>
 		public Dictionary<string, string> RouteOptions { get; set; } = new Dictionary<string, string>();
@@ -31,6 +28,18 @@ namespace Ceen.Httpd.Cli
 		/// Gets or sets the constructor arguments.
 		/// </summary>
 		public List<string> ConstructorArguments { get; set; } = new List<string>();
+	}
+
+	/// <summary>
+	/// A definition of a CLI defined route
+	/// </summary>
+	[Serializable]
+	public class RouteDefinition : ModuleDefinition
+	{
+		/// <summary>
+		/// Using a route prefix on the class
+		/// </summary>
+		public string RoutePrefix { get; set; }
 	}
 
 	/// <summary>
@@ -137,6 +146,11 @@ namespace Ceen.Httpd.Cli
 		/// Gets the defined routes
 		/// </summary>
 		public List<RouteDefinition> Routes { get; set; } = new List<RouteDefinition>();
+
+		/// <summary>
+		/// Gets the defined routes
+		/// </summary>
+		public List<ModuleDefinition> Modules { get; set; } = new List<ModuleDefinition>();
 
 		/// <summary>
 		/// Gets the list of loggers to attach

@@ -465,4 +465,11 @@ namespace Ceen
 		/// </summary>
 		DateTime Expires { get; set; }
 	}
+
+	/// <summary>
+	/// Marker interface for a generic module
+	/// </summary>
+	public interface IModule
+	{
+	}
 }

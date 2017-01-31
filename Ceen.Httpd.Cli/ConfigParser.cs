@@ -262,6 +262,21 @@ namespace Ceen.Httpd.Cli
 						cfg.Routes.Add(route);
 						lastitemprops = route.RouteOptions;
 					}
+					else if (string.Equals(cmd, "module", StringComparison.OrdinalIgnoreCase))
+					{
+						if (args.Length < 3)
+							throw new Exception($"Too few arguments in line {lineindex}: {line}");
+
+						var module = new ModuleDefinition()
+						{
+							Assembly = args.Skip(1).First(),
+							Classname = args.Skip(2).First(),
+							ConstructorArguments = args.Skip(3).ToList()
+						};
+
+						cfg.Modules.Add(module);
+						lastitemprops = module.RouteOptions;
+					}
 					else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
 					{
 						if (args.Length < 3)
@@ -471,6 +486,21 @@ namespace Ceen.Httpd.Cli
 					if (logger.LoggerOptions != null)
 						SetProperties(inst, logger.LoggerOptions);
 					cfg.AddLogger((ILogger)inst);
+				}
+			}
+
+			if (config.Modules != null)
+			{
+				foreach (var module in config.Modules)
+				{
+					object handler;
+					var moduletype = ResolveType(module.Assembly, module.Classname);
+					handler = CreateInstance(moduletype, module.ConstructorArguments, typeof(IModule));
+
+					if (module.RouteOptions != null)
+						SetProperties(handler, module.RouteOptions);
+
+					cfg.AddModule((IModule)handler);
 				}
 			}
 

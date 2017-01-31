@@ -88,6 +88,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		public IList<ILogger> Loggers { get; set; }
 		/// <summary>
+		/// The loaded module instance
+		/// </summary>
+		public IList<IModule> Modules { get; set; }
+		/// <summary>
 		/// A callback method for injecting headers into the responses
 		/// </summary>
 		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
@@ -254,6 +258,22 @@ namespace Ceen.Httpd
 
 			rt.Add(route, handler);
 			return this;		
+		}
+
+		/// <summary>
+		/// Adds a module instance to the server
+		/// </summary>
+		/// <returns>The server configuration.</returns>
+		/// <param name="module">The module to add.</param>
+		public ServerConfig AddModule(IModule module)
+		{
+			if (module == null)
+				throw new ArgumentNullException(nameof(module));
+			if (Modules == null)
+				Modules = new List<IModule>();
+
+			Modules.Add(module);
+			return this;
 		}
 	}
 }
