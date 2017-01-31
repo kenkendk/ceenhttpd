@@ -68,15 +68,27 @@ namespace Ceen.Httpd
 		/// <value>The files.</value>
 		public IList<IMultipartItem> Files { get; private set; }
 		/// <summary>
+		/// Gets the headers found in the request.
+		/// Duplicate values are not represented, instead only the latest is stored
+		/// </summary>
+		/// <value>The headers.</value>
+		public IDictionary<string, object> RequestState { get; private set; }
+		/// <summary>
 		/// Gets the http version string.
 		/// </summary>
 		/// <value>The http version.</value>
 		public string HttpVersion { get; private set; }
 		/// <summary>
+		/// Gets or sets a user identifier attached to the request.
+		/// This can be set by handlers processing the request to simplify dealing with logged in users.
+		/// Handlers should only set this is the user is authenticated.
+		/// </summary>
+		public string UserID { get; set; }
 		/// <summary>
 		/// Gets a value indicating what connection security is used.
 		/// </summary>
 		public SslProtocols SslProtocol { get; private set; }
+		/// <summary>
 		/// Gets the remote endpoint
 		/// </summary>
 		public System.Net.EndPoint RemoteEndPoint { get; private set; }
@@ -144,6 +156,7 @@ namespace Ceen.Httpd
 			QueryString = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			Form = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			Cookies = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
+			RequestState = new Dictionary<string, object>();
 		}
 
 		/// <summary>

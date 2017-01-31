@@ -159,10 +159,16 @@ namespace Ceen
 		/// <value>The http version.</value>
 		string HttpVersion { get; }
 		/// <summary>
+		/// Gets or sets a user identifier attached to the request.
+		/// This can be set by handlers processing the request to simplify dealing with logged in users.
+		/// Handlers should only set this is the user is authenticated.
+		/// </summary>
+		string UserID { get; set; }
 		/// <summary>
 		/// Gets a value indicating what connection security is used.
 		/// </summary>
 		SslProtocols SslProtocol { get; }
+		/// <summary>
 		/// Gets the remote endpoint
 		/// </summary>
 		EndPoint RemoteEndPoint { get; }
@@ -191,6 +197,11 @@ namespace Ceen
 		/// </summary>
 		/// <value>The length of the content.</value>
 		int ContentLength { get; }
+
+		/// <summary>
+		/// Gets a dictionary with items attached to the current request.
+		/// </summary>
+		IDictionary<string, object> RequestState { get; }
 
 		/// <summary>
 		/// Gets the handlers that have processed this request
