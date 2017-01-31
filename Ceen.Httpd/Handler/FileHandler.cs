@@ -47,6 +47,14 @@ namespace Ceen.Httpd.Handler
 		public string PathPrefix { get; set; } = "";
 
 		/// <summary>
+		/// Gets or sets a value indicating if this module is simply acting as a rewrite filter,
+		/// that is it converts /test to /test.html or /test/index.html if possible.
+		/// Using a rewrite filter can simplify other filters as you can write a *.html filter,
+		/// and avoid other triggers activating on non *.html files
+		/// </summary>
+		public bool RedirectOnly { get; set; } = false;
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
@@ -170,6 +178,10 @@ namespace Ceen.Httpd.Handler
 				// No alternatives available
 				throw new HttpException(HttpStatusCode.NotFound);
 			}
+
+			// If this is just a rewrite handler, stop now as we did not handle it
+			if (RedirectOnly)
+				return false;
 
 			var mimetype = m_mimetypelookup(context.Request, path);
 			if (mimetype == null)
