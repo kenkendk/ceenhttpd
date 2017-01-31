@@ -1,0 +1,642 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Ceen.Security.Login
+{
+	/// <summary>
+	/// Implementation of a database-based storage module
+	/// </summary>
+	public class DatabaseStorageModule : IModule, IShortTermStorageModule, ILongTermStorageModule, ILoginEntryModule, IDisposable
+	{
+		/// <summary>
+		/// Gets or sets the connection string use to connect to the database.
+		/// If the database provider is &quot;sqlite&quot; and the string does not start with
+		/// &quot;DataSource=&quot; the string is assumed to be a filename
+		/// </summary>
+		public string ConnectionString { get; set; } = "sessiondata.sqlite";
+
+		/// <summary>
+		/// Gets or sets the full name of the connection class, in standard .Net notation.
+		/// The ODBC provider is &quot;System.Data.Odbc.OdbcConnection, System.Data&quot;.
+		/// Specially recognized names are: &quot;sqlite&quot;, &quot;sqlite3&quot;, and &quot;odbc&quot;.
+		/// </summary>
+		/// <value>The connection class.</value>
+		public string ConnectionClass { get; set; } = "sqlite";
+
+		/// <summary>
+		/// Gets or sets the name of the long-term login table
+		/// </summary>
+		public string LongTermLoginTablename { get; set; } = "LongTermLogin";
+
+		/// <summary>
+		/// Gets or sets the name of the session token table
+		/// </summary>
+		public string SessionRecordTablename { get; set; } = "Session";
+
+		/// <summary>
+		/// Gets or sets the name of the session token table
+		/// </summary>
+		public string LoginEntryTablename { get; set; } = "Login";
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> class.
+		/// </summary>
+		public DatabaseStorageModule()
+			: this(true, true, true)
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> class.
+		/// </summary>
+		/// <param name="default_short_term">If set to <c>true</c> this instance is used as the storage for the loginhandler.</param>
+		/// <param name="default_authentication">If set to <c>true</c> this instance is used as the authentication for the loginhandler.</param>
+		public DatabaseStorageModule(bool default_short_term, bool default_long_term, bool default_authentication)
+		{
+			if (default_short_term)
+				new LoginSettingsModule().ShortTermStorage = this;
+			if (default_long_term)
+				new LoginSettingsModule().LongTermStorage = this;
+			if (default_authentication)
+				new LoginSettingsModule().Authentication = this;
+		}
+
+		/// <summary>
+		/// The lock used to guard access to the database
+		/// </summary>
+		protected AsyncLock m_lock = new AsyncLock();
+
+		/// <summary>
+		/// The database connection
+		/// </summary>
+		protected System.Data.IDbConnection m_connection;
+
+		/// <summary>
+		/// The command used to add a session record
+		/// </summary>
+		protected System.Data.IDbCommand m_addSessionCommand;
+		/// <summary>
+		/// The command used to drop a session record
+		/// </summary>
+		protected System.Data.IDbCommand m_dropSessionCommand;
+		/// <summary>
+		/// The command used to update the session records expiration valued
+		/// </summary>
+		protected System.Data.IDbCommand m_updateSessionCommand;
+		/// <summary>
+		/// The command used to get a session record from a cookie identifier
+		/// </summary>
+		protected System.Data.IDbCommand m_getSessionFromCookieCommand;
+		/// <summary>
+		/// The command used to get a session record from an XSRF token
+		/// </summary>
+		protected System.Data.IDbCommand m_getSessionFromXSRFCommand;
+
+		/// <summary>
+		/// The command used to get the long term login record
+		/// </summary>
+		protected System.Data.IDbCommand m_getLongTermLoginCommand;
+		/// <summary>
+		/// The comand used to drop a long term login record
+		/// </summary>
+		protected System.Data.IDbCommand m_dropLongTermLoginCommand;
+		/// <summary>
+		/// The command used to drop all long term login records
+		/// </summary>
+		protected System.Data.IDbCommand m_dropAllLongTermLoginCommand;
+		/// <summary>
+		/// The command used to add a long term login record
+		/// </summary>
+		protected System.Data.IDbCommand m_addLongTermLoginCommand;
+
+		/// <summary>
+		/// The command used to drop expired sessions
+		/// </summary>
+		protected System.Data.IDbCommand m_dropExpiredSessionsCommand;
+		/// <summary>
+		/// The command used to drop expired long term logins
+		/// </summary>
+		protected System.Data.IDbCommand m_dropExpiredLongTermCommand;
+
+		/// <summary>
+		/// The command used to add a user login entry
+		/// </summary>
+		protected System.Data.IDbCommand m_addLoginEntryCommand;
+		/// <summary>
+		/// The command used to get the user login entries
+		/// </summary>
+		protected System.Data.IDbCommand m_getLoginEntriesCommand;
+		/// <summary>
+		/// The command used to drop a login entry
+		/// </summary>
+		protected System.Data.IDbCommand m_dropLoginEntryCommand;
+		/// <summary>
+		/// The command used to drop all login entries
+		/// </summary>
+		protected System.Data.IDbCommand m_dropAllLoginEntryCommand;
+		/// <summary>
+		/// The command used to update login entries
+		/// </summary>
+		protected System.Data.IDbCommand m_updateLoginEntryCommand;
+
+		/// <summary>
+		/// Establishes a connection to the database, must hold the lock before this method is called.
+		/// </summary>
+		protected virtual void EnsureConnected()
+		{
+			if (m_connection != null && m_connection.State == System.Data.ConnectionState.Open)
+				return;
+
+			if (m_connection != null)
+				try
+				{
+					m_connection.Close();
+				}
+				catch
+				{
+				}
+				finally
+				{
+					m_connection = null;
+				}
+
+			var classname = ConnectionClass;
+			if (string.Equals(classname, "sqlite", StringComparison.OrdinalIgnoreCase) || string.Equals(classname, "sqlite3", StringComparison.OrdinalIgnoreCase))
+				classname = "System.Data.SQLite.SQLiteConnection, System.Data.SQLite";
+			else if (string.Equals(classname, "odbc", StringComparison.OrdinalIgnoreCase))
+				classname = "System.Data.Odbc.OdbcConnection, System.Data";
+
+			var contype = Type.GetType(classname);
+			if (contype == null)
+				throw new Exception($"Failed to locate the requested database type: {contype}");
+			var e = Activator.CreateInstance(contype);
+			if (!(e is System.Data.IDbConnection))
+				throw new Exception($"The requested type {contype} is not implementing {typeof(System.Data.IDbConnection).FullName}");
+			m_connection = e as System.Data.IDbConnection;
+
+			SetupCommands();
+		}
+
+		/// <summary>
+		/// Sets up all the required commands, must hold the lock before this method is called.
+		/// </summary>
+		protected virtual void SetupCommands()
+		{
+			CreateTable(SessionRecordTablename, typeof(SessionRecord), "Cookie");
+			CreateTable(LongTermLoginTablename, typeof(LongTermToken), "Series");
+			CreateTable(LoginEntryTablename, typeof(LoginEntry), "Username", "Token");
+
+			m_addSessionCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"") VALUES (?, ?, ?, ?)", SessionRecordTablename));
+			m_dropSessionCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Cookie"" = ? AND ""XSRFToken"" = ?", SessionRecordTablename));
+			m_updateSessionCommand = SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Expires"" = ? WHERE ""UserID"" = ? AND ""Cookie"" = ?  AND ""XSRFToken"" = ?", SessionRecordTablename));
+			m_getSessionFromCookieCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""Cookie"" = ?", SessionRecordTablename));
+			m_getSessionFromXSRFCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""XSRFToken"" = ?", SessionRecordTablename));
+
+			m_addLongTermLoginCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
+			m_dropLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Series"" = ? AND ""Token"" = ?", LongTermLoginTablename));
+			m_dropAllLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? OR ""Series"" = ?", LongTermLoginTablename));
+			m_getLongTermLoginCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
+
+			m_dropExpiredSessionsCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", SessionRecordTablename));
+			m_dropLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
+
+			m_addLoginEntryCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Username"", ""Token"") VALUES (?, ?, ?)", LoginEntryTablename));
+			m_getLoginEntriesCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Username"", ""Token"" FROM ""{0}"" WHERE ""Username"" = ?", LoginEntryTablename));
+			m_dropLoginEntryCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ? AND ""Token"" = ?", LoginEntryTablename));
+			m_dropAllLoginEntryCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
+			m_updateLoginEntryCommand = SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Token"" = ? WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
+		}
+
+		/// <summary>
+		/// Gets the SQL type for a given property
+		/// </summary>
+		/// <returns>The sql column type.</returns>
+		/// <param name="property">The property being examined.</param>
+		protected virtual string GetSqlColumnType(System.Reflection.PropertyInfo property)
+		{
+			if (property.PropertyType == typeof(int) || property.PropertyType == typeof(uint) || property.PropertyType == typeof(short) || property.PropertyType == typeof(ushort) || property.PropertyType == typeof(long) || property.PropertyType == typeof(ulong))
+			{
+				if (property.Name == "ID")
+					return "INTEGER PRIMARY KEY";
+				
+				return "INTEGER";
+			}
+			else if (property.PropertyType == typeof(DateTime))
+				return "DATETIME";
+			else
+				return "STRING";
+		}
+
+		/// <summary>
+		/// Creates the table for the given type.
+		/// </summary>
+		/// <param name="tablename">The name of the table to create.</param>
+		/// <param name="recordtype">The datatype to store in the table.</param>
+		protected virtual void CreateTable(string tablename, Type recordtype, params string[] unique)
+		{
+			var sql = string.Format(
+				@"CREATE TABLE ""{0}"" ({1}) ",
+				tablename,
+				string.Join(", ",
+					recordtype
+					.GetProperties()
+		            .Select(x => string.Format(@"""{0}"" {1}", x.Name, GetSqlColumnType(x)))
+			   	)
+			);
+
+			if (unique != null && unique.Length > 0)
+				sql += string.Format(@", CONSTRAINT ""{0}_unique"" UNIQUE({1})", tablename, string.Join(", ", unique));
+
+			using (var cmd = m_connection.CreateCommand())
+			{
+				try
+				{
+					// Check if the table exists
+					cmd.CommandText = string.Format(@"SELECT COUNT(*) FROM ""{0}""", tablename);
+					var r = cmd.ExecuteScalar();
+					if (r != null && r != DBNull.Value)
+						return;
+				}
+				catch
+				{
+				}
+
+				cmd.CommandText = sql;
+				cmd.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Helper method for creating a command and initializing the parameters
+		/// </summary>
+		/// <returns>The command.</returns>
+		/// <param name="commandtext">The commandtext.</param>
+		protected virtual System.Data.IDbCommand SetupCommand(string commandtext)
+		{
+			var cmd = m_connection.CreateCommand();
+			cmd.CommandText = commandtext;
+			AddParameters(cmd, commandtext.Count(x => x == '?'));
+			return cmd;
+		}
+
+		/// <summary>
+		/// Adds a number of parameters to the command
+		/// </summary>
+		/// <param name="cmd">The command to add the parameters to.</param>
+		/// <param name="count">The number of parameters to add.</param>
+		protected static void AddParameters(System.Data.IDbCommand cmd, int count)
+		{
+			for (var i = 0; i < count; i++)
+				cmd.Parameters.Add(cmd.CreateParameter());
+		}
+
+		/// <summary>
+		/// Sets the parameter values.
+		/// </summary>
+		/// <param name="cmd">The command to set parameter values on.</param>
+		/// <param name="values">The values to set.</param>
+		protected static void SetParameterValues(System.Data.IDbCommand cmd, params object[] values)
+		{
+			for (var i = 0; i < values.Length; i++)
+				((System.Data.IDbDataParameter)cmd.Parameters[i]).Value = values[i];
+		}
+
+		/// <summary>
+		/// Adds a new session record
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to add.</param>
+		public virtual async Task AddSessionAsync(SessionRecord record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_addSessionCommand,
+					record.UserID,
+					record.Cookie,
+					record.XSRFToken,
+					record.Expires
+				);
+				m_addSessionCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Drops a session record
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to drop.</param>
+		public virtual async Task DropSessionAsync(SessionRecord record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_addSessionCommand,
+					record.UserID,
+					record.Cookie,
+					record.XSRFToken
+				);
+				m_addSessionCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Gets a session record from a cookie identifier
+		/// </summary>
+		/// <returns>The session record.</returns>
+		/// <param name="cookie">The cookie identifier.</param>
+		public virtual async Task<SessionRecord> GetSessionFromCookieAsync(string cookie)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(m_getSessionFromCookieCommand, cookie);
+				using (var rd = m_getSessionFromCookieCommand.ExecuteReader())
+				{
+					if (!rd.Read())
+						return null;
+					else
+						return new SessionRecord()
+						{
+							UserID = rd.GetString(0),
+							Cookie = rd.GetString(1),
+							XSRFToken = rd.GetString(2),
+							Expires = rd.GetDateTime(3)
+						};
+				}
+			}
+		}
+
+		/// <summary>
+		/// Gets a session record from an XSRF token
+		/// </summary>
+		/// <returns>The session record.</returns>
+		/// <param name="xsrf">The XSRF token.</param>
+		public virtual async Task<SessionRecord> GetSessionFromXSRFAsync(string xsrf)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(m_getSessionFromXSRFCommand, xsrf);
+				using (var rd = m_getSessionFromXSRFCommand.ExecuteReader())
+				{
+					if (!rd.Read())
+						return null;
+					else
+						return new SessionRecord()
+						{
+							UserID = rd.GetString(0),
+							Cookie = rd.GetString(1),
+							XSRFToken = rd.GetString(2),
+							Expires = rd.GetDateTime(3)
+						};
+				}
+			}
+		}
+
+		/// <summary>
+		/// Updates the expiration time on the given session record
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to update.</param>
+		public virtual async Task UpdateSessionExpirationAsync(SessionRecord record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_updateSessionCommand,
+					record.Expires,
+					record.UserID,
+					record.Cookie,
+					record.XSRFToken
+				);
+				m_addLongTermLoginCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Adds a long term login entry
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to add.</param>
+		public virtual async Task AddLongTermLoginAsync(LongTermToken record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_addLongTermLoginCommand,
+					record.UserID,
+					record.Series,
+					record.Token,
+					record.Expires
+				);
+				m_addLongTermLoginCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Drops all long term logins for a given user.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="userid">The user for whom the long term logins must be dropped.</param>
+		/// <param name="series">The series identifier for the login token that caused the issuance.</param>
+		public virtual async Task DropAllLongTermLoginsAsync(string userid, string series)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_dropAllLongTermLoginCommand,
+					userid,
+					series
+				);
+				m_dropAllLongTermLoginCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Drops the given long term login entry.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">Record.</param>
+		public virtual async Task DropLongTermLoginAsync(LongTermToken record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_dropLongTermLoginCommand,
+					record.UserID,
+					record.Series,
+					record.Token
+				);
+				m_dropLongTermLoginCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Gets a long-term login entry
+		/// </summary>
+		/// <returns>The long term login entry.</returns>
+		/// <param name="series">The series identifier to use for lookup.</param>
+		public virtual async Task<LongTermToken> GetLongTermLoginAsync(string series)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(m_getLongTermLoginCommand, series);
+				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
+				{
+					if (!rd.Read())
+						return null;
+					else
+						return new LongTermToken()
+						{
+							UserID = rd.GetString(0),
+							Series = rd.GetString(1),
+							Token = rd.GetString(2),
+							Expires = rd.GetDateTime(3)
+						};
+				}
+			}
+		}
+
+		/// <summary>
+		/// Called periodically to expire old items
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		public virtual async Task ExpireOldItemsAsync()
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(m_dropExpiredSessionsCommand, DateTime.Now);
+				m_dropExpiredSessionsCommand.ExecuteNonQuery();
+				SetParameterValues(m_dropExpiredLongTermCommand, DateTime.Now);
+				m_dropExpiredLongTermCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Releases all resource used by the <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> object.
+		/// </summary>
+		/// <remarks>Call <see cref="Dispose"/> when you are finished using the
+		/// <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/>. The <see cref="Dispose"/> method leaves the
+		/// <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> in an unusable state. After calling
+		/// <see cref="Dispose"/>, you must release all references to the
+		/// <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> so the garbage collector can reclaim the memory
+		/// that the <see cref="T:Ceen.Httpd.Handler.Login.DatabaseStorageModule"/> was occupying.</remarks>
+		public void Dispose()
+		{
+			foreach (var f in this.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
+				if (typeof(System.Data.IDbCommand).IsAssignableFrom(f.FieldType))
+					try { ((System.Data.IDbCommand)f.GetValue(this)).Dispose(); }
+					catch { }
+
+			if (m_connection != null)
+			{
+				m_connection.Dispose();
+				m_connection = null;
+			}
+		}
+
+		/// <summary>
+		/// Returns the user information, or null, for a user with the given name
+		/// </summary>
+		/// <returns>The login entries.</returns>
+		/// <param name="username">The username to get the login tokens for.</param>
+		public virtual async Task<IEnumerable<LoginEntry>> GetLoginEntriesAsync(string username)
+		{
+			var lst = new List<LoginEntry>();
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(m_getLoginEntriesCommand, username);
+				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
+				{
+					while (rd.Read())
+						lst.Add(new LoginEntry()
+						{
+							UserID = rd.GetString(0),
+							Username = rd.GetString(1),
+							Token = rd.GetString(2)
+						});
+				}
+			}
+
+			// Not using enumerable, because it messes with the lock if the caller does not exhaust the enumerable
+			return lst;
+		}
+
+		/// <summary>
+		/// Adds a login entry to the storage
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to add.</param>
+		public virtual async Task AddLoginEntryAsync(LoginEntry record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_addLoginEntryCommand,
+					record.UserID,
+					record.Username,
+					record.Token
+				);
+				m_addLoginEntryCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Deletes a login entry from the storage
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to drop.</param>
+		public virtual async Task DropLoginEntryAsync(LoginEntry record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_dropLoginEntryCommand,
+					record.UserID,
+					record.Username,
+					record.Token
+				);
+				m_dropLoginEntryCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Drops all login entries for the given userid or username.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="userid">The user ID.</param>
+		/// <param name="username">The user name.</param>
+		public virtual async Task DropAllLoginEntriesAsync(string userid, string username)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_dropAllLoginEntryCommand,
+					userid,
+					username
+				);
+				m_dropAllLoginEntryCommand.ExecuteNonQuery();
+			}
+		}
+
+		/// <summary>
+		/// Updates the login entry.
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="record">The record to update.</param>
+		public virtual async Task UpdateLoginTokenAsync(LoginEntry record)
+		{
+			using (await m_lock.LockAsync())
+			{
+				SetParameterValues(
+					m_updateSessionCommand,
+					record.Token,
+					record.UserID,
+					record.Username
+				);
+				m_dropAllLoginEntryCommand.ExecuteNonQuery();
+			}
+		}
+	}
+}

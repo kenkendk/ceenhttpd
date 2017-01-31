@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{D5A92F56-9881-415C-B9D3-71833EE0DF65}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Ceen.Security</RootNamespace>
+    <AssemblyName>Ceen.Security</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Login\DatabaseStorageModule.cs" />
+    <Compile Include="Login\ILoginEntryModule.cs" />
+    <Compile Include="Login\ILongTermStorageModule.cs" />
+    <Compile Include="Login\IShortTermStorageModule.cs" />
+    <Compile Include="Login\LoginEntry.cs" />
+    <Compile Include="Login\LoginHandler.cs" />
+    <Compile Include="Login\LoginRequiredHandler.cs" />
+    <Compile Include="Login\LoginSettingsModule.cs" />
+    <Compile Include="Login\LogoutHandler.cs" />
+    <Compile Include="Login\LongTermCookie.cs" />
+    <Compile Include="Login\LongTermToken.cs" />
+    <Compile Include="Login\MemoryStorageModule.cs" />
+    <Compile Include="Login\PrimitiveSerializer.cs" />
+    <Compile Include="Login\SessionRecord.cs" />
+    <Compile Include="Login\XSRFTokenGeneratorHandler.cs" />
+    <Compile Include="Login\XSRFTokenRequiredHandler.cs" />
+    <Compile Include="PBKDF2.cs" />
+    <Compile Include="PRNG.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Login\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
+      <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
+      <Name>Ceen.Common</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+</Project>
