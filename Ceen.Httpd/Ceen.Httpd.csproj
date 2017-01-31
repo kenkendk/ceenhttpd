@@ -60,6 +60,7 @@
     <Compile Include="Handler\SetXSRFCookieHandler.cs" />
     <Compile Include="Logging\Log4netCLFLogger.cs" />
     <Compile Include="Handler\RedirectHandler.cs" />
+    <Compile Include="Handler\ClearRequestStateHandler.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
