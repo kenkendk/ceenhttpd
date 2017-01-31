@@ -84,7 +84,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		public IRouter Router { get; set; }
 		/// <summary>
-		/// The logger instance to use
+		/// The logger instances to use
 		/// </summary>
 		public IList<ILogger> Loggers { get; set; }
 		/// <summary>
