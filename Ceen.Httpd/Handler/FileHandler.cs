@@ -385,9 +385,19 @@ namespace Ceen.Httpd.Handler
 				case ".hbs":
 					return "application/x-handlebars-template";
 				case ".woff":
+				case ".woff2":
 					return "application/font-woff";
 				case ".ttf":
 					return "application/font-ttf";
+				case ".eot":
+					return "application/vnd.ms-fontobject";
+				case ".otf":
+					return "application/font-otf";
+				case ".svg":
+					return "application/svg+xml";
+				case ".xml":
+					return "application/xml";
+
 				default:
 					return null;
 			}
