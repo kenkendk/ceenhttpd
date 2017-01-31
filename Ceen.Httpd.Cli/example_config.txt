@@ -223,3 +223,116 @@
 #set HideDefaultAction true
 # Turn on debug printing to stdout after building the route map
 #set Debug false
+
+
+#
+# Login and XSRF handling
+#
+
+# All the basic settings are found in the Ceen.Httpd.Handler.Login.LoginSettings handler, which does nothing
+# You can set options for login handling via this handler, it does not matter if it is invoked or not.
+
+#handler "/unused/and/not/important" Ceen.Httpd Ceen.Httpd.Handler.Login.LoginSettings
+#set XSRFErrorStatusMessage 403
+#set XSRFErrorStatusCode "XSRF token invalid or missing"
+#set XSRFErrorRedirectUrl ""
+
+#set HijackErrorStatusMessage 403
+#set HijackErrorStatusCode "Login token hijacking detected, someone else has used your identity"
+#set HijackErrorRedirectUrl ""
+
+#set LoginErrorStatusCode 403
+#set LoginErrorStatusMessage "Not logged in"
+#set LoginErrorRedirectUrl ""
+
+#set LongTermDurationSeconds 5184000
+
+#set LoginSuccessStatusCode 200
+#set LoginSuccessStatusMessage "OK"
+#set LoginSuccessRedirectUrl ""
+
+#set ShortTermExpirationSeconds 900
+
+#set UseLongTermCookieStorage true
+#set UseXSRFTokens true
+#set XSRFHeaderName "X-XSRF-Token"
+#set XSRFCookieName "xsrf-token"
+
+#set AuthSessionCookieName "ceen-auth-session-token"
+#set AuthCookieName "ceen-auth-token"
+
+
+# The supported modules are
+
+# Performs login by sending a POST with the username and password
+#handler "/api/*" Ceen.Security Ceen.Security.Login.LoginHandler
+
+# Deletes all cookies from server and client
+#handler "/logout" Ceen.Security Ceen.Security.Login.LogoutHandler
+
+# Checks if the login is correct and sets the UserID string on the request
+#handler "/api/*" Ceen.Security Ceen.Security.Login.LoginRequiredHandler
+
+# Creates and sets an XSRF token by cookie on all html requests
+#handler "/*.html" Ceen.Security Ceen.Security.Login.XSRFTokenGeneratorHandler
+
+# Verifies the XSRF token header on each request
+#handler "/api/*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+
+# The login modules require a storage module to be present
+# For simple setups, a memory storage module can be use,
+# and for more persistent storage, a database can be used
+
+# To use the memory module to store settings, simply load it:
+#module Ceen.Httpd Ceen.Security.Login.MemoryStorageModule
+
+# The database module will default to using SQLite, and store the data locally
+# The three booleans indicate that the module will handle: cookies+xsrf, long-term cookies, and authentication
+#module Ceen.Httpd Ceen.Security.Login.DatabaseStorageModule true true true
+#set ConnectionString "sessiondata.sqlite"
+#set ConnectionClass "sqlite"
+
+# Other database connections are also supported, either by the special
+# ConnectionClass value "odbc" or by the fully qualified assembly name
+# of the class implementing System.Data.IDbConnection
+
+# The DatabaseStorageModule supports subclassing for even more customization
+
+
+# Each of the login modules can override the default settings in LoginSettingsModule.
+# This allows overrides to perform different. For example, it is possible to set the XSRF cookie name
+# in settings, and a default redirect handling for all pages, but a specific for others.
+
+#
+# Example:
+#
+
+#module Ceen.Httpd Ceen.Security.Login.LoginSettingsModule
+#set XSRFCookieName "my-xsrf-token"
+#set XSRFErrorStatusMessage 302
+#set XSRFErrorStatusCode "Found"
+#set XSRFErrorRedirectUrl "/"
+#
+#module Ceen.Httpd Ceen.Security.Login.MemoryStorageModule
+#
+#handler "/api/*" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
+#set XSRFErrorStatusMessage 403
+#set XSRFErrorStatusCode "XSRF token expired"
+#set XSRFErrorRedirectUrl ""
+#
+#handler "/*.html" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
+#set XSRFErrorStatusMessage 302
+#set XSRFErrorStatusCode "Found"
+#set XSRFErrorRedirectUrl "/xsrf-expired-explanation"
+#
+#handler "*" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
+
+# In the example, all calls to /api/ with an expired XSRF token will return a 403 code,
+# and all others will perform a 302 redirect to /, except those ending in .html, which
+# will be redirected to /xsrf-expired-explanation
+# All will use the same xsrf cookie name: "my-xsrf-token"
+
+# The loading of the MemoryStorageModule will cause it to be the default storage unit for XSRF tokens
+
+
+
