@@ -503,9 +503,13 @@ namespace Ceen.Httpd.Cli
 
 			if (config.AutoLoadAssemblies)
 			{
+				// Workaround for unittests not providing EntryAssembly
+				var callingasm = Assembly.GetEntryAssembly();
+				var callingdir = callingasm == null ? null : Path.GetDirectoryName(callingasm.Location);
+				                                       
 				var paths = (config.Assemblypath ?? string.Empty)
 					.Split(new char[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries)
-					.Union(new[] { config.Basepath, Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) })
+					.Union(new[] { config.Basepath, callingdir })
 					.Where(x => !string.IsNullOrWhiteSpace(x) && Directory.Exists(x))
 					.Distinct();
 
