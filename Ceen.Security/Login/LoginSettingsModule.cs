@@ -219,7 +219,7 @@ namespace Ceen.Security.Login
 		{
 			context.Response.StatusCode = (HttpStatusCode)LoginErrorStatusCode;
 			context.Response.StatusMessage = LoginErrorStatusMessage;
-			if (string.IsNullOrWhiteSpace(LoginErrorRedirectUrl))
+			if (!string.IsNullOrWhiteSpace(LoginErrorRedirectUrl))
 				context.Response.Headers["Location"] = LoginErrorRedirectUrl;
 			
 			return true;
@@ -234,7 +234,7 @@ namespace Ceen.Security.Login
 		{
 			context.Response.StatusCode = (HttpStatusCode)XSRFErrorStatusCode;
 			context.Response.StatusMessage = XSRFErrorStatusMessage;
-			if (string.IsNullOrWhiteSpace(XSRFErrorRedirectUrl))
+			if (!string.IsNullOrWhiteSpace(XSRFErrorRedirectUrl))
 				context.Response.Headers["Location"] = XSRFErrorRedirectUrl;
 			return true;
 		}
