@@ -62,7 +62,11 @@ namespace Ceen.Httpd
 				return WildcardExpandToRegex(value);
 		}
 
-
+		/// <summary>
+		/// Expands a wildcard expression to a regular expression
+		/// </summary>
+		/// <returns>The regular expression.</returns>
+		/// <param name="value">The wildcard expression.</param>
 		public static Regex WildcardExpandToRegex(string value)
 		{
 			return new Regex(WILDCARD_MATCHER.Replace(value, (match) => {
