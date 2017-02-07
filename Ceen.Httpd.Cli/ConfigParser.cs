@@ -67,7 +67,14 @@ namespace Ceen.Httpd.Cli
 		/// <param name="value">The value to set.</param>
 		public static void SetProperty(object instance, PropertyInfo prop, string value)
 		{
-			prop.SetValue(instance, ArgumentFromString(value, prop.PropertyType));
+			try
+			{
+				prop.SetValue(instance, ArgumentFromString(value, prop.PropertyType));
+			}
+			catch (Exception ex)
+			{
+				throw new ArgumentException($"Failed to set the {prop.PropertyType.FullName} property {prop.Name} in {prop.DeclaringType.FullName} to value \"{value}\"", ex);
+			}
 		}
 
 
@@ -129,8 +136,26 @@ namespace Ceen.Httpd.Cli
 			if (cons.Length != 1)
 				throw new Exception($"Failed to load the class named {itemtype.FullName} from assembly {itemtype.Assembly.FullName} as there were {cons.Length} matching constructors");
 
-			var args = cons.First().GetParameters().Zip(constructorargs, (arg1, arg2) => ArgumentFromString(arg2, arg1.ParameterType)).ToArray();
-			return Activator.CreateInstance(itemtype, args);		
+			var args = cons.First().GetParameters().Zip(constructorargs, (parameter, value) =>
+			{
+				try
+				{
+					return ArgumentFromString(value, parameter.ParameterType);
+				}
+				catch (Exception ex)
+				{
+					throw new ArgumentException($"Failed to set the {parameter.ParameterType.FullName} property {parameter.Name} in {parameter.Member.DeclaringType.FullName}.{parameter.Member.Name} to value \"{value}\"", ex);
+				}
+			}).ToArray();
+
+			try
+			{
+				return Activator.CreateInstance(itemtype, args);
+			}
+			catch(Exception ex)
+			{
+				throw new ArgumentException($"Failed to create an instance of type {itemtype.FullName} with arguments: {string.Join(", ", args.Select(x => x == null ? string.Empty : x.ToString()))}{Environment.NewLine}Error: {ex.Message}", ex);
+			}
 		}
 
 		/// <summary>
