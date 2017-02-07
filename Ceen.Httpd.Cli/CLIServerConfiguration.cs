@@ -11,19 +11,13 @@ namespace Ceen.Httpd.Cli
 	public class ModuleDefinition
 	{
 		/// <summary>
-		/// The name of the assembly to load
+		/// The name of the class to use, can be partially qualified
 		/// </summary>
-		public string Assembly { get; set; }
-		/// <summary>
-		/// The name of the class to use in the assembly,
-		/// using the entire assembly if this is  empty
-		/// </summary>
-		/// <value>The assembly.</value>
 		public string Classname { get; set; }
 		/// <summary>
 		/// A list of route options to apply
 		/// </summary>
-		public Dictionary<string, string> RouteOptions { get; set; } = new Dictionary<string, string>();
+		public Dictionary<string, string> Options { get; set; } = new Dictionary<string, string>();
 		/// <summary>
 		/// Gets or sets the constructor arguments.
 		/// </summary>
@@ -37,6 +31,10 @@ namespace Ceen.Httpd.Cli
 	public class RouteDefinition : ModuleDefinition
 	{
 		/// <summary>
+		/// The name of the assembly to load
+		/// </summary>
+		public string Assembly { get; set; }
+		/// <summary>
 		/// Using a route prefix on the class
 		/// </summary>
 		public string RoutePrefix { get; set; }
@@ -46,26 +44,8 @@ namespace Ceen.Httpd.Cli
 	/// A logger of a logger to attach
 	/// </summary>
 	[Serializable]
-	public class LoggerDefinition
+	public class LoggerDefinition : ModuleDefinition
 	{
-		/// <summary>
-		/// The name of the assembly to load
-		/// </summary>
-		public string Assembly { get; set; }
-		/// <summary>
-		/// The name of the class to use in the assembly,
-		/// using the entire assembly if this is  empty
-		/// </summary>
-		/// <value>The assembly.</value>
-		public string Classname { get; set; }
-		/// <summary>
-		/// Gets or sets the logger options.
-		/// </summary>
-		public Dictionary<string, string> LoggerOptions { get; set; } = new Dictionary<string, string>();
-		/// <summary>
-		/// Gets or sets the constructor arguments.
-		/// </summary>
-		public List<string> ConstructorArguments { get; set; } = new List<string>();
 	}
 
 	/// <summary>
@@ -82,6 +62,12 @@ namespace Ceen.Httpd.Cli
 		/// Path where assemblies are loaded from
 		/// </summary>
 		public string Assemblypath { get; set; }
+
+		/// <summary>
+		/// Gets or sets a value indicating if assemblies are loaded automatically from
+		/// <see cref="Assemblypath"/> and <see cref="Basepath"/>, as well as the Ceen libraries.
+		/// </summary>
+		public bool AutoLoadAssemblies { get; set; } = true;
 
 		/// <summary>
 		/// Gets a value indicating if the config file is monitored for changes,

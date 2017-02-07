@@ -9,8 +9,13 @@
 # The path where relative paths are treated, defaults to CWD
 #basepath .
 
+# Paths to probe for .dll and .exe files that will be attempted loaded as assemblies
+# this makes it simpler to define types without requiring the assembly name
+# If this is enabled (default) it will auto-load all assemblies in 
+# "basepath", "assemblypath" and the "Ceen.Httpd.Cli.dll" folder
+#autoloadassemblies true
+
 # Additional paths to use when attempting to load assemblies
-# Only works if using isolated domain to execute
 #assemblypath /test:/test2
 
 # Use app-domains to load executing assemblies, 
@@ -128,29 +133,29 @@
 #
 
 # Log Common Log Format output to stdout
-#logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdOut
+#logger Ceen.Httpd.Logging.CLFStdOut
 # Log Common Log Format output to stderr
-#logger Ceen.Httpd Ceen.Httpd.Logging.CLFStdErr
+#logger Ceen.Httpd.Logging.CLFStdErr
 
 # Log exceptions to stderr
-#logger Ceen.Httpd Ceen.Httpd.Logging.StdErrErrors
+#logger Ceen.Httpd.Logging.StdErrErrors
 # Log exceptions to stdout
-#logger Ceen.Httpd Ceen.Httpd.Logging.StdOutErrors
+#logger Ceen.Httpd.Logging.StdOutErrors
 
 # Log CLF to syslog, requires SyslogNet.Client in GAC or assembly path
 # Only works on Linux
-#logger Ceen.Httpd Ceen.Httpd.Logging.SyslogLogger
+#logger Ceen.Httpd.Logging.SyslogLogger
 
 # Log CLF to log4net, requires log4net in GAC or assembly path
-#logger Ceen.Httpd Ceen.Httpd.Logging.Log4netCLFLogger
+#logger Ceen.Httpd.Logging.Log4netCLFLogger
 
 # Log CLF to a file
-#logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file"
+#logger Ceen.Httpd.CLFLogger "/path/to/file"
 # Log CLF to a file, setting combinedformat = true and logcookies to false
-#logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file" true false
+#logger Ceen.Httpd.CLFLogger "/path/to/file" true false
 
 # Custom log method, must implement Ceen.Httpd.ILogger
-#logger MyAssemblyName MyNamespace.MyLogger "constructor arg1" "constructor arg2" "..."
+#logger MyNamespace.MyLogger "constructor arg1" "constructor arg2" "..."
 # Setting some properties on the logger
 #set ExtendedLogging true
 #set maxfilesize 1024
@@ -160,26 +165,14 @@
 #
 
 # Add session state
-#handler "" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
+#handler "" Ceen.Httpd.Handler.SessionHandler
 
 # Or, add session state only to .htm and .html documents
-#handler "*.htm" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
-#handler "*.html" Ceen.Httpd Ceen.Httpd.Handler.SessionHandler
-
-# To use XSRF protection, set the cookie on all htm(l) documents
-#handler "[.*\.html?]" Ceen.Httpd Ceen.Httpd.Handler.SetXSRFCookieHandler
-#set cookiename xsrf-token
-#set expirationseconds 3600
-
-# Then protect the api entries with an XSRF guard
-#handler "/api/*" Ceen.Httpd Ceen.Httpd.Handler.VerifyXSRFHandler
-#set headername "X-XSRF-Token"
-#set errorstatuscode 403
-#set errorstatusmessage "Expired or missing XSRF token"
-
+#handler "*.htm" Ceen.Httpd.Handler.SessionHandler
+#handler "*.html" Ceen.Httpd.Handler.SessionHandler
 
 # A custom handler, must implement Ceen.IHttpModule
-#handler "/data" MyAssemblyName MyNamespace.MyHandler "constructor arg1" "constructor arg2" "..."
+#handler "/data" MyNamespace.MyHandler "constructor arg1" "constructor arg2" "..."
 #set ExtendedLogging true
 #set maxfilesize 1024
 
@@ -188,9 +181,9 @@
 #serve "/" "/path/to/files"
 
 # Or manually invoked, useful when deriving from FileHandler
-#handler "[/index(/.*)?]" Ceen.Httpd Ceen.Httpd.Handler.FileHandler "/path/to/index"
+#handler "[/index(/.*)?]" Ceen.Httpd.Handler.FileHandler "/path/to/index"
 #set pathprefix /index
-#handler "" Ceen.Httpd Ceen.Httpd.Handler.FileHandler "/path/to/files"
+#handler "" Ceen.Httpd.Handler.FileHandler "/path/to/files"
 
 # Redirect paths
 #redirect "/about" "http://www.example.com"
@@ -232,7 +225,7 @@
 # All the basic settings are found in the Ceen.Httpd.Handler.Login.LoginSettings handler, which does nothing
 # You can set options for login handling via this handler, it does not matter if it is invoked or not.
 
-#handler "/unused/and/not/important" Ceen.Httpd Ceen.Httpd.Handler.Login.LoginSettings
+#module Ceen.Httpd.Security.Login.LoginSettings
 #set XSRFErrorStatusMessage 403
 #set XSRFErrorStatusCode "XSRF token invalid or missing"
 #set XSRFErrorRedirectUrl ""
@@ -265,26 +258,26 @@
 # The supported modules are
 
 # Performs login by sending a POST with the username and password
-#handler "/api/*" Ceen.Security Ceen.Security.Login.LoginHandler
+#handler "/api/*" Ceen.Security.Login.LoginHandler
 
 # Deletes all cookies from server and client
-#handler "/logout" Ceen.Security Ceen.Security.Login.LogoutHandler
+#handler "/logout" Ceen.Security.Login.LogoutHandler
 
 # Checks if the login is correct and sets the UserID string on the request
-#handler "/api/*" Ceen.Security Ceen.Security.Login.LoginRequiredHandler
+#handler "/api/*" Ceen.Security.Login.LoginRequiredHandler
 
 # Creates and sets an XSRF token by cookie on all html requests
-#handler "/*.html" Ceen.Security Ceen.Security.Login.XSRFTokenGeneratorHandler
+#handler "/*.html" Ceen.Security.Login.XSRFTokenGeneratorHandler
 
 # Verifies the XSRF token header on each request
-#handler "/api/*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#handler "/api/*" Ceen.Security.Login.XSRFTokenRequiredHandler
 
 # The login modules require a storage module to be present
 # For simple setups, a memory storage module can be use,
 # and for more persistent storage, a database can be used
 
 # To use the memory module to store settings, simply load it:
-#module Ceen.Httpd Ceen.Security.Login.MemoryStorageModule
+#module Ceen.Security.Login.MemoryStorageModule
 
 # The database module will default to using SQLite, and store the data locally
 # The three booleans indicate that the module will handle: cookies+xsrf, long-term cookies, and authentication
@@ -307,25 +300,25 @@
 # Example:
 #
 
-#module Ceen.Security Ceen.Security.Login.LoginSettingsModule
+#module Ceen.Security.Login.LoginSettingsModule
 #set XSRFCookieName "my-xsrf-token"
 #set XSRFErrorStatusCode 302
 #set XSRFErrorStatusMessage "Found"
 #set XSRFErrorRedirectUrl "/"
 #
-#module Ceen.Httpd Ceen.Security.Login.MemoryStorageModule
+#module Ceen.Security.Login.MemoryStorageModule
 #
-#handler "/api/*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#handler "/api/*" Ceen.Security.Login.XSRFTokenRequiredHandler
 #set XSRFErrorStatusCode 403
 #set XSRFErrorStatusMessage "XSRF token expired"
 #set XSRFErrorRedirectUrl ""
 #
-#handler "/*.html" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#handler "/*.html" Ceen.Security.Login.XSRFTokenRequiredHandler
 #set XSRFErrorStatusCode 302
 #set XSRFErrorStatusMessage "Found"
 #set XSRFErrorRedirectUrl "/xsrf-expired-explanation"
 #
-#handler "*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#handler "*" Ceen.Security.Login.XSRFTokenRequiredHandler
 
 # In the example, all calls to /api/ with an expired XSRF token will return a 403 code,
 # and all others will perform a 302 redirect to /, except those ending in .html, which

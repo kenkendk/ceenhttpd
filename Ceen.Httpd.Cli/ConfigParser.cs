@@ -162,26 +162,30 @@ namespace Ceen.Httpd.Cli
 		/// Create an instance of an object, using constructor arguments and properties
 		/// </summary>
 		/// <returns>The created instance.</returns>
-		/// <param name="assemblyname">The name of the assembly where the type is in.</param>
 		/// <param name="classname">The name of the class to create.</param>
 		/// <param name="constructorargs">Arguments to pass to the constructor.</param>
 		/// <param name="targettype">The type the instance should be assignable to.</param>
-		private static object CreateInstance(string assemblyname, string classname, List<string> constructorargs, Type targettype)
+		private static object CreateInstance(string classname, List<string> constructorargs, Type targettype)
 		{
-			return CreateInstance(ResolveType(assemblyname, classname), constructorargs, targettype);
+			return CreateInstance(ResolveType(classname), constructorargs, targettype);
 		}
 
 		/// <summary>
 		/// Resolves the type given the class and assembly names.
 		/// </summary>
 		/// <returns>The resolved type.</returns>
-		/// <param name="assemblyname">The name of the assembly where the type is in.</param>
 		/// <param name="classname">The name of the class to create.</param>
-		private static Type ResolveType(string assemblyname, string classname)
+		private static Type ResolveType(string classname)
 		{
-			var itemtype = Type.GetType($"{classname}, {assemblyname}", false);
+			var itemtype =
+				Type.GetType(classname, false)
+					??
+				AppDomain.CurrentDomain.GetAssemblies()
+					.Select(x => x.GetType(classname))
+					.FirstOrDefault(x => x != null);
+
 			if (itemtype == null)
-				throw new Exception($"Failed to find the class named {classname} in assembly {assemblyname}");
+				throw new Exception($"Failed to find the class named {classname}");
 			return itemtype;
 		}
 
@@ -252,7 +256,7 @@ namespace Ceen.Httpd.Cli
 						{
 							var route = new RouteDefinition() { Assembly = args.Skip(1).First() };
 							cfg.Routes.Add(route);
-							lastitemprops = route.RouteOptions;
+							lastitemprops = route.Options;
 						}
 						else
 						{
@@ -267,55 +271,51 @@ namespace Ceen.Httpd.Cli
 							};
 
 							cfg.Routes.Add(route);
-							lastitemprops = route.RouteOptions;
+							lastitemprops = route.Options;
 						}
-
 					}
 					else if (string.Equals(cmd, "handler", StringComparison.OrdinalIgnoreCase))
 					{
-						if (args.Length < 4)
+						if (args.Length < 3)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
 
 						var route = new RouteDefinition()
 						{
 							RoutePrefix = args.Skip(1).First(),
-							Assembly = args.Skip(2).First(),
-							Classname = args.Skip(3).First(),
-							ConstructorArguments = args.Skip(4).ToList()
+							Classname = args.Skip(2).First(),
+							ConstructorArguments = args.Skip(3).ToList()
 						};
 
 						cfg.Routes.Add(route);
-						lastitemprops = route.RouteOptions;
+						lastitemprops = route.Options;
 					}
 					else if (string.Equals(cmd, "module", StringComparison.OrdinalIgnoreCase))
 					{
-						if (args.Length < 3)
+						if (args.Length < 2)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
 
 						var module = new ModuleDefinition()
 						{
-							Assembly = args.Skip(1).First(),
-							Classname = args.Skip(2).First(),
-							ConstructorArguments = args.Skip(3).ToList()
+							Classname = args.Skip(1).First(),
+							ConstructorArguments = args.Skip(2).ToList()
 						};
 
 						cfg.Modules.Add(module);
-						lastitemprops = module.RouteOptions;
+						lastitemprops = module.Options;
 					}
 					else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
 					{
-						if (args.Length < 3)
+						if (args.Length < 2)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
 
 						var logger = new LoggerDefinition()
 						{
-							Assembly = args.Skip(1).First(),
-							Classname = args.Skip(2).First(),
-							ConstructorArguments = args.Skip(3).ToList()
+							Classname = args.Skip(1).First(),
+							ConstructorArguments = args.Skip(2).ToList()
 						};
 
 						cfg.Loggers.Add(logger);
-						lastitemprops = logger.LoggerOptions;
+						lastitemprops = logger.Options;
 					}
 					else if (string.Equals(cmd, "set", StringComparison.OrdinalIgnoreCase))
 					{
@@ -352,13 +352,12 @@ namespace Ceen.Httpd.Cli
 						var route = new RouteDefinition()
 						{
 							RoutePrefix = routearg,
-							Assembly = typeof(Ceen.Httpd.Handler.FileHandler).Assembly.GetName().Name,
-							Classname = typeof(Ceen.Httpd.Handler.FileHandler).FullName,
+							Classname = typeof(Ceen.Httpd.Handler.FileHandler).AssemblyQualifiedName,
 							ConstructorArguments = args.Skip(2).ToList()
 						};
 
 						cfg.Routes.Add(route);
-						lastitemprops = route.RouteOptions;
+						lastitemprops = route.Options;
 						lastitemprops.Add(nameof(Ceen.Httpd.Handler.FileHandler.PathPrefix), pathprefix);
 					}
 					else if (string.Equals(cmd, "redirect", StringComparison.OrdinalIgnoreCase))
@@ -373,13 +372,12 @@ namespace Ceen.Httpd.Cli
 						var route = new RouteDefinition()
 						{
 							RoutePrefix = routearg,
-							Assembly = typeof(Ceen.Httpd.Handler.RedirectHandler).Assembly.GetName().Name,
-							Classname = typeof(Ceen.Httpd.Handler.RedirectHandler).FullName,
+							Classname = typeof(Ceen.Httpd.Handler.RedirectHandler).AssemblyQualifiedName,
 							ConstructorArguments = args.Skip(2).ToList()
 						};
 
 						cfg.Routes.Add(route);
-						lastitemprops = route.RouteOptions;
+						lastitemprops = route.Options;
 					}
 					else if (string.Equals(cmd, "mime", StringComparison.OrdinalIgnoreCase))
 					{
@@ -503,13 +501,36 @@ namespace Ceen.Httpd.Cli
 		{
 			var cfg = CreateServerConfig(config);
 
+			if (config.AutoLoadAssemblies)
+			{
+				var paths = (config.Assemblypath ?? string.Empty)
+					.Split(new char[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries)
+					.Union(new[] { config.Basepath, Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) })
+					.Where(x => !string.IsNullOrWhiteSpace(x) && Directory.Exists(x))
+					.Distinct();
+
+				foreach (var p in paths)
+					foreach (var file in Directory.GetFiles(p, "*.*", SearchOption.TopDirectoryOnly))
+						if (file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+							try { Assembly.LoadFrom(file); }
+							catch { }
+
+				var ceenpath = Path.GetDirectoryName(typeof(CLIServerConfiguration).Assembly.Location);
+				if ( Directory.Exists(ceenpath))
+				{
+					foreach (var dll in Directory.GetFiles(ceenpath, "Ceen.*.dll", SearchOption.TopDirectoryOnly))
+						try { Assembly.LoadFrom(dll); }
+						catch { }
+				}
+			}
+
 			if (config.Loggers != null)
 			{
 				foreach (var logger in config.Loggers)
 				{
-					var inst = CreateInstance(logger.Assembly, logger.Classname, logger.ConstructorArguments, typeof(ILogger));
-					if (logger.LoggerOptions != null)
-						SetProperties(inst, logger.LoggerOptions);
+					var inst = CreateInstance(logger.Classname, logger.ConstructorArguments, typeof(ILogger));
+					if (logger.Options != null)
+						SetProperties(inst, logger.Options);
 					cfg.AddLogger((ILogger)inst);
 				}
 			}
@@ -519,11 +540,11 @@ namespace Ceen.Httpd.Cli
 				foreach (var module in config.Modules)
 				{
 					object handler;
-					var moduletype = ResolveType(module.Assembly, module.Classname);
+					var moduletype = ResolveType(module.Classname);
 					handler = CreateInstance(moduletype, module.ConstructorArguments, typeof(IModule));
 
-					if (module.RouteOptions != null)
-						SetProperties(handler, module.RouteOptions);
+					if (module.Options != null)
+						SetProperties(handler, module.Options);
 
 					cfg.AddModule((IModule)handler);
 				}
@@ -537,7 +558,7 @@ namespace Ceen.Httpd.Cli
 					if (route.RoutePrefix != null)
 					{
 						object handler;
-						var moduletype = ResolveType(route.Assembly, route.Classname);
+						var moduletype = ResolveType(route.Classname);
 						if (typeof(Ceen.Httpd.Handler.FileHandler).IsAssignableFrom(moduletype))
 						{
 							Func<IHttpRequest, string, string> mimehandler = null;
@@ -599,8 +620,8 @@ namespace Ceen.Httpd.Cli
 							handler = CreateInstance(moduletype, route.ConstructorArguments, typeof(IHttpModule));
 						}
 
-						if (route.RouteOptions != null)
-							SetProperties(handler, route.RouteOptions);
+						if (route.Options != null)
+							SetProperties(handler, route.Options);
 
 						if (string.IsNullOrWhiteSpace(route.RoutePrefix))
 							cfg.AddRoute((IHttpModule)handler);
@@ -609,19 +630,21 @@ namespace Ceen.Httpd.Cli
 					}
 					else
 					{
+						var assembly = Assembly.Load(route.Assembly);
+						if (assembly == null)
+							throw new Exception($"Failed to find load assembly {route.Assembly}");
+
 						Type defaulttype = null;
 						if (!string.IsNullOrWhiteSpace(route.Classname))
 						{
-							defaulttype = Type.GetType($"{route.Classname}, {route.Assembly}", false);
+							defaulttype = assembly.GetType(route.Classname, false);
 							if (defaulttype == null)
 								throw new Exception($"Failed to find class {route.Classname} in {route.Assembly}");
 						}
 
 						var rt = new Ceen.Mvc.ControllerRouterConfig(defaulttype);
-						if (route.RouteOptions != null)
-							SetProperties(rt, route.RouteOptions);
-
-						var assembly = Assembly.Load(route.Assembly);
+						if (route.Options != null)
+							SetProperties(rt, route.Options);
 
 						cfg.AddRoute(new Ceen.Mvc.ControllerRouter(rt, assembly));
 					}

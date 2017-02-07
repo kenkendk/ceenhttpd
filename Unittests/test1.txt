@@ -17,20 +17,20 @@ AllowedSourceIPHeaderValue "X-Real-IP" #And a comment
 # The allowed SSL protocols
 SSLEnabledProtocols "Tls11|Tls12"
 
-logger Ceen.Httpd Ceen.Httpd.CLFStdOut
-logger Ceen.Httpd Ceen.Httpd.StdErrErrors
-logger Ceen.Httpd.Cli Ceen.Httpd.Cli.SyslogLogger
-logger Ceen.Httpd Ceen.Httpd.CLFLogger "/path/to/file" true false
-logger Unittests Unittests.TestLogger
+logger Ceen.Httpd.CLFStdOut
+logger Ceen.Httpd.StdErrErrors
+logger Ceen.Httpd.Cli.SyslogLogger
+logger Ceen.Httpd.CLFLogger "/path/to/file" true false
+logger Unittests.TestLogger
 set TestProp true
 
 # A custom handler, must implement Ceen.IHttpModule
-handler "/data" Unittests Unittests.TimeOfDayHandler 4 "string" true
+handler "/data" Unittests.TimeOfDayHandler 4 "string" true
 set ExtendedLogging true
 set maxfilesize 1024
 
 # Serve local files
-handler "" Ceen.Httpd Ceen.Httpd.FileHandler "/path/to/files"
+handler "" Ceen.Httpd.FileHandler "/path/to/files"
 
 # A custom route using Ceen.Mvc, loading an assembly
 route MyAssemblyName
