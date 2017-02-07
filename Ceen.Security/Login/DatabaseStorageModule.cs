@@ -13,7 +13,7 @@ namespace Ceen.Security.Login
 		/// <summary>
 		/// Gets or sets the connection string use to connect to the database.
 		/// If the database provider is &quot;sqlite&quot; and the string does not start with
-		/// &quot;DataSource=&quot; the string is assumed to be a filename
+		/// &quot;Data Source=&quot; the string is assumed to be a filename
 		/// </summary>
 		public string ConnectionString { get; set; } = "sessiondata.sqlite";
 
@@ -61,6 +61,8 @@ namespace Ceen.Security.Login
 				new LoginSettingsModule().LongTermStorage = this;
 			if (default_authentication)
 				new LoginSettingsModule().Authentication = this;
+			
+			EnsureConnected();
 		}
 
 		/// <summary>
@@ -163,18 +165,30 @@ namespace Ceen.Security.Login
 				}
 
 			var classname = ConnectionClass;
+			var connstr = ConnectionString;
 			if (string.Equals(classname, "sqlite", StringComparison.OrdinalIgnoreCase) || string.Equals(classname, "sqlite3", StringComparison.OrdinalIgnoreCase))
-				classname = "System.Data.SQLite.SQLiteConnection, System.Data.SQLite";
+			{
+				classname = "Mono.Data.Sqlite.SqliteConnection, Mono.Data.Sqlite, Version=4.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756";
+				if (Type.GetType(classname) == null)
+					classname = "System.Data.SQLite.SQLiteConnection, System.Data.SQLite, Version=1.0.104.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139";
+
+				if (!string.IsNullOrWhiteSpace(connstr) && !connstr.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
+					connstr = "Data Source=" + connstr;
+			}
 			else if (string.Equals(classname, "odbc", StringComparison.OrdinalIgnoreCase))
-				classname = "System.Data.Odbc.OdbcConnection, System.Data";
+				classname = "System.Data.Odbc.OdbcConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089";
 
 			var contype = Type.GetType(classname);
 			if (contype == null)
-				throw new Exception($"Failed to locate the requested database type: {contype}");
+				throw new Exception($"Failed to locate the requested database type: {classname}");
 			var e = Activator.CreateInstance(contype);
 			if (!(e is System.Data.IDbConnection))
-				throw new Exception($"The requested type {contype} is not implementing {typeof(System.Data.IDbConnection).FullName}");
+				throw new Exception($"The requested type {contype.FullName} is not implementing {typeof(System.Data.IDbConnection).FullName}");
+
 			m_connection = e as System.Data.IDbConnection;
+
+			m_connection.ConnectionString = connstr;
+			m_connection.Open();
 
 			SetupCommands();
 		}
@@ -236,18 +250,24 @@ namespace Ceen.Security.Login
 		/// <param name="recordtype">The datatype to store in the table.</param>
 		protected virtual void CreateTable(string tablename, Type recordtype, params string[] unique)
 		{
-			var sql = string.Format(
-				@"CREATE TABLE ""{0}"" ({1}) ",
-				tablename,
+			var fields = 
 				string.Join(", ",
 					recordtype
 					.GetProperties()
-		            .Select(x => string.Format(@"""{0}"" {1}", x.Name, GetSqlColumnType(x)))
-			   	)
-			);
+					.Select(x => string.Format(@"""{0}"" {1}", x.Name, GetSqlColumnType(x)))
+			   	);
 
-			if (unique != null && unique.Length > 0)
-				sql += string.Format(@", CONSTRAINT ""{0}_unique"" UNIQUE({1})", tablename, string.Join(", ", unique));
+			var constr =
+				(unique == null || unique.Length == 0)
+				? string.Empty
+				: string.Format(@", CONSTRAINT ""{0}_unique"" UNIQUE({1})", tablename, string.Join(", ", unique));
+
+			var sql = string.Format(
+				@"CREATE TABLE ""{0}"" ({1} {2}) ",
+				tablename,
+				fields,
+				constr
+			);
 
 			using (var cmd = m_connection.CreateCommand())
 			{
@@ -312,6 +332,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_addSessionCommand,
 					record.UserID,
@@ -332,6 +353,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_addSessionCommand,
 					record.UserID,
@@ -351,6 +373,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(m_getSessionFromCookieCommand, cookie);
 				using (var rd = m_getSessionFromCookieCommand.ExecuteReader())
 				{
@@ -377,6 +400,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(m_getSessionFromXSRFCommand, xsrf);
 				using (var rd = m_getSessionFromXSRFCommand.ExecuteReader())
 				{
@@ -403,6 +427,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_updateSessionCommand,
 					record.Expires,
@@ -423,6 +448,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_addLongTermLoginCommand,
 					record.UserID,
@@ -444,6 +470,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_dropAllLongTermLoginCommand,
 					userid,
@@ -462,6 +489,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_dropLongTermLoginCommand,
 					record.UserID,
@@ -481,6 +509,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(m_getLongTermLoginCommand, series);
 				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
 				{
@@ -506,6 +535,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(m_dropExpiredSessionsCommand, DateTime.Now);
 				m_dropExpiredSessionsCommand.ExecuteNonQuery();
 				SetParameterValues(m_dropExpiredLongTermCommand, DateTime.Now);
@@ -546,6 +576,7 @@ namespace Ceen.Security.Login
 			var lst = new List<LoginEntry>();
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(m_getLoginEntriesCommand, username);
 				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
 				{
@@ -572,6 +603,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_addLoginEntryCommand,
 					record.UserID,
@@ -591,6 +623,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_dropLoginEntryCommand,
 					record.UserID,
@@ -611,6 +644,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_dropAllLoginEntryCommand,
 					userid,
@@ -629,6 +663,7 @@ namespace Ceen.Security.Login
 		{
 			using (await m_lock.LockAsync())
 			{
+				EnsureConnected();
 				SetParameterValues(
 					m_updateSessionCommand,
 					record.Token,
