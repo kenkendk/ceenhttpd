@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Ceen;
 using Ceen.Httpd;
@@ -40,7 +41,13 @@ namespace Ceen.Httpd.Logging
 		public Log4netCLFLogger(string logreporttype)
 			: base(new MemoryStream(), true, false)
 		{
-			var targettype = Type.GetType(logreporttype);
+			var targettype = 
+				Type.GetType(logreporttype, false)
+					??
+				AppDomain.CurrentDomain.GetAssemblies()
+					.Select(x => x.GetType(logreporttype))
+					.FirstOrDefault(x => x != null);
+			
 			if (targettype == null)
 				throw new Exception($"Failed to load target type: {logreporttype}");
 
