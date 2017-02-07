@@ -36,16 +36,16 @@
 # > openssl pkcs12 -export -in certificate.crt -inkey privkey.key -out certificate.pfx
 
 # Path to the certificate to use for SSL requests, environment variables are expanded
-#certificatepath
+#certificatepath certificate.pfx
 
 # The password used to open the SSL certificate, environment variables are expanded
-#certificatepassword
+#certificatepassword mypassword
 
 # The ports the server listens on
 #httpport 80
 #httpsport 443
 
-# The IP address to listen on, can also be "any" or "loopback"
+# The IP address to listen on for HTTP, can also be "any" or "loopback"
 #httpaddress loopback
 
 # The IP adress to listen on for HTTPS, can also be "any" or "loopback"
@@ -307,25 +307,25 @@
 # Example:
 #
 
-#module Ceen.Httpd Ceen.Security.Login.LoginSettingsModule
+#module Ceen.Security Ceen.Security.Login.LoginSettingsModule
 #set XSRFCookieName "my-xsrf-token"
-#set XSRFErrorStatusMessage 302
-#set XSRFErrorStatusCode "Found"
+#set XSRFErrorStatusCode 302
+#set XSRFErrorStatusMessage "Found"
 #set XSRFErrorRedirectUrl "/"
 #
 #module Ceen.Httpd Ceen.Security.Login.MemoryStorageModule
 #
-#handler "/api/*" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
-#set XSRFErrorStatusMessage 403
-#set XSRFErrorStatusCode "XSRF token expired"
+#handler "/api/*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#set XSRFErrorStatusCode 403
+#set XSRFErrorStatusMessage "XSRF token expired"
 #set XSRFErrorRedirectUrl ""
 #
-#handler "/*.html" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
-#set XSRFErrorStatusMessage 302
-#set XSRFErrorStatusCode "Found"
+#handler "/*.html" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
+#set XSRFErrorStatusCode 302
+#set XSRFErrorStatusMessage "Found"
 #set XSRFErrorRedirectUrl "/xsrf-expired-explanation"
 #
-#handler "*" Ceen.Httpd Ceen.Httpd.Handler.Login.XSRFTokenRequiredHandler
+#handler "*" Ceen.Security Ceen.Security.Login.XSRFTokenRequiredHandler
 
 # In the example, all calls to /api/ with an expired XSRF token will return a 403 code,
 # and all others will perform a 302 redirect to /, except those ending in .html, which
