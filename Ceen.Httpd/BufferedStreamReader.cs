@@ -186,7 +186,7 @@ namespace Ceen.Httpd
 		internal async Task<byte[]> RepeatReadAsync(int count, TimeSpan idletimeout, Task timeouttask, Task stoptask)
 		{
 			var buf = new byte[count];
-			await RepeatReadAsync(count, idletimeout, timeouttask, stoptask);
+			await RepeatReadAsync(buf, 0, count, idletimeout, timeouttask, stoptask);
 			return buf;
 		}
 
@@ -195,7 +195,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		/// <returns>The delimited sub stream.</returns>
 		/// <param name="delimiter">Delimiter.</param>
-		/// <param name="idletimeout">The time to wait while idle</param>
+		/// <param name="idletime">The time to wait while idle</param>
 		/// <param name="timeouttask">The task that signals request timeout</param>
 		/// <param name="stoptask">The task that signals stop for the server</param>
 		internal Stream GetDelimitedSubStream(byte[] delimiter, TimeSpan idletime, Task timeouttask, Task stoptask)
