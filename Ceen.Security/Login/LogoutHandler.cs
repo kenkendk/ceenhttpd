@@ -29,9 +29,10 @@ namespace Ceen.Security.Login
 		/// <param name="context">The requests context.</param>
 		public async Task<bool> HandleAsync(IHttpContext context)
 		{
-			var xsrf = context.Request.Headers[XSRFHeaderName];
+			var xsrf = context.Request.Headers[XSRFHeaderName] ?? context.Request.Cookies[XSRFCookieName];
 			var cookie = context.Request.Cookies[AuthSessionCookieName];
 			var longterm = context.Request.Cookies[AuthCookieName];
+			var droppedxsrf = false;
 
 			if (!string.IsNullOrWhiteSpace(xsrf))
 			{
@@ -39,20 +40,20 @@ namespace Ceen.Security.Login
 				if (session != null)
 				{
 					await ShortTermStorage.DropSessionAsync(session);
-					if (!string.IsNullOrWhiteSpace(cookie))
-						context.Response.AddCookie(AuthSessionCookieName, "", expires: new DateTime(1970, 1, 1), maxage: 0);
-
-					cookie = null;
+					droppedxsrf = true;
 				}
 
-				context.Response.AddCookie(XSRFCookieName, "", expires: new DateTime(1970, 1, 1), maxage: 0);
+				context.Response.AddCookie(XSRFCookieName, "", path: CookiePath, expires: new DateTime(1970, 1, 1), maxage: 0);
 			}
 
 			if (!string.IsNullOrWhiteSpace(cookie))
 			{
-				var session = await ShortTermStorage.GetSessionFromXSRFAsync(cookie);
+				var session = await ShortTermStorage.GetSessionFromCookieAsync(cookie);
 				if (session != null)
 					await ShortTermStorage.DropSessionAsync(session);
+
+				if (session != null || droppedxsrf)
+					context.Response.AddCookie(AuthSessionCookieName, "", path: CookiePath, expires: new DateTime(1970, 1, 1), maxage: 0);
 			}
 
 			if (!string.IsNullOrWhiteSpace(longterm))
@@ -68,7 +69,7 @@ namespace Ceen.Security.Login
 					}
 				}
 
-				context.Response.AddCookie(AuthCookieName, "", expires: new DateTime(1970, 1, 1), maxage: 0);
+				context.Response.AddCookie(AuthCookieName, "", path: CookiePath, expires: new DateTime(1970, 1, 1), maxage: 0);
 			}
 
 			context.Response.StatusCode = (HttpStatusCode)ResultStatusCode;

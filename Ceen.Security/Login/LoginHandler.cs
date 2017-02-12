@@ -105,7 +105,7 @@ namespace Ceen.Security.Login
 		/// <param name="userid">The user ID.</param>
 		/// <param name="username">The username.</param>
 		/// <param name="password">The password.</param>
-		public LoginEntry CreateUser(string userid, string username, string password)
+		public static LoginEntry CreateUser(string userid, string username, string password)
 		{
 			return new LoginEntry()
 			{

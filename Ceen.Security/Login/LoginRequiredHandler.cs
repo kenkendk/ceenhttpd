@@ -59,7 +59,7 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(cookie))
 					session = await ShortTermStorage.GetSessionFromCookieAsync(cookie);
 
-				if (session == null || session.Expires > DateTime.Now)
+				if (session == null || DateTime.Now > session.Expires)
 				{
 					if (await LoginWithBasicAuth(context))
 						return false;

@@ -214,7 +214,7 @@ namespace Ceen.Security.Login
 			m_getLongTermLoginCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
 
 			m_dropExpiredSessionsCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", SessionRecordTablename));
-			m_dropLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
+			m_dropExpiredLongTermCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
 
 			m_addLoginEntryCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Username"", ""Token"") VALUES (?, ?, ?)", LoginEntryTablename));
 			m_getLoginEntriesCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Username"", ""Token"" FROM ""{0}"" WHERE ""Username"" = ?", LoginEntryTablename));
@@ -289,6 +289,23 @@ namespace Ceen.Security.Login
 		}
 
 		/// <summary>
+		/// Fixes a deficiency in the database mapping,
+		///  and returns string null values as null
+		/// </summary>
+		/// <returns>The string representatio.</returns>
+		/// <param name="rd">The reader to use.</param>
+		/// <param name="index">The index to read the string from.</param>
+		protected string GetAsString(System.Data.IDataReader rd, int index)
+		{
+			var val = rd.GetValue(index);
+
+			if (val == null || val == DBNull.Value)
+				return null;
+			else
+				return (string)val;
+		}
+
+		/// <summary>
 		/// Helper method for creating a command and initializing the parameters
 		/// </summary>
 		/// <returns>The command.</returns>
@@ -355,12 +372,12 @@ namespace Ceen.Security.Login
 			{
 				EnsureConnected();
 				SetParameterValues(
-					m_addSessionCommand,
+					m_dropSessionCommand,
 					record.UserID,
 					record.Cookie,
 					record.XSRFToken
 				);
-				m_addSessionCommand.ExecuteNonQuery();
+				m_dropSessionCommand.ExecuteNonQuery();
 			}
 		}
 
@@ -382,9 +399,9 @@ namespace Ceen.Security.Login
 					else
 						return new SessionRecord()
 						{
-							UserID = rd.GetString(0),
-							Cookie = rd.GetString(1),
-							XSRFToken = rd.GetString(2),
+							UserID = GetAsString(rd, 0),
+							Cookie = GetAsString(rd, 1),
+							XSRFToken = GetAsString(rd, 2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -409,9 +426,9 @@ namespace Ceen.Security.Login
 					else
 						return new SessionRecord()
 						{
-							UserID = rd.GetString(0),
-							Cookie = rd.GetString(1),
-							XSRFToken = rd.GetString(2),
+							UserID = GetAsString(rd, 0),
+							Cookie = GetAsString(rd, 1),
+							XSRFToken = GetAsString(rd, 2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -435,7 +452,7 @@ namespace Ceen.Security.Login
 					record.Cookie,
 					record.XSRFToken
 				);
-				m_addLongTermLoginCommand.ExecuteNonQuery();
+				m_updateSessionCommand.ExecuteNonQuery();
 			}
 		}
 
@@ -518,9 +535,9 @@ namespace Ceen.Security.Login
 					else
 						return new LongTermToken()
 						{
-							UserID = rd.GetString(0),
-							Series = rd.GetString(1),
-							Token = rd.GetString(2),
+							UserID = GetAsString(rd, 0),
+							Series = GetAsString(rd, 1),
+							Token = GetAsString(rd, 2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -578,14 +595,14 @@ namespace Ceen.Security.Login
 			{
 				EnsureConnected();
 				SetParameterValues(m_getLoginEntriesCommand, username);
-				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
+				using (var rd = m_getLoginEntriesCommand.ExecuteReader())
 				{
 					while (rd.Read())
 						lst.Add(new LoginEntry()
 						{
-							UserID = rd.GetString(0),
-							Username = rd.GetString(1),
-							Token = rd.GetString(2)
+							UserID = GetAsString(rd, 0),
+							Username = GetAsString(rd, 1),
+							Token = GetAsString(rd, 2)
 						});
 				}
 			}
@@ -665,12 +682,12 @@ namespace Ceen.Security.Login
 			{
 				EnsureConnected();
 				SetParameterValues(
-					m_updateSessionCommand,
+					m_updateLoginEntryCommand,
 					record.Token,
 					record.UserID,
 					record.Username
 				);
-				m_dropAllLoginEntryCommand.ExecuteNonQuery();
+				m_updateLoginEntryCommand.ExecuteNonQuery();
 			}
 		}
 	}

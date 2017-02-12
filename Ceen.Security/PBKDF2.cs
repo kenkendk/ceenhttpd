@@ -65,16 +65,21 @@ namespace Ceen.Security
 
 			var comp = previous.Split('$');
 			int rounds = -1;
-			if (comp.Length != 5 || comp[0] != MAGIC || comp[1] != VERSION.ToString() || !int.TryParse(comp[2], out rounds) || rounds <= 0 || comp[3].Length != SALTLEN || comp[4].Length != KEYLEN)
+			if (comp.Length != 5 || comp[0] != MAGIC || comp[1] != VERSION.ToString() || !int.TryParse(comp[2], out rounds) || rounds <= 0)
 				throw new ArgumentException("The supplied PBKDF2 token is invalid", nameof(previous));
+
 
 			var data = System.Text.Encoding.UTF8.GetBytes(password);
 			var salt = Convert.FromBase64String(comp[3]);
+			var prevkey = Convert.FromBase64String(comp[4]);
+
+			if (salt.Length != SALTLEN || prevkey.Length != KEYLEN)
+				throw new ArgumentException("The supplied PBKDF2 token is invalid", nameof(previous));
 
 			var pbkdf2 = new Rfc2898DeriveBytes(data, salt, rounds);
-			var key = Convert.ToBase64String(pbkdf2.GetBytes(comp[4].Length));
+			var key = Convert.ToBase64String(pbkdf2.GetBytes(prevkey.Length));
 
-			return CompareStringsConstantTime(key, previous);
+			return CompareStringsConstantTime(key, comp[4]);
 		}
 
 		/// <summary>

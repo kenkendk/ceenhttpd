@@ -44,6 +44,8 @@ namespace Ceen.Security.Login
 			_basesettings[nameof(AuthSessionCookieName)] = "ceen-auth-session-token";
 			_basesettings[nameof(AuthCookieName)] = "ceen-auth-token";
 
+			_basesettings[nameof(CookiePath)] = "/";
+
 			_basesettings[nameof(AllowBasicAuth)] = true;
 
 			_basesettings[nameof(ShortTermStorage)] = null;
@@ -153,6 +155,11 @@ namespace Ceen.Security.Login
 		/// Gets or sets the name of the authentication cookie to look for.
 		/// </summary>
 		public string XSRFCookieName { get { return GetValue<string>(); } set { SetValue(value); } }
+
+		/// <summary>
+		/// Gets or sets the path component for the cookies.
+		/// </summary>
+		public string CookiePath { get { return GetValue<string>(); } set { SetValue(value); } }
 
 		/// <summary>
 		/// Gets or sets the storage implementation for short term items.
@@ -272,11 +279,12 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(xsrf))
 				{
 					var prev = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-					if (prev != null && prev.Expires < DateTime.Now)
+					if (prev != null && prev.Expires < DateTime.Now && prev.UserID == userid && !string.IsNullOrWhiteSpace(userid))
 						session = prev;
 				}
 			}
 
+			session.UserID = userid;
 			session.Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds);
 
 			// If the connection is using SSL, require SSL for the cookie
@@ -284,8 +292,8 @@ namespace Ceen.Security.Login
 
 			if (UseXSRFTokens)
 			{
-				session.XSRFToken = PRNG.GetRandomString(32);
-				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, secure: usingssl);
+				session.XSRFToken = session.XSRFToken ?? PRNG.GetRandomString(32);
+				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl);
 			}
 
 			if (UseLongTermCookieStorage && LongTermStorage != null)
@@ -303,11 +311,11 @@ namespace Ceen.Security.Login
 				};
 
 				await LongTermStorage.AddLongTermLoginAsync(st);
-				context.Response.AddCookie(AuthCookieName, cookie.ToString(), expires: st.Expires, httponly: true, secure: usingssl);
+				context.Response.AddCookie(AuthCookieName, cookie.ToString(), expires: st.Expires, httponly: true, path: CookiePath, secure: usingssl);
 			}
 
 			session.Cookie = PRNG.GetRandomString(32);
-			context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, secure: usingssl);
+			context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
 
 			await ShortTermStorage.AddSessionAsync(session);
 
