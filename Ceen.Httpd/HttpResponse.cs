@@ -370,21 +370,31 @@ namespace Ceen.Httpd
 
 				foreach (var cookie in Cookies)
 				{
-					// URL encoding not required, but common practice
-					Func<string, string> cookievalue = x => string.IsNullOrWhiteSpace(x) ? "" : string.Format("=\"{0}\"", Uri.EscapeDataString(x));
+					var sb = new StringBuilder();
+					sb.Append("Set-Cookie: ");
+					sb.Append(cookie.Name);
+					if (!string.IsNullOrWhiteSpace(cookie.Value))
+					{
+						sb.Append("=");
 
-					line = 
-						Encoding.ASCII.GetBytes(
-							string.Format("Set-Cookie: {0}{1}{2}", 
-							              Uri.EscapeDataString(cookie.Name), 
-							              string.Join("; ", 
-							                          new string[] { cookievalue(cookie.Value) }
-							                          .Union(
-								                          cookie.Settings
-								                          .Select(x => string.Format("{0}{1}", x.Key, cookievalue(x.Value))))
-							                          .Where(x => !string.IsNullOrWhiteSpace(x))),
-							              CRLF));
-					
+						// URL encoding not required, but common practice
+						sb.Append(Uri.EscapeDataString(cookie.Value));
+					}
+
+					foreach (var setting in cookie.Settings)
+					{
+						sb.Append("; ");
+						sb.Append(setting.Key);
+						if (!string.IsNullOrWhiteSpace(setting.Value))
+						{
+							sb.Append("=");
+							sb.Append(setting.Value);
+						}
+					}
+
+					sb.Append(CRLF);
+					line = Encoding.ASCII.GetBytes(sb.ToString());
+
 					await m_stream.WriteAsync(line, 0, line.Length);
 				}
 

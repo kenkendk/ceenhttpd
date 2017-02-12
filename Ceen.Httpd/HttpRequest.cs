@@ -205,7 +205,7 @@ namespace Ceen.Httpd
 				// Setup cookie collection automatically
 				if (string.Equals(components[0].Trim(), "cookie", StringComparison.OrdinalIgnoreCase))
 					foreach(var k in SplitHeaderLine((components[1] ?? string.Empty).Trim()))
-						Cookies[Uri.UnescapeDataString(k.Key)] = Uri.UnescapeDataString(k.Value);
+						Cookies[k.Key] = Uri.UnescapeDataString(k.Value);
 
 				var key = components[0].Trim();
 				var value = (components[1] ?? string.Empty).Trim();
