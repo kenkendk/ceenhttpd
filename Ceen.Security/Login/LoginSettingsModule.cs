@@ -35,6 +35,7 @@ namespace Ceen.Security.Login
 			_basesettings[nameof(LoginSuccessRedirectUrl)] = null;
 
 			_basesettings[nameof(ShortTermExpirationSeconds)] = (int)TimeSpan.FromMinutes(15).TotalSeconds;
+			_basesettings[nameof(ShortTermRefreshThreshold)] = (int)TimeSpan.FromMinutes(14).TotalSeconds;
 
 			_basesettings[nameof(UseLongTermCookieStorage)] = true;
 			_basesettings[nameof(UseXSRFTokens)] = true;
@@ -119,6 +120,11 @@ namespace Ceen.Security.Login
 		/// Gets or sets the number of seconds a token is valid.
 		/// </summary>
 		public int ShortTermExpirationSeconds { get { return GetValue<int>(); } set { SetValue(value); UpdateExpiration(); } }
+
+		/// <summary>
+		/// Gets or sets the number of seconds a token can have left without being renewed.
+		/// </summary>
+		public int ShortTermRefreshThreshold { get { return GetValue<int>(); } set { SetValue(value); UpdateExpiration(); } }
 
 		/// <summary>
 		/// Gets or sets a value indicating if credentials passed as Basic HTTP auth are accepted
@@ -259,6 +265,35 @@ namespace Ceen.Security.Login
 				context.Response.Headers["Location"] = HijackErrorRedirectUrl;
 
 			return true;
+		}
+
+		/// <summary>
+		/// Emits the current session tokens with an updated expiration time
+		/// </summary>
+		/// <returns>An awaitable task.</returns>
+		/// <param name="context">The http context.</param>
+		/// <param name="session">The current session record.</param>
+		protected virtual async Task RefreshSessionTokensAsync(IHttpContext context, SessionRecord session)
+		{
+			if (session == null)
+				throw new ArgumentNullException(nameof(session));
+
+			// Renew if the token is starting to get old
+			if ((session.Expires - DateTime.Now).TotalSeconds < ShortTermRefreshThreshold)
+			{
+				// If the connection is using SSL, require SSL for the cookie
+				var usingssl = context.Request.SslProtocol != System.Security.Authentication.SslProtocols.None;
+
+				session.Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds);
+				await ShortTermStorage.UpdateSessionExpirationAsync(session);
+
+				if (!string.IsNullOrWhiteSpace(session.XSRFToken))
+					context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl);
+				
+				if (!string.IsNullOrWhiteSpace(session.Cookie))
+					context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
+			}
+
 		}
 
 		/// <summary>

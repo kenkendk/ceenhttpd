@@ -26,8 +26,7 @@ namespace Ceen.Security.Login
 			if (session == null || session.Expires > DateTime.Now)
 				return SetXSRFError(context);
 
-			session.Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds);
-			await ShortTermStorage.UpdateSessionExpirationAsync(session);
+			await RefreshSessionTokensAsync(context, session);
 
 			return false;
 		}

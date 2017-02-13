@@ -49,8 +49,7 @@ namespace Ceen.Security.Login
 					return SetLoginError(context);
 				}
 
-				session.Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds);
-				await ShortTermStorage.UpdateSessionExpirationAsync(session);
+				await RefreshSessionTokensAsync(context, session);
 			}
 			else
 			{
@@ -66,9 +65,8 @@ namespace Ceen.Security.Login
 					
 					return SetLoginError(context);
 				}
-				
-				session.Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds);
-				await ShortTermStorage.UpdateSessionExpirationAsync(session);
+
+				await RefreshSessionTokensAsync(context, session);
 			}
 
 			return false;
