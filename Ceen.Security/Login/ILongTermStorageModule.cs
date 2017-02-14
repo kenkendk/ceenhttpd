@@ -21,7 +21,7 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to add.</param>
-		Task AddLongTermLoginAsync(LongTermToken record);
+		Task AddOrUpdateLongTermLoginAsync(LongTermToken record);
 		/// <summary>
 		/// Drops the given long term login entry.
 		/// </summary>

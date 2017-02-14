@@ -22,6 +22,10 @@ namespace Ceen.Security.Login
 		/// Gets or sets the name of the form item that contains the password.
 		/// </summary>
 		public string PasswordFormElement { get; set; } = "password";
+		/// <summary>
+		/// Gets or sets the name of the form item that contains the password.
+		/// </summary>
+		public string RememberMeFormElement { get; set; } = "remember";
 
 		/// <summary>
 		/// Handles the request
@@ -37,6 +41,7 @@ namespace Ceen.Security.Login
 
 			var username = ExtractUsername(context);
 			var password = ExtractPassword(context);
+			var rememberme = ExtractRememberMe(context);
 
 			if (string.IsNullOrWhiteSpace(username))
 				return SetLoginError(context);
@@ -73,7 +78,7 @@ namespace Ceen.Security.Login
 				return SetLoginError(context);
 			}
 
-			await PerformLoginAsync(context, user.UserID);
+			await PerformLoginAsync(context, user.UserID, null, rememberme);
 
 			return true;
 		}
@@ -96,6 +101,19 @@ namespace Ceen.Security.Login
 		protected virtual string ExtractPassword(IHttpContext context)
 		{
 			return context.Request.Form[PasswordFormElement];
+		}
+
+		/// <summary>
+		/// Extracts the password from the request.
+		/// </summary>
+		/// <returns>The password.</returns>
+		/// <param name="context">The http context.</param>
+		protected virtual bool ExtractRememberMe(IHttpContext context)
+		{
+			if (!context.Request.Form.ContainsKey(RememberMeFormElement))
+				return false;
+
+			return ! new[] { "0", "false", "no", "off" }.Contains(context.Request.Form[RememberMeFormElement], StringComparer.OrdinalIgnoreCase);
 		}
 
 		/// <summary>

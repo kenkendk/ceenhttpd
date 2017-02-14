@@ -303,7 +303,8 @@ namespace Ceen.Security.Login
 		/// <param name="context">The http context.</param>
 		/// <param name="userid">The user ID.</param>
 		/// <param name="series">The long-term series</param>
-		protected virtual async Task PerformLoginAsync(IHttpContext context, string userid, string series = null)
+		/// <param name="withlongterm">A value indicating if a long-term session should be created</param>
+		protected virtual async Task PerformLoginAsync(IHttpContext context, string userid, string series, bool withlongterm)
 		{
 			var session = new SessionRecord();
 
@@ -331,7 +332,7 @@ namespace Ceen.Security.Login
 				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl);
 			}
 
-			if (UseLongTermCookieStorage && LongTermStorage != null)
+			if (UseLongTermCookieStorage && LongTermStorage != null && (!string.IsNullOrWhiteSpace(series) || withlongterm))
 			{
 				var cookie = new LongTermCookie();
 				if (!string.IsNullOrWhiteSpace(series))
@@ -345,7 +346,7 @@ namespace Ceen.Security.Login
 					Token = PBKDF2.CreatePBKDF2(cookie.Token)
 				};
 
-				await LongTermStorage.AddLongTermLoginAsync(st);
+				await LongTermStorage.AddOrUpdateLongTermLoginAsync(st);
 				context.Response.AddCookie(AuthCookieName, cookie.ToString(), expires: st.Expires, httponly: true, path: CookiePath, secure: usingssl);
 			}
 
@@ -380,7 +381,7 @@ namespace Ceen.Security.Login
 				return false;
 
 			var lts = await LongTermStorage.GetLongTermLoginAsync(ltc.Series);
-			if (lts == null || lts.Expires > DateTime.Now)
+			if (lts == null || lts.Expires < DateTime.Now)
 				return false;
 
 			if (!PBKDF2.ComparePassword(ltc.Token, lts.Token))
@@ -393,7 +394,7 @@ namespace Ceen.Security.Login
 				return false;
 			}
 
-			await PerformLoginAsync(context, lts.UserID, lts.Series);
+			await PerformLoginAsync(context, lts.UserID, lts.Series, true);
 
 			return true;
 		}
@@ -466,7 +467,7 @@ namespace Ceen.Security.Login
 
 								if (user != null)
 								{
-									await PerformLoginAsync(context, user.UserID, null);
+									await PerformLoginAsync(context, user.UserID, null, false);
 									return true;
 								}
 							}

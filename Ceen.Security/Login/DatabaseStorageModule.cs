@@ -208,7 +208,7 @@ namespace Ceen.Security.Login
 			m_getSessionFromCookieCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""Cookie"" = ?", SessionRecordTablename));
 			m_getSessionFromXSRFCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""XSRFToken"" = ?", SessionRecordTablename));
 
-			m_addLongTermLoginCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
+			m_addLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Series"" = ?; INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
 			m_dropLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Series"" = ? AND ""Token"" = ?", LongTermLoginTablename));
 			m_dropAllLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? OR ""Series"" = ?", LongTermLoginTablename));
 			m_getLongTermLoginCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
@@ -461,13 +461,15 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to add.</param>
-		public virtual async Task AddLongTermLoginAsync(LongTermToken record)
+		public virtual async Task AddOrUpdateLongTermLoginAsync(LongTermToken record)
 		{
 			using (await m_lock.LockAsync())
 			{
 				EnsureConnected();
 				SetParameterValues(
 					m_addLongTermLoginCommand,
+					record.Series,
+
 					record.UserID,
 					record.Series,
 					record.Token,

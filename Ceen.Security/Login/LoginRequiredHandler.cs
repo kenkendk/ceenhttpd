@@ -45,7 +45,14 @@ namespace Ceen.Security.Login
 				{
 					if (await LoginWithBasicAuth(context))
 						return false;
-					
+
+					if (await PerformLongTermLogin(context))
+						return false;
+
+					// Check for a Hijack response
+					if (context.Response.HasSentHeaders)
+						return true;
+
 					return SetLoginError(context);
 				}
 
@@ -62,6 +69,13 @@ namespace Ceen.Security.Login
 				{
 					if (await LoginWithBasicAuth(context))
 						return false;
+					
+					if (await PerformLongTermLogin(context))
+						return false;
+
+					// Check for a Hijack response
+					if (context.Response.HasSentHeaders)
+						return true;
 					
 					return SetLoginError(context);
 				}
