@@ -2,6 +2,22 @@
 namespace Ceen.Security.Login
 {
 	/// <summary>
+	/// Helper class to
+	/// </summary>
+	public static partial class Utility
+	{
+		/// <summary>
+		/// Gets a value indicating if the session is valid
+		/// </summary>
+		/// <returns><c>true</c>, if the session is valid, <c>false</c> otherwise.</returns>
+		/// <param name="session">The session to validate.</param>
+		public static bool IsNullOrExpired(this SessionRecord session)
+		{
+			return session == null || session.Expires < DateTime.Now;
+		}
+	}
+
+	/// <summary>
 	/// Implementation of a session record
 	/// </summary>
 	public class SessionRecord

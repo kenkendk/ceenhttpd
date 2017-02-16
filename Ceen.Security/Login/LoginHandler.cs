@@ -52,7 +52,7 @@ namespace Ceen.Security.Login
 			if (RequireXSRFToken)
 			{
 				var session = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-				if (session == null || session.Expires > DateTime.Now)
+				if (Utility.IsNullOrExpired(session))
 					return SetXSRFError(context);
 			}
 

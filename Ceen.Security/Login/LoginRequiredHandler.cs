@@ -38,7 +38,7 @@ namespace Ceen.Security.Login
 			if (UseXSRFTokens && CheckXSRFToken)
 			{
 				var session = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-				if (session == null || session.Expires > DateTime.Now)
+				if (Utility.IsNullOrExpired(session))
 					return SetXSRFError(context);
 
 				if (string.IsNullOrWhiteSpace(cookie) || session.Cookie != cookie)
@@ -57,6 +57,8 @@ namespace Ceen.Security.Login
 				}
 
 				await RefreshSessionTokensAsync(context, session);
+
+				context.Request.UserID = session.UserID;
 			}
 			else
 			{
@@ -65,7 +67,7 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(cookie))
 					session = await ShortTermStorage.GetSessionFromCookieAsync(cookie);
 
-				if (session == null || DateTime.Now > session.Expires)
+				if (Utility.IsNullOrExpired(session))
 				{
 					if (await LoginWithBasicAuth(context))
 						return false;
@@ -81,6 +83,8 @@ namespace Ceen.Security.Login
 				}
 
 				await RefreshSessionTokensAsync(context, session);
+
+				context.Request.UserID = session.UserID;
 			}
 
 			return false;

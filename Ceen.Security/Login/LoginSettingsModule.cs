@@ -293,7 +293,6 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(session.Cookie))
 					context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
 			}
-
 		}
 
 		/// <summary>
@@ -315,7 +314,7 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(xsrf))
 				{
 					var prev = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-					if (prev != null && prev.Expires < DateTime.Now && prev.UserID == userid && !string.IsNullOrWhiteSpace(userid))
+					if (!Utility.IsNullOrExpired(prev) && prev.UserID == userid && !string.IsNullOrWhiteSpace(userid))
 						session = prev;
 				}
 			}
@@ -381,7 +380,7 @@ namespace Ceen.Security.Login
 				return false;
 
 			var lts = await LongTermStorage.GetLongTermLoginAsync(ltc.Series);
-			if (lts == null || lts.Expires < DateTime.Now)
+			if (Utility.IsNullOrExpired(lts))
 				return false;
 
 			if (!PBKDF2.ComparePassword(ltc.Token, lts.Token))

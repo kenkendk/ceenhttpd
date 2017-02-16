@@ -23,7 +23,7 @@ namespace Ceen.Security.Login
 				return SetXSRFError(context);
 
 			var session = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-			if (session == null || session.Expires > DateTime.Now)
+			if (Utility.IsNullOrExpired(session))
 				return SetXSRFError(context);
 
 			await RefreshSessionTokensAsync(context, session);

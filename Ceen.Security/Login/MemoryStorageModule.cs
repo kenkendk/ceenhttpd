@@ -107,7 +107,7 @@ namespace Ceen.Security.Login
 				foreach (var e in m_cookie_storage)
 				{
 					var ds = PrimitiveSerializer.Deserialize<SessionRecord>(e.Value);
-					if (ds.Expires <= DateTime.Now)
+					if (Utility.IsNullOrExpired(ds))
 					{
 						to_remove.Add(e.Key);
 						
@@ -124,7 +124,7 @@ namespace Ceen.Security.Login
 				foreach (var e in m_xsrf_storage)
 				{
 					var ds = PrimitiveSerializer.Deserialize<SessionRecord>(e.Value);
-					if (ds.Expires <= DateTime.Now)
+					if (Utility.IsNullOrExpired(ds))
 					{
 						to_remove.Add(e.Key);
 

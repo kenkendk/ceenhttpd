@@ -26,7 +26,7 @@ namespace Ceen.Security.Login
 			if (!string.IsNullOrWhiteSpace(xsrf))
 			{
 				session = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-				if (session == null || session.Expires < DateTime.Now)
+				if (Utility.IsNullOrExpired(session))
 					session = null;
 				else
 					await RefreshSessionTokensAsync(context, session);
@@ -35,7 +35,7 @@ namespace Ceen.Security.Login
 			if (session == null && !string.IsNullOrWhiteSpace(cookie))
 			{
 				session = await ShortTermStorage.GetSessionFromCookieAsync(cookie);
-				if (session == null || session.Expires < DateTime.Now)
+				if (Utility.IsNullOrExpired(session))
 					session = null;
 				else
 					await RefreshSessionTokensAsync(context, session);
