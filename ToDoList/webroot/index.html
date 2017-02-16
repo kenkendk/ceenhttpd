@@ -1,0 +1,63 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <title></title>
+    <meta value="Sample adapted from: http://bootsnipp.com/snippets/featured/todo-example" />
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet" />
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.10.2.min.js"></script>
+    <script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+
+    <script type="text/javascript" src="script/main.js"></script>
+    <link href="css/main.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container" ng-app="todoApp" ng-controller="mainController">
+        <div ng-hide="hasLoaded" class="center-screen">
+            <div class="loader"></div>
+            <div ng-show="(failuretext || '').trim().length > 0">{{failuretext}}</div>
+            <div ng-hide="(failuretext || '').trim().length > 0">Loading ...</div>
+
+        </div>
+
+        <div ng-cloak ng-show="hasLoaded" class="row">
+            <div class="col-md-6">
+                <div class="todolist not-done">
+                <h1>Todos</h1>
+                <form ng-submit="addItem()">
+                    <input type="text" class="form-control add-todo" ng-model="newtext" placeholder="Add todo" />
+                    <button ng-click="addItem()" class="btn btn-success {{(newtext || '').trim().length == 0 ? 'disabled' : ''}}">Add new item</button>
+                </form>
+                        
+                <hr>
+                
+                <ul ng-repeat="item in items" class="list-unstyled">
+                    <li class="ui-state-default">
+                        <div class="checkbox">
+                            <label class="{{item.completed ? 'completed' : ''}}">
+                                <input type="checkbox" value="" ng-model="item.completed" />{{item.text}}</label>
+
+                            <button ng-click="remove(item)" class="remove-item btn btn-default btn-xs pull-right"><span class="glyphicon glyphicon-remove"></span></button>                        
+                        </div>
+
+                    </li>
+                </ul>
+                <div class="todo-footer">
+                    <strong><span class="count-todos">{{itemsleft}}</span></strong> Items Left
+                    <br />
+
+                    <button ng-click="allAsDone()" class="btn btn-success {{itemsleft == 0 ? 'disabled' : ''}}">Mark all as done</button>
+
+                    <button ng-click="removeAllCompleted()" class="btn btn-warning {{items.length == itemsleft ? 'disabled' : ''}}">Remove all completed</button>
+
+
+                    <span ng-show="dirtydata" class="glyphicon glyphicon-refresh spin pull-right status-marker"></span>
+                    <span ng-show="!dirtydata" class="glyphicon glyphicon-floppy-saved pull-right status-marker"></span>
+
+                    <div class="pull-right btn-danger status-marker failure-text" ng-show="(failuretext || '').trim().length > 0">{{failuretext}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+  </body>
+</html>

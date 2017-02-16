@@ -1,0 +1,59 @@
+﻿isolatedappdomain false
+watchconfigfile true
+
+httpport %LISTEN_PORT%
+httpaddress any
+
+logger Ceen.Httpd.Logging.Log4netCLFLogger
+
+# Set up login
+module Ceen.Security.Login.LoginSettingsModule
+set XSRFErrorStatusCode 403
+set XSRFErrorStatusMessage "Missing XSRF token"
+set XSRFErrorRedirectUrl ""
+
+# Use a custom storage module that ensures we have a demo user
+module ToDoList.DemoStorageModule
+
+# Set up a login handler
+handler "/api/login" Ceen.Security.Login.LoginHandler
+set LoginSuccessStatusCode 302
+set LoginSuccessStatusMessage "Found"
+set LoginSuccessRedirectUrl "/"
+
+set LoginErrorStatusCode 302
+set LoginErrorStatusMessage "Found"
+set LoginErrorRedirectUrl "/login?loginfailed"
+
+# Since this is done via form POST we disable XSRF here
+set RequireXSRFToken false
+
+# Require a valid user for all API requests
+# but place it AFTER the login, so we can call
+# login without being logged in
+handler "/api/*" Ceen.Security.Login.LoginRequiredHandler
+
+# Require a valid user for all DEBUG requests
+# but disable XSRF so we can test it more easily
+handler "/debug/*" Ceen.Security.Login.LoginRequiredHandler
+set CheckXSRFToken false
+
+# Help the user by redirecting from the index page
+# to the login page
+handler "/index.html" Ceen.Security.Login.LoginRequiredHandler
+set CheckXSRFToken false
+set LoginErrorStatusCode 302
+set LoginErrorStatusMessage "Found"
+set LoginErrorRedirectUrl "/login"
+
+# Scan the assembly and set up the API based on that
+route ToDoList
+
+# Set the XSRF token on all HTML requests
+handler "/*.html" Ceen.Security.Login.XSRFTokenGeneratorHandler
+
+# Add a logout option
+handler "/logout" Ceen.Security.Login.LogoutHandler
+
+# Then give the root folder contents
+serve "/" "%WEBROOT%"

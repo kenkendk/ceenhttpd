@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceen.Common", "Ceen.Common\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceen.Security", "Ceen.Security\Ceen.Security.csproj", "{D5A92F56-9881-415C-B9D3-71833EE0DF65}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{83C5E8E3-2BAD-4512-85DD-923076AA9CB3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToDoList", "ToDoList\ToDoList.csproj", "{1A4BF2A4-743C-4311-B7D0-E589B3F55D48}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,8 +47,15 @@ Global
 		{D5A92F56-9881-415C-B9D3-71833EE0DF65}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5A92F56-9881-415C-B9D3-71833EE0DF65}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5A92F56-9881-415C-B9D3-71833EE0DF65}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		version = 0.9.2
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48} = {83C5E8E3-2BAD-4512-85DD-923076AA9CB3}
 	EndGlobalSection
 EndGlobal
