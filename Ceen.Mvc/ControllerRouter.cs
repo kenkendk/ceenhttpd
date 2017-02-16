@@ -139,7 +139,7 @@ namespace Ceen.Mvc
 		{
 			var all = self.GetInterfaces().AsEnumerable();
 			if (basetypefilter != null)
-				all = all.Where(x => typeof(IControllerPrefix).IsAssignableFrom(x));
+				all = all.Where(x => basetypefilter.IsAssignableFrom(x));
 			
 			return all.Except(all.SelectMany(t => t.GetInterfaces()));
 		}
@@ -171,8 +171,11 @@ namespace Ceen.Mvc
 				var parents = cur.GetParentInterfaces(basetypefilter);
 
 				if (parents.Count() > 1)
-					throw new Exception($"Error building prefix map, the type {cur.FullName} has multiple parents");
+					throw new Exception($"Error building prefix map, the type {cur.FullName} (from {self.FullName} has multiple parents");
 				cur = parents.FirstOrDefault();
+
+				if (cur == basetypefilter)
+					basetypefilter = null;
 			}
 		}
 
