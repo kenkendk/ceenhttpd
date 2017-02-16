@@ -52,6 +52,10 @@
       <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
       <Name>Ceen.Mvc</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Ceen.Security\Ceen.Security.csproj">
+      <Project>{D5A92F56-9881-415C-B9D3-71833EE0DF65}</Project>
+      <Name>Ceen.Security</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="example_config.txt">
