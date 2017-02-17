@@ -194,7 +194,7 @@ namespace ToDoList
 		[HttpPost]
 		[Name("index")]
 		/// <summary>
-		/// Handles a PUT request, using the &quot;index&quot; name,
+		/// Handles a POST request, using the &quot;index&quot; name,
 		/// because we want two different functions to handle
 		/// PUT, POST and GET, and they cannot all be called &quot;Index&quot;.
 		/// </summary>
