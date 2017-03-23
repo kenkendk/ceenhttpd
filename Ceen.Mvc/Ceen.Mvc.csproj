@@ -41,6 +41,7 @@
     <Compile Include="ControllerRouterConfig.cs" />
     <Compile Include="LookupEntries.cs" />
     <Compile Include="RouteParser.cs" />
+    <Compile Include="RestApiHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
