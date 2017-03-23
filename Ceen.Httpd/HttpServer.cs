@@ -465,7 +465,10 @@ namespace Ceen.Httpd
 						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
 
 						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
-						ThreadPool.QueueUserWorkItem(x => spawner(client, client.Client.RemoteEndPoint, newtaskid, rc));
+
+						// Read the endpoint here to avoid crashes when invoking the spawner
+						var ep = client.Client.RemoteEndPoint;
+						ThreadPool.QueueUserWorkItem(x => spawner(client, ep, newtaskid, rc));
 					}
 					catch(Exception ex)
 					{
