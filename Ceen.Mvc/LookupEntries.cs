@@ -119,8 +119,9 @@ namespace Ceen.Mvc
 					{
 						source = par_attr.Source;
 						optional = !par_attr.Required;
+                        if (!string.IsNullOrWhiteSpace(par_attr.Name))
+                            name = par_attr.Name;
 					}
-
 
 					var pe = new ParameterEntry(par, name, source, !optional, i);
 

@@ -72,6 +72,11 @@ namespace Ceen.Mvc
 		/// </summary>
 		/// <value>The source.</value>
 		public ParameterSource Source { get; set; }
+        /// <summary>
+        /// Gets or sets the name of the entry, defaults to the name or the method argument
+        /// </summary>
+        /// <value>The name.</value>
+        public string Name { get; set; }
 		/// <summary>
 		/// Gets or sets a value indicating whether this argument is required.
 		/// </summary>
