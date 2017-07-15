@@ -91,12 +91,14 @@
 
 # Number of seconds to allow a request to linger
 #RequestIdleTimeoutSeconds 5
-# Number of seconds to wait for the client to finish the header
+# Maximum number of seconds to wait for the client to finish the header
 #RequestHeaderReadTimeoutSeconds 10
 # Maximum HTTP requests from a client over the same TCP connection
 #KeepAliveMaxRequests 30
 # Maximum number of seconds between each HTTP request on the same connection
-#KeepAliveTimeoutSeconds "10"
+#KeepAliveTimeoutSeconds 10
+# Maximum number of seconds for processing a request
+#MaxProcessingTimeSeconds 30
 
 # Require that the client has a valid SSL certificate
 #SSLRequireClientCert false

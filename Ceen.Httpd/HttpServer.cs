@@ -582,7 +582,7 @@ namespace Ceen.Httpd
 						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, client);
 
 						// Log a message indicating that we failed setting up SSL
-						await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None), null, storage), aex, DateTime.Now, new TimeSpan());
+                        await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
 
 						return;
 					}
@@ -634,18 +634,24 @@ namespace Ceen.Httpd
 						bs.ResetReadLength(config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
-							cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol),
+                            cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol, () => client.Connected),
 							resp = new HttpResponse(stream, config),
 							storage
 						);
 
-						var timeouttask = Task.Delay(TimeSpan.FromSeconds(keepingalive ? config.KeepAliveTimeoutSeconds : config.RequestIdleTimeoutSeconds));
+                        var timeoutcontroltask = new TaskCompletionSource<bool>();
 						var idletime = TimeSpan.FromSeconds(config.RequestHeaderReadTimeoutSeconds);
+
+						// Set up timeout for processing
+						cur.SetProcessingTimeout(TimeSpan.FromSeconds(config.MaxProcessingTimeSeconds));
 
 						if (config.DebugLogHandler != null) config.DebugLogHandler("Parsing headers", logtaskid, endpoint);
 						try
 						{
-							await cur.Parse(bs, config, idletime, timeouttask, controller.StopTask);
+                            var ct = new CancellationTokenSource();
+                            ct.CancelAfter(TimeSpan.FromSeconds(keepingalive ? config.KeepAliveTimeoutSeconds : config.RequestIdleTimeoutSeconds));
+                            using (ct.Token.Register(() => timeoutcontroltask.TrySetCanceled(), useSynchronizationContext: false))
+                                await cur.Parse(bs, config, idletime, timeoutcontroltask.Task, controller.StopTask);
 						}
 						catch (EmptyStreamClosedException)
 						{
@@ -692,22 +698,35 @@ namespace Ceen.Httpd
 
 						try
 						{
-							// TODO: Set a timer on the processing as well?
-							// TODO: Use a cancellation token?
-							// TODO: Abort processing if the client closes?
+                            // Trigger the streams to stop reading/writing data when the timeout happens
+                            using (cur.TimeoutCancellationToken.Register(() => timeoutcontroltask.TrySetCanceled(), useSynchronizationContext: false))
+                            {
+                                if (cur.TimeoutCancellationToken.IsCancellationRequested)
+                                {
+                                    if (timeoutcontroltask.Task.Status == TaskStatus.Canceled)
+                                    {
+                                        throw new TimeoutException();
+                                    }
+                                    else
+                                    {
+                                        timeoutcontroltask.TrySetCanceled();
+                                        throw new OperationCanceledException();
+                                    }
+                                }
 
-							// Process the request
-							do
-							{
-								cur.ClearHandlerStack();
-								var target = resp.ClearInternalRedirect();
-								if (target != null)
-									cur.Path = target;
+                                // Process the request
+                                do
+                                {
+                                    cur.ClearHandlerStack();
+                                    var target = resp.ClearInternalRedirect();
+                                    if (target != null)
+                                        cur.Path = target;
 
-								if (!await config.Router.Process(context))
-									throw new HttpException(Ceen.HttpStatusCode.NotFound);
-							}
-							while (resp.IsRedirectingInternally);
+                                    if (!await config.Router.Process(context))
+                                        throw new HttpException(Ceen.HttpStatusCode.NotFound);
+                                }
+                                while (resp.IsRedirectingInternally);
+                            }
 						}
 						catch (HttpException hex)
 						{

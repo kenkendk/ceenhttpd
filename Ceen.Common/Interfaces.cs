@@ -6,6 +6,7 @@ using System.Net;
 using System.Text;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
+using System.Threading;
 
 namespace Ceen
 {
@@ -226,6 +227,22 @@ namespace Ceen
 		/// <param name="handler">The type to check for.</param>
 		/// <param name="allowderived">A flag indicating if the type match must be exact, or if derived types are accepted</param>
 		void RequireHandler(Type handler, bool allowderived = true);
+
+		/// <summary>
+		/// Gets the request cancellation token that is triggered if the request times out
+		/// </summary>
+		CancellationToken TimeoutCancellationToken { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this <see cref="T:Ceen.IHttpRequest"/> is connected.
+        /// </summary>
+        /// <value><c>true</c> if is connected; otherwise, <c>false</c>.</value>
+        bool IsConnected { get; }
+
+        /// <summary>
+        /// Gets the time the request processing started
+        /// </summary>
+        DateTime RequestProcessingStarted { get; }
 	}
 
 	/// <summary>

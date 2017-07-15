@@ -79,6 +79,11 @@ namespace Ceen.Httpd
 		/// The keep-alive timeout in seconds
 		/// </summary>
 		public int KeepAliveTimeoutSeconds { get; set; } = 10;
+        /// <summary>
+        /// The maximum number of seconds a process may be running
+        /// </summary>
+        /// <value>The max processing time seconds.</value>
+        public int MaxProcessingTimeSeconds { get; set; } = 30;
 		/// <summary>
 		/// The router instance to use for handling requests
 		/// </summary>

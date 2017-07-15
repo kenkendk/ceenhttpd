@@ -111,6 +111,41 @@ namespace Ceen.Httpd
 		/// </summary>
 		public Stream Body { get; private set; }
 
+        /// <summary>
+        /// The cancellation token source
+        /// </summary>
+        private CancellationTokenSource m_cancelRequest;
+
+		/// <summary>
+		/// Gets the request cancellation token that is triggered if the request times out
+		/// </summary>
+        public CancellationToken TimeoutCancellationToken { get { return m_cancelRequest.Token; } }
+
+        /// <summary>
+        /// The method to call to obtain the remote client connected stated
+        /// </summary>
+        private Func<bool> m_connectedMethod;
+
+		/// <summary>
+		/// Gets a value indicating whether this <see cref="T:Ceen.IHttpRequest"/> is connected.
+		/// </summary>
+		/// <value><c>true</c> if is connected; otherwise, <c>false</c>.</value>
+        public bool IsConnected 
+        { 
+            get 
+            {
+                if (m_connectedMethod != null && !m_connectedMethod())
+                    return false;
+
+                return true;
+            }
+        }
+
+        /// <summary>
+		/// Gets the time the request processing started
+		/// </summary>
+        public DateTime RequestProcessingStarted { get; private set; }
+
 		/// <summary>
 		/// Gets the HTTP Content-Type header value
 		/// </summary>
@@ -146,8 +181,12 @@ namespace Ceen.Httpd
 		/// <param name="logtaskid">The logging ID for the task</param>
 		/// <param name="clientCert">The client SSL certificate.</param>
 		/// <param name="sslProtocol">The SSL protocol used</param>
-		public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol)
+        /// <param name="logrequestid">The ID of the request for logging purposes</param>
+        /// <param name="connected">The method providing the remote client connected state</param>
+        public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol, Func<bool> connected)
 		{
+            m_cancelRequest = new CancellationTokenSource();
+            m_connectedMethod = connected;
 			RemoteEndPoint = remoteEndpoint;
 			ClientCertificate = clientCert;
 			SslProtocol = sslProtocol;
@@ -204,7 +243,7 @@ namespace Ceen.Httpd
 
 				// Setup cookie collection automatically
 				if (string.Equals(components[0].Trim(), "cookie", StringComparison.OrdinalIgnoreCase))
-					foreach(var k in SplitHeaderLine((components[1] ?? string.Empty).Trim()))
+					foreach(var k in RequestUtility.SplitHeaderLine((components[1] ?? string.Empty).Trim()))
 						Cookies[k.Key] = Uri.UnescapeDataString(k.Value);
 
 				var key = components[0].Trim();
@@ -238,7 +277,7 @@ namespace Ceen.Httpd
 			{
 				if (this.ContentLength > config.MaxPostSize)
 					throw new HttpException(HttpStatusCode.PayloadTooLarge);
-				
+
 				var trail = new byte[2];
 				var parts = this.ContentType.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 				var bndpart = parts.Where(x => x.Trim().StartsWith("boundary", StringComparison.OrdinalIgnoreCase)).FirstOrDefault() ?? string.Empty;
@@ -292,54 +331,6 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Splits a header line into its key-value components
-		/// </summary>
-		/// <returns>The components.</returns>
-		/// <param name="line">The line to split.</param>
-		public virtual IEnumerable<KeyValuePair<string, string>> SplitHeaderLine(string line)
-		{
-			return (line ?? "").Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(x =>
-				{
-					var c = x.Split(new char[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries);
-					var value = (c.Skip(1).FirstOrDefault() ?? "").Trim();
-					if (value.StartsWith("\"") && value.EndsWith("\""))
-						value = value.Substring(1, value.Length - 2);
-					return new KeyValuePair<string, string>(c.First().Trim(), value);
-				});
-		}
-
-
-		/// <summary>
-		/// Gets a named component from a header line
-		/// </summary>
-		/// <returns>The header component or null.</returns>
-		/// <param name="line">The header line.</param>
-		/// <param name="key">The component to find.</param>
-		public virtual string GetHeaderComponent(string line, string key)
-		{
-			return
-				SplitHeaderLine(line)
-				.Where(x => string.Equals(x.Key,key, StringComparison.OrdinalIgnoreCase))
-				.Select(x => x.Value)
-				.FirstOrDefault();		
-		}
-
-		/// <summary>
-		/// Gets an encoding from a charset string
-		/// </summary>
-		/// <returns>The encoding for the charset.</returns>
-		/// <param name="charset">The charset string.</param>
-		public virtual System.Text.Encoding GetEncodingForCharset(string charset)
-		{
-			if (string.Equals("utf-8", charset, StringComparison.OrdinalIgnoreCase))
-				return System.Text.Encoding.UTF8;
-			else if (string.Equals("ascii", charset, StringComparison.OrdinalIgnoreCase))
-				return System.Text.Encoding.ASCII;
-			else
-				return System.Text.Encoding.GetEncoding(charset);
-		}
-
-		/// <summary>
 		/// Parses url encoded form data
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
@@ -369,25 +360,25 @@ namespace Ceen.Httpd
 
 				this.Body = new LimitedBodyStream(reader, 0, idletime, timeouttask, stoptask);
 			}
-			else if ((this.ContentType ?? "").StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase) && this.ContentLength > 0 && this.ContentLength < config.MaxUrlEncodedFormSize && config.AutoParseMultipartFormData)
+            else if (RequestUtility.IsMultipartRequest(this.ContentType) && this.ContentLength > 0 && this.ContentLength < config.MaxUrlEncodedFormSize && config.AutoParseMultipartFormData)
 			{
 				await ParseMultiPart(
 					async (headers, stream) =>
 					{
-						var dispositionItems = SplitHeaderLine(headers["Content-Disposition"]);
+						var dispositionItems = RequestUtility.SplitHeaderLine(headers["Content-Disposition"]);
 						if (!string.Equals(dispositionItems.FirstOrDefault().Key, "form-data", StringComparison.OrdinalIgnoreCase))
 							throw new HttpException(HttpStatusCode.BadRequest);
 
-						var name = GetHeaderComponent(headers["Content-Disposition"], "name");
+						var name = RequestUtility.GetHeaderComponent(headers["Content-Disposition"], "name");
 						if (string.IsNullOrWhiteSpace("name"))
 							throw new HttpException(HttpStatusCode.BadRequest);
 						
-						var filename = GetHeaderComponent(headers["Content-Disposition"], "filename");
-						var charset = GetHeaderComponent(headers["Content-Type"], "charset") ?? "ascii";
+						var filename = RequestUtility.GetHeaderComponent(headers["Content-Disposition"], "filename");
+						var charset = RequestUtility.GetHeaderComponent(headers["Content-Type"], "charset") ?? "ascii";
 
 						if (string.IsNullOrWhiteSpace(filename))
 						{
-							using (var sr = new StreamReader(stream, GetEncodingForCharset(charset)))
+							using (var sr = new StreamReader(stream, RequestUtility.GetEncodingForCharset(charset)))
 							{
 								var rtask = sr.ReadToEndAsync();
 								var rt = await Task.WhenAny(Task.Delay(idletime), timeouttask, stoptask, rtask);
@@ -541,6 +532,18 @@ namespace Ceen.Httpd
 		public void RequireHandler(Type handler, bool allowderived = true)
 		{
 			RequireHandler(new[] { new RequireHandlerAttribute(handler) { AllowDerived = allowderived } });
+		}
+
+        /// <summary>
+        /// Sets the processing timeout value.
+        /// </summary>
+        /// <param name="maxtime">The maximum processing time.</param>
+        internal void SetProcessingTimeout(TimeSpan maxtime)
+		{
+            RequestProcessingStarted = DateTime.Now;
+
+			if (maxtime.Ticks > 0)
+				m_cancelRequest.CancelAfter(maxtime);
 		}
 	}
 }
