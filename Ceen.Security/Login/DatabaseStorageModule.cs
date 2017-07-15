@@ -1,5 +1,6 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -248,14 +249,15 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <param name="tablename">The name of the table to create.</param>
 		/// <param name="recordtype">The datatype to store in the table.</param>
+		/// <param name="unique">The list of unique columns.</param>
 		protected virtual void CreateTable(string tablename, Type recordtype, params string[] unique)
 		{
-			var fields = 
+			var fields =
 				string.Join(", ",
 					recordtype
 					.GetProperties()
 					.Select(x => string.Format(@"""{0}"" {1}", x.Name, GetSqlColumnType(x)))
-			   	);
+				);
 
 			var constr =
 				(unique == null || unique.Length == 0)
@@ -289,31 +291,18 @@ namespace Ceen.Security.Login
 		}
 
 		/// <summary>
-		/// Fixes a deficiency in the database mapping,
-		///  and returns string null values as null
-		/// </summary>
-		/// <returns>The string representatio.</returns>
-		/// <param name="rd">The reader to use.</param>
-		/// <param name="index">The index to read the string from.</param>
-		protected string GetAsString(System.Data.IDataReader rd, int index)
-		{
-			var val = rd.GetValue(index);
-
-			if (val == null || val == DBNull.Value)
-				return null;
-			else
-				return (string)val;
-		}
-
-		/// <summary>
 		/// Helper method for creating a command and initializing the parameters
 		/// </summary>
 		/// <returns>The command.</returns>
 		/// <param name="commandtext">The commandtext.</param>
-		protected virtual System.Data.IDbCommand SetupCommand(string commandtext)
+		protected IDbCommand SetupCommand(string commandtext, IDbTransaction transaction = null)
 		{
+			if (string.IsNullOrWhiteSpace(commandtext))
+				throw new ArgumentNullException(nameof(commandtext));
+
 			var cmd = m_connection.CreateCommand();
 			cmd.CommandText = commandtext;
+			cmd.Transaction = transaction;
 			AddParameters(cmd, commandtext.Count(x => x == '?'));
 			return cmd;
 		}
@@ -323,9 +312,16 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <param name="cmd">The command to add the parameters to.</param>
 		/// <param name="count">The number of parameters to add.</param>
-		protected static void AddParameters(System.Data.IDbCommand cmd, int count)
+		public static void AddParameters(IDbCommand cmd, int count)
 		{
-			for (var i = 0; i < count; i++)
+			if (cmd == null)
+				throw new ArgumentNullException(nameof(cmd));
+			if (count < 0)
+				throw new ArgumentOutOfRangeException(nameof(count));
+
+			if (cmd.Parameters.Count > count)
+				cmd.Parameters.Clear();
+			for (var i = cmd.Parameters.Count; i < count; i++)
 				cmd.Parameters.Add(cmd.CreateParameter());
 		}
 
@@ -334,31 +330,65 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <param name="cmd">The command to set parameter values on.</param>
 		/// <param name="values">The values to set.</param>
-		protected static void SetParameterValues(System.Data.IDbCommand cmd, params object[] values)
+		public static void SetParameterValues(IDbCommand cmd, params object[] values)
 		{
+			if (cmd == null)
+				throw new ArgumentNullException(nameof(cmd));
+
+			values = values ?? new object[0];
+
+			AddParameters(cmd, values.Length);
 			for (var i = 0; i < values.Length; i++)
-				((System.Data.IDbDataParameter)cmd.Parameters[i]).Value = values[i];
+				((IDbDataParameter)cmd.Parameters[i]).Value = values[i];
 		}
+
+		/// <summary>
+		/// Fixes a deficiency in the database mapping,
+		///  and returns string null values as null
+		/// </summary>
+		/// <returns>The string representation.</returns>
+		/// <param name="rd">The reader to use.</param>
+		/// <param name="index">The index to read the string from.</param>
+		public static string GetAsString(IDataReader rd, int index)
+		{
+			var val = rd.GetValue(index);
+
+			if (val == null || val == DBNull.Value)
+				return null;
+			else
+				return (string)val;
+		}
+
+        /// <summary>
+        /// Executes a command while being locked
+        /// </summary>
+        /// <returns>The command async.</returns>
+        /// <param name="command">Command.</param>
+        /// <param name="values">Values.</param>
+        public virtual Task ExecuteCommandAsync(IDbCommand command, params object[] values)
+        {
+            return m_lock.LockedAsync(() => {
+                EnsureConnected();
+                SetParameterValues(command, values);
+                command.ExecuteNonQuery();
+            });
+        }
+
 
 		/// <summary>
 		/// Adds a new session record
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to add.</param>
-		public virtual async Task AddSessionAsync(SessionRecord record)
+		public virtual Task AddSessionAsync(SessionRecord record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_addSessionCommand,
-					record.UserID,
-					record.Cookie,
-					record.XSRFToken,
-					record.Expires
-				);
-				m_addSessionCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+                m_addSessionCommand,
+				record.UserID,
+				record.Cookie,
+				record.XSRFToken,
+				record.Expires
+			);
 		}
 
 		/// <summary>
@@ -366,19 +396,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to drop.</param>
-		public virtual async Task DropSessionAsync(SessionRecord record)
+		public virtual Task DropSessionAsync(SessionRecord record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_dropSessionCommand,
-					record.UserID,
-					record.Cookie,
-					record.XSRFToken
-				);
-				m_dropSessionCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_dropSessionCommand,
+				record.UserID,
+				record.Cookie,
+				record.XSRFToken
+			);
 		}
 
 		/// <summary>
@@ -440,20 +465,15 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to update.</param>
-		public virtual async Task UpdateSessionExpirationAsync(SessionRecord record)
+		public virtual Task UpdateSessionExpirationAsync(SessionRecord record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_updateSessionCommand,
-					record.Expires,
-					record.UserID,
-					record.Cookie,
-					record.XSRFToken
-				);
-				m_updateSessionCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_updateSessionCommand,
+				record.Expires,
+				record.UserID,
+				record.Cookie,
+				record.XSRFToken
+			);
 		}
 
 		/// <summary>
@@ -461,22 +481,16 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to add.</param>
-		public virtual async Task AddOrUpdateLongTermLoginAsync(LongTermToken record)
+		public virtual Task AddOrUpdateLongTermLoginAsync(LongTermToken record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_addLongTermLoginCommand,
-					record.Series,
-
-					record.UserID,
-					record.Series,
-					record.Token,
-					record.Expires
-				);
-				m_addLongTermLoginCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_addLongTermLoginCommand,
+				record.Series,
+				record.UserID,
+				record.Series,
+				record.Token,
+				record.Expires
+			);
 		}
 
 		/// <summary>
@@ -485,18 +499,13 @@ namespace Ceen.Security.Login
 		/// <returns>An awaitable task.</returns>
 		/// <param name="userid">The user for whom the long term logins must be dropped.</param>
 		/// <param name="series">The series identifier for the login token that caused the issuance.</param>
-		public virtual async Task DropAllLongTermLoginsAsync(string userid, string series)
+		public virtual Task DropAllLongTermLoginsAsync(string userid, string series)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_dropAllLongTermLoginCommand,
-					userid,
-					series
-				);
-				m_dropAllLongTermLoginCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_dropAllLongTermLoginCommand,
+				userid,
+				series
+			);
 		}
 
 		/// <summary>
@@ -504,19 +513,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">Record.</param>
-		public virtual async Task DropLongTermLoginAsync(LongTermToken record)
+		public virtual  Task DropLongTermLoginAsync(LongTermToken record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_dropLongTermLoginCommand,
-					record.UserID,
-					record.Series,
-					record.Token
-				);
-				m_dropLongTermLoginCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_dropLongTermLoginCommand,
+				record.UserID,
+				record.Series,
+				record.Token
+			);
 		}
 
 		/// <summary>
@@ -550,16 +554,15 @@ namespace Ceen.Security.Login
 		/// Called periodically to expire old items
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
-		public virtual async Task ExpireOldItemsAsync()
+		public virtual Task ExpireOldItemsAsync()
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(m_dropExpiredSessionsCommand, DateTime.Now);
-				m_dropExpiredSessionsCommand.ExecuteNonQuery();
-				SetParameterValues(m_dropExpiredLongTermCommand, DateTime.Now);
-				m_dropExpiredLongTermCommand.ExecuteNonQuery();
-			}
+            return m_lock.LockedAsync(() =>
+            {
+                SetParameterValues(m_dropExpiredSessionsCommand, DateTime.Now);
+                m_dropExpiredSessionsCommand.ExecuteNonQuery();
+                SetParameterValues(m_dropExpiredLongTermCommand, DateTime.Now);
+                m_dropExpiredLongTermCommand.ExecuteNonQuery();
+            });
 		}
 
 		/// <summary>
@@ -618,19 +621,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to add.</param>
-		public virtual async Task AddLoginEntryAsync(LoginEntry record)
+		public virtual Task AddLoginEntryAsync(LoginEntry record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_addLoginEntryCommand,
-					record.UserID,
-					record.Username,
-					record.Token
-				);
-				m_addLoginEntryCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_addLoginEntryCommand,
+				record.UserID,
+				record.Username,
+				record.Token
+			);
 		}
 
 		/// <summary>
@@ -638,19 +636,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to drop.</param>
-		public virtual async Task DropLoginEntryAsync(LoginEntry record)
+		public virtual Task DropLoginEntryAsync(LoginEntry record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_dropLoginEntryCommand,
-					record.UserID,
-					record.Username,
-					record.Token
-				);
-				m_dropLoginEntryCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_dropLoginEntryCommand,
+				record.UserID,
+				record.Username,
+				record.Token
+			);
 		}
 
 		/// <summary>
@@ -659,18 +652,13 @@ namespace Ceen.Security.Login
 		/// <returns>An awaitable task.</returns>
 		/// <param name="userid">The user ID.</param>
 		/// <param name="username">The user name.</param>
-		public virtual async Task DropAllLoginEntriesAsync(string userid, string username)
+		public virtual Task DropAllLoginEntriesAsync(string userid, string username)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_dropAllLoginEntryCommand,
-					userid,
-					username
-				);
-				m_dropAllLoginEntryCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_dropAllLoginEntryCommand,
+				userid,
+				username
+			);
 		}
 
 		/// <summary>
@@ -678,19 +666,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="record">The record to update.</param>
-		public virtual async Task UpdateLoginTokenAsync(LoginEntry record)
+		public virtual Task UpdateLoginTokenAsync(LoginEntry record)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-				SetParameterValues(
-					m_updateLoginEntryCommand,
-					record.Token,
-					record.UserID,
-					record.Username
-				);
-				m_updateLoginEntryCommand.ExecuteNonQuery();
-			}
+            return ExecuteCommandAsync(
+				m_updateLoginEntryCommand,
+				record.Token,
+				record.UserID,
+				record.Username
+			);
 		}
 	}
 }
