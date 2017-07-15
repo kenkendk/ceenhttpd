@@ -568,26 +568,36 @@ namespace Ceen.Mvc
 			
 			// Apply each argument in turn
 			var values = new object[method.ArgumentCount];
+            var hasreadbody = false;
 
 			for (var ix = 0; ix < values.Length; ix++)
 			{
 				var e = method.Parameters[ix];
 				string val;
+                IMultipartItem file;
 
-				if (typeof(IHttpContext).IsAssignableFrom(e.Parameter.ParameterType))
-					values[ix] = context;
-				else if (typeof(IHttpRequest).IsAssignableFrom(e.Parameter.ParameterType))
-					values[ix] = context.Request;
-				else if (typeof(IHttpResponse).IsAssignableFrom(e.Parameter.ParameterType))
-					values[ix] = context.Response;
-				else if (e.Source.HasFlag(ParameterSource.Url) && urlmatch != null && urlmatch.TryGetValue(e.Name, out val))
-					ApplyArgument(method.Method, e, val, values);
-				else if (e.Source.HasFlag(ParameterSource.Header) && context.Request.Headers.TryGetValue(e.Name, out val))
-					ApplyArgument(method.Method, e, val, values);
-				else if (e.Source.HasFlag(ParameterSource.Form) && context.Request.Form.TryGetValue(e.Name, out val))
-					ApplyArgument(method.Method, e, val, values);
-				else if (e.Source.HasFlag(ParameterSource.Query) && context.Request.QueryString.TryGetValue(e.Name, out val))
-					ApplyArgument(method.Method, e, val, values);
+                if (typeof(IHttpContext).IsAssignableFrom(e.Parameter.ParameterType))
+                    values[ix] = context;
+                else if (typeof(IHttpRequest).IsAssignableFrom(e.Parameter.ParameterType))
+                    values[ix] = context.Request;
+                else if (typeof(IHttpResponse).IsAssignableFrom(e.Parameter.ParameterType))
+                    values[ix] = context.Response;
+                else if (e.Source.HasFlag(ParameterSource.Url) && urlmatch != null && urlmatch.TryGetValue(e.Name, out val))
+                    ApplyArgument(method.Method, e, val, values);
+                else if (e.Source.HasFlag(ParameterSource.Header) && context.Request.Headers.TryGetValue(e.Name, out val))
+                    ApplyArgument(method.Method, e, val, values);
+                else if (e.Source.HasFlag(ParameterSource.Form) && context.Request.Form.TryGetValue(e.Name, out val))
+                    ApplyArgument(method.Method, e, val, values);
+                else if (e.Source.HasFlag(ParameterSource.Form) && ((file = context.Request.Files.FirstOrDefault(x => string.Equals(x.Name, e.Name, StringComparison.OrdinalIgnoreCase))) != null))
+                    ApplyArgument(method.Method, e, await RequestUtility.ReadAllAsStringAsync(file.Data, RequestUtility.GetEncodingForContentType(file.Headers["Content-Type"]), context.Request.TimeoutCancellationToken), values);
+                else if (e.Source.HasFlag(ParameterSource.Query) && context.Request.QueryString.TryGetValue(e.Name, out val))
+                    ApplyArgument(method.Method, e, val, values);
+                else if (e.Source.HasFlag(ParameterSource.Body) && !hasreadbody && RequestUtility.IsJsonRequest(context.Request.ContentType))
+                {
+                    // We can have at most one body param
+                    hasreadbody = true;
+                    ApplyArgument(method.Method, e, await RequestUtility.ReadAllAsStringAsync(context.Request.Body, RequestUtility.GetEncodingForContentType(context.Request.ContentType), context.Request.TimeoutCancellationToken), values);
+                }
 				else if (e.Required)
 					throw new HttpException(HttpStatusCode.BadRequest, $"Missing mandatory parameter {e.Name}");
 				else if (e.Parameter.HasDefaultValue)
@@ -624,7 +634,10 @@ namespace Ceen.Mvc
 			var argtype = method.GetParameters()[entry.ArgumentIndex].ParameterType;
 			try
 			{
-				values[entry.ArgumentIndex] = Convert.ChangeType(value, argtype);
+                if (argtype.IsPrimitive || argtype.IsEnum || argtype == typeof(string))
+                    values[entry.ArgumentIndex] = Convert.ChangeType(value, argtype);
+                else
+                    Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
 			}
 			catch (Exception)
 			{

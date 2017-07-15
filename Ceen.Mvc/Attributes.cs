@@ -59,9 +59,10 @@ namespace Ceen.Mvc
 		Query = 0x2,
 		Form = 0x4,
 		Header = 0x8,
-		Default = Url | Query | Form,
+        Body = 0xF,
+		Default = Url | Query | Form | Body,
 		Request = Query | Form,
-		Any = Url | Query | Form | Request | Header
+		Any = Url | Query | Form | Request | Header | Body
 	}
 
 	[AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
