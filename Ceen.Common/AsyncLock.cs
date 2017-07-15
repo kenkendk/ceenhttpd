@@ -7,6 +7,8 @@ namespace Ceen
 {
 	// Implementation based on: http://blogs.msdn.com/b/pfxteam/archive/2012/02/12/10266988.aspx
 
+	// Added support for cancellation tokens
+
 	/// <summary>
 	/// Implementation of a Semaphore that is usable with await statements
 	/// </summary>
@@ -15,11 +17,11 @@ namespace Ceen
 		/// <summary>
 		/// A task signaling completion
 		/// </summary>
-		private readonly static Task s_completed = Task.FromResult(true);
+		private readonly static Task m_completed = Task.FromResult(true);
 		/// <summary>
 		/// The list of waiters
 		/// </summary>
-		private readonly Queue<TaskCompletionSource<bool>> m_waiters = new Queue<TaskCompletionSource<bool>>();
+		private readonly Queue<KeyValuePair<TaskCompletionSource<bool>, IDisposable>> m_waiters = new Queue<KeyValuePair<TaskCompletionSource<bool>, IDisposable>>();
 		/// <summary>
 		/// The additional number of release calls
 		/// </summary>
@@ -40,20 +42,35 @@ namespace Ceen
 		/// <summary>
 		/// Waits for the semaphire to be released
 		/// </summary>
+		/// <param name="token">The cancellation token</param>
 		/// <returns>The awaitable task.</returns>
-		public Task WaitAsync()
+		public Task WaitAsync(CancellationToken token = default(CancellationToken))
 		{
+			if (token.IsCancellationRequested)
+			{
+				var tcs = new TaskCompletionSource<bool>();
+				tcs.SetCanceled();
+				return tcs.Task;
+			}
+
 			lock (m_waiters)
 			{
 				if (m_currentCount > 0)
 				{
 					--m_currentCount;
-					return s_completed;
+					return m_completed;
 				}
 				else
 				{
 					var waiter = new TaskCompletionSource<bool>();
-					m_waiters.Enqueue(waiter);
+
+					// Make sure the waiter returns asap on cancellation
+					var registrar =
+						token.CanBeCanceled
+							 ? token.Register(() => waiter.TrySetCanceled())
+							 : (IDisposable)null;
+
+					m_waiters.Enqueue(new KeyValuePair<TaskCompletionSource<bool>, IDisposable>(waiter, registrar));
 					return waiter.Task;
 				}
 			}
@@ -67,9 +84,22 @@ namespace Ceen
 			TaskCompletionSource<bool> result = null;
 			lock (m_waiters)
 			{
-				if (m_waiters.Count > 0)
-					result = m_waiters.Dequeue();
-				else
+				while (m_waiters.Count > 0)
+				{
+					var res = m_waiters.Dequeue();
+
+					// Clear the cancellation event to avoid races
+					if (res.Value != null)
+						res.Value.Dispose();
+
+					if (!res.Key.Task.IsCanceled && !res.Key.Task.IsFaulted)
+					{
+						result = res.Key;
+						break;
+					}
+				}
+
+				if (result == null)
 					++m_currentCount;
 			}
 			if (result != null)
@@ -103,19 +133,64 @@ namespace Ceen
 			m_releaser = Task.FromResult(new Releaser(this));
 		}
 
+        /// <summary>
+        /// Runs an action with the lock active
+        /// </summary>
+        /// <returns>The lock async.</returns>
+        /// <param name="action">The action to execute.</param>
+        /// <param name="token">The cancellation token.</param>
+        public async Task LockedAsync(Action action, CancellationToken token = default(CancellationToken))
+        {
+            using (await LockAsync(token))
+                action();
+        }
+
+		/// <summary>
+		/// Runs an action with the lock active
+		/// </summary>
+		/// <returns>The lock async.</returns>
+		/// <param name="action">The action to execute.</param>
+		/// <param name="token">The cancellation token.</param>
+		public async Task LockedAsync(Func<Task> action, CancellationToken token = default(CancellationToken))
+		{
+			using (await LockAsync(token))
+				await action();
+		}
+
+		/// <summary>
+		/// Runs an action with the lock active
+		/// </summary>
+		/// <returns>The lock async.</returns>
+		/// <param name="action">The action to execute.</param>
+		/// <param name="token">The cancellation token.</param>
+        /// <typeparam name="T">The type of the return data</typeparam>
+		public async Task<T> LockedAsync<T>(Func<Task<T>> action, CancellationToken token = default(CancellationToken))
+		{
+			using (await LockAsync(token))
+				return await action();
+		}
+
 		/// <summary>
 		/// Aquires the exclusive lock, and awaits until it is available
 		/// </summary>
+		/// <param name="token">The cancellation token</param>
 		/// <returns>The async.</returns>
-		public Task<Releaser> LockAsync()
+		public Task<Releaser> LockAsync(CancellationToken token = default(CancellationToken))
 		{
-			var wait = m_semaphore.WaitAsync();
+			var wait = m_semaphore.WaitAsync(token);
 
 			return wait.IsCompleted ?
 				m_releaser :
-				wait.ContinueWith((_, state) => new Releaser((AsyncLock)state),
-					this, CancellationToken.None,
-					TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+				wait.ContinueWith(
+						   (_, state) => new Releaser((AsyncLock)state),
+						   this,
+
+						   // The token is signalling the wait task, so we do not cancel here
+						   CancellationToken.None,
+
+						   // Only if we actually have the lock, should we return the releaser
+						   TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnRanToCompletion,
+						   TaskScheduler.Default);
 		}
 
 		/// <summary>
