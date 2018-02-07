@@ -196,6 +196,7 @@ namespace Ceen.Httpd
 			QueryString = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			Form = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
 			Cookies = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
+            Files = new List<IMultipartItem>();
 			RequestState = new Dictionary<string, object>();
 		}
 
