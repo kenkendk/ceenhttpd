@@ -510,10 +510,30 @@ namespace Ceen.Httpd
 		/// </summary>
 		public void SetNonCacheable()
 		{
-			Headers["Vary"] = "X-Origin,Origin,Accept-Encoding";
 			Headers["Date"] = Headers["Expires"] = DateTime.Now.ToString("R", CultureInfo.InvariantCulture);
-			Headers["Cache-Control"] = "private, max-age=0";
+            Headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0";
 		}
+
+        /// <summary>
+        /// Sets headers that instruct the client and proxies to allow caching for a limited time
+        /// </summary>
+        /// <param name="duration">The time the client is allowed to cache the response</param>
+        /// <param name="isPublic">A flag indicating if the response is public and can be cached by proxies</param>
+        public void SetExpires(TimeSpan duration, bool isPublic = true)
+        {
+            Headers["Expires"] = (DateTime.Now + duration).ToString("R", CultureInfo.InvariantCulture);
+            Headers["Cache-Control"] = $"{(isPublic ? "public" : "private")}, max-age={Math.Max(0, Math.Min(duration.TotalSeconds, int.MaxValue))}";
+        }
+
+        /// <summary>
+        /// Sets headers that instruct the client and proxies to allow caching for a limited time
+        /// </summary>
+        /// <param name="until">The time the client is no longer allowed to use the cached response</param>
+        /// <param name="isPublic">A flag indicating if the response is public and can be cached by proxies</param>
+        public void SetExpires(DateTime until, bool isPublic = true)
+        {
+            SetExpires(until - DateTime.Now, isPublic);
+        }
 
 		/// <summary>
 		/// Gets the response stream.

@@ -397,6 +397,20 @@ namespace Ceen
 		/// </summary>
 		void SetNonCacheable();
 
+        /// <summary>
+        /// Sets headers that instruct the client and proxies to allow caching for a limited time
+        /// </summary>
+        /// <param name="duration">The time the client is allowed to cache the response</param>
+        /// <param name="isPublic">A flag indicating if the response is public and can be cached by proxies</param>
+        void SetExpires(TimeSpan duration, bool isPublic = true);
+
+        /// <summary>
+        /// Sets headers that instruct the client and proxies to allow caching for a limited time
+        /// </summary>
+        /// <param name="until">The time the client is no longer allowed to use the cached response</param>
+        /// <param name="isPublic">A flag indicating if the response is public and can be cached by proxies</param>
+        void SetExpires(DateTime until, bool isPublic = true);
+
 		/// <summary>
 		/// Gets the response stream.
 		/// To avoid buffering the contents, make sure the
