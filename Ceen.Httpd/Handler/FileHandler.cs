@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace Ceen.Httpd.Handler
 {
@@ -40,6 +41,18 @@ namespace Ceen.Httpd.Handler
 		/// List of allowed index file extensions
 		/// </summary>
 		private readonly string[] m_autoprobeextensions;
+        /// <summary>
+        /// The current etag cache
+        /// </summary>
+        protected readonly Dictionary<string, KeyValuePair<string, long>> m_etagCache = new Dictionary<string, KeyValuePair<string, long>>();
+        /// <summary>
+        /// The lock used to guard the ETag cache
+        /// </summary>
+        protected readonly AsyncLock m_etagLock = new AsyncLock();
+        /// <summary>
+        /// The regular expression used to extract etags from the request
+        /// </summary>
+        protected readonly Regex ETAG_RE = new Regex(@"\s*(?<isWeak>W\\)?""(?<etag>\w+)""\s*,?");
 
 		/// <summary>
 		/// Gets or sets the path prefix
@@ -53,6 +66,19 @@ namespace Ceen.Httpd.Handler
 		/// and avoid other triggers activating on non *.html files
 		/// </summary>
 		public bool RedirectOnly { get; set; } = false;
+
+        /// <summary>
+        /// Enable the ETag header output, which returns an MD5 value for each.
+        /// Setting this to less than zero will disable ETag output.
+        /// Setting this to zero will emit ETag output, but not cache the results,
+        /// causing an etag to be computed for each request.
+        /// </summary>
+        public int ETagCacheSize { get; set; } = 1000;
+
+        /// <summary>
+        /// Gets or sets the number of seconds the browser is allowed to cache the response.
+        /// </summary>
+        public int CacheSeconds { get; set; } = 60 * 60 * 24;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
@@ -112,11 +138,58 @@ namespace Ceen.Httpd.Handler
 		/// flushing the headers and sending content, allows
 		/// an overriding class to alter the response
 		/// </summary>
-		/// <param name="context">Context.</param>
-		public virtual Task BeforeResponseAsync(IHttpContext context)
+		/// <param name="context">The request context.</param>
+        /// <param name="sourcedata">The file with the source data</param>
+		public virtual Task BeforeResponseAsync(IHttpContext context, Stream sourcedata)
 		{
 			return Task.FromResult(true);
 		}
+
+        /// <summary>
+        /// Computes the ETag value for a given resources
+        /// </summary>
+        /// <returns>The ETag value.</returns>
+        /// <param name="sourcedata">The source stream to compute the ETag for.</param>
+        public virtual async Task<string> ComputeETag(Stream sourcedata)
+        {
+            var buffer = new byte[8 * 1024];
+            using (var hasher = System.Security.Cryptography.MD5.Create())
+            {
+                int r = 0;
+                while ((r = await sourcedata.ReadAsync(buffer, 0, buffer.Length)) != 0)
+                    hasher.TransformBlock(buffer, 0, r, buffer, 0);
+                return Convert.ToString(hasher.TransformFinalBlock(buffer, 0, 0));
+            }
+        }
+
+        /// <summary>
+        /// Helper method to report the given range as invalid
+        /// </summary>
+        /// <returns><c>true</c></returns>
+        /// <param name="context">The request context.</param>
+        /// <param name="bytecount">The byte count to report</param>
+        private bool SetInvalidRangeHeader(IHttpContext context, long bytecount)
+        {
+            context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
+            context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
+            return true;
+        }
+
+        /// <summary>
+        /// Helper method to report 304 - Not modified to the client
+        /// </summary>
+        /// <returns><c>true</c></returns>
+        /// <param name="context">The request context.</param>
+        /// <param name="etag">The resource ETag, if any.</param>
+        private bool SetNotModified(IHttpContext context, string etag)
+        {
+            context.Response.StatusCode = HttpStatusCode.NotModified;
+            context.Response.ContentLength = 0;
+            context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
+            if (!string.IsNullOrWhiteSpace(etag))
+                context.Response.Headers["ETag"] = $"\"{etag}\"";
+            return true;
+        }
 
 		#region IHttpModule implementation
 		/// <summary>
@@ -189,6 +262,31 @@ namespace Ceen.Httpd.Handler
 
 			try
 			{
+                string etag = null;
+                string etagkey = ETagCacheSize < 0 ? null : File.GetLastWriteTimeUtc(path).Ticks + path;
+                string[] clientetags = new string[0];
+
+                if (etagkey != null)
+                {
+                    KeyValuePair<string, long> etagcacheddata;
+                    using(await m_etagLock.LockAsync())
+                        m_etagCache.TryGetValue(etagkey, out etagcacheddata);
+                    
+                    etag = etagcacheddata.Key;
+
+                    var ce = ETAG_RE.Matches(context.Request.Headers["If-None-Match"] ?? string.Empty);
+                    if (ce.Count > 0)
+                    {
+                        clientetags = new string[ce.Count];
+                        for (var i = 0; i < clientetags.Length; i++)
+                        {
+                            clientetags[i] = ce[i].Groups["etag"].Value;
+                            if (etag != null && string.Equals(clientetags[i], etag, StringComparison.OrdinalIgnoreCase))
+                                return SetNotModified(context, etag);
+                        }
+                    }
+                }          
+
 				using (var fs = File.OpenRead(path))
 				{
 					var startoffset = 0L;
@@ -199,35 +297,19 @@ namespace Ceen.Httpd.Handler
 					if (!string.IsNullOrWhiteSpace(rangerequest))
 					{
 						var m = RANGE_MATCHER.Match(rangerequest);
-						if (!m.Success || m.Length != rangerequest.Length)
-						{
-							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
-							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
-							return true;
-						}
+                        if (!m.Success || m.Length != rangerequest.Length)
+                            return SetInvalidRangeHeader(context, bytecount);
 
 						if (m.Groups["start"].Length != 0)
 							if (!long.TryParse(m.Groups["start"].Value, out startoffset))
-							{
-								context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
-								context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
-								return true;
-							}
+                                return SetInvalidRangeHeader(context, bytecount);
 
 						if (m.Groups["end"].Length != 0)
 							if (!long.TryParse(m.Groups["end"].Value, out endoffset))
-							{
-								context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
-								context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
-								return true;
-							}
+                                return SetInvalidRangeHeader(context, bytecount);
 
 						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length == 0)
-						{
-							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
-							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
-							return true;
-						}
+                            return SetInvalidRangeHeader(context, bytecount);
 
 						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length != 0)
 						{
@@ -239,38 +321,65 @@ namespace Ceen.Httpd.Handler
 							endoffset = bytecount - 1;
 
 						if (endoffset < startoffset)
-						{
-							context.Response.StatusCode = HttpStatusCode.RangeNotSatisfiable;
-							context.Response.Headers["Content-Range"] = "bytes */" + bytecount;
-							return true;
-						}
+                            return SetInvalidRangeHeader(context, bytecount);
 					}
+
+                    if (etagkey != null)
+                    {
+                        fs.Position = 0;
+                        etag = await ComputeETag(fs);
+
+                        if (ETagCacheSize > 0)
+                        {
+                            using (await m_etagLock.LockAsync())
+                            {
+                                m_etagCache[etagkey] = new KeyValuePair<string, long>(etag, DateTime.UtcNow.Ticks);
+
+                                if (m_etagCache.Count > ETagCacheSize)
+                                {
+                                    // Don't repeatedly remove items,
+                                    // but batch up the removal,
+                                    // as the sorting takes some time
+                                    var removecount = Math.Max(1, m_etagCache.Count / 3);
+
+                                    foreach (var key in m_etagCache.OrderBy(x => x.Value.Value).Select(x => x.Key).Take(removecount).ToArray())
+                                        m_etagCache.Remove(key);
+                                }
+                            }
+                        }
+                    }
+
+                    if (etag != null && clientetags != null && clientetags.Any(x => string.Equals(x, etag, StringComparison.Ordinal)))
+                        return SetNotModified(context, etag);
 
 					var lastmodified = File.GetLastWriteTimeUtc(path);
 					context.Response.ContentType = mimetype;
 					context.Response.StatusCode = HttpStatusCode.OK;
 					context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
 					context.Response.AddHeader("Accept-Ranges", "bytes");
+                    context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
 
 					DateTime modifiedsincedate;
 					DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
 
 					if (modifiedsincedate == lastmodified)
 					{
-						context.Response.StatusCode = HttpStatusCode.NotModified;
-						context.Response.ContentLength = 0;
+                        return SetNotModified(context, etag);
 					}
 					else
 					{
+                        if (etag != null)
+                            context.Response.Headers["ETag"] = $"\"{etag}\"";
+
 						context.Response.ContentLength = endoffset - startoffset + 1;
-						if (context.Response.ContentLength != bytecount)
-						{
-							context.Response.StatusCode = HttpStatusCode.PartialContent;
-							context.Response.AddHeader("Content-Range", string.Format("bytes {0}-{1}/{2}", startoffset, endoffset, bytecount));
-						}
+                        if (context.Response.ContentLength != bytecount)
+                        {
+                            context.Response.StatusCode = HttpStatusCode.PartialContent;
+                            context.Response.AddHeader("Content-Range", string.Format("bytes {0}-{1}/{2}", startoffset, endoffset, bytecount));
+                        }
 					}
 
-					await BeforeResponseAsync(context);
+					await BeforeResponseAsync(context, fs);
 
 					if (context.Response.StatusCode == HttpStatusCode.NotModified)
 						return true;
