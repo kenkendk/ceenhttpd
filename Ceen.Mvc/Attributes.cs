@@ -88,10 +88,11 @@ namespace Ceen.Mvc
 		/// </summary>
 		/// <param name="source">Sets the allowed sources.</param>
 		/// <param name="required">A flag indicating if the parameter is required.</param>
-		public ParameterAttribute(ParameterSource source = ParameterSource.Default, bool required = true)
+		public ParameterAttribute(ParameterSource source = ParameterSource.Default, bool required = true, string name = null)
 		{
 			Source = source;
 			Required = required;
+            Name = name;
 		}
 	}
 
