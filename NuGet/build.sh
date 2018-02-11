@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BINDIR=/Library/Frameworks/Mono.framework/Commands
-XBUILD=${BINDIR}/xbuild
+XBUILD=${BINDIR}/msbuild
 NUGET=${BINDIR}/nuget
 VERSION_FILE=version.txt
 
@@ -84,5 +84,5 @@ for NUSPEC in $(find . -type f -name "*.nuspec"); do
 	FILENAME=$(basename "${NUSPEC}")
 	FILENAME="${FILENAME%.*}"
 
-	echo "${NUGET} push ${FILENAME}.${VERSION}.nupkg"
+	echo "${NUGET} push ${FILENAME}.${VERSION}.nupkg -src https://www.nuget.org"
 done

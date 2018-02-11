@@ -2,19 +2,19 @@
 <package >
   <metadata>
     <id>Ceen.Mvc</id>
-    <version>0.9</version>
+    <version>0.9.3</version>
     <authors>Kenneth Skovhede</authors>
     <owners>Kenneth Skovhede</owners>
     <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Model-View-Controller package for Ceen.Httpd</description>
-    <releaseNotes>Initial NuGet package</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2016</copyright>
+    <releaseNotes>Added many features, such as Json decoding to parameters</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2018</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
-        <dependency id="Newtonsoft.Json" version="9.0" />
-        <dependency id="Ceen.Httpd" version="0.9" />
+        <dependency id="Newtonsoft.Json" version="10.0.3" />
+        <dependency id="Ceen.Httpd" version="0.9.3" />
     </dependencies>
   </metadata>
   <files>
