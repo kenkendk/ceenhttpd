@@ -34,7 +34,7 @@ namespace Ceen.Security.Login
 		/// <summary>
 		/// The lock
 		/// </summary>
-		private AsyncLock m_lock;
+        private AsyncLock m_lock = new AsyncLock();
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Security.Login.MemoryStorageModule"/> class.
