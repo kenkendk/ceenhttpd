@@ -42,6 +42,7 @@
     <Compile Include="DerivedSettings.cs" />
     <Compile Include="QueryStringSerializer.cs" />
     <Compile Include="RequestUtility.cs" />
+    <Compile Include="LRUCache.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
