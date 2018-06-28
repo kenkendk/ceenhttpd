@@ -7,7 +7,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Ceen.Httpd.Cli</RootNamespace>
     <AssemblyName>Ceen.Httpd.Cli</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <ReleaseVersion>0.9.3</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
