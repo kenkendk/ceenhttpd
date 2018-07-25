@@ -1,4 +1,5 @@
 ﻿isolatedappdomain false
+IsolatedProcesses true
 watchconfigfile true
 
 httpport %LISTEN_PORT%

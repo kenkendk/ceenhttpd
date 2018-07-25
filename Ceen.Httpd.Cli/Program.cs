@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Net;
 using System.Collections.Generic;
+using Ceen.Httpd.Cli.Spawn;
 
 namespace Ceen.Httpd.Cli
 {
@@ -11,6 +12,23 @@ namespace Ceen.Httpd.Cli
 	{
 		public static int Main(string[] args)
 		{
+            Console.WriteLine("Started new process");
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(SubProcess.SpawnedRunner.SOCKET_PATH_VARIABLE_NAME)))
+            {
+                try
+                {
+                    Console.WriteLine("Starting child process");
+                    SubProcess.SpawnedRunner.RunClientRPCListenerAsync().Wait();
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine("Crashed child: {0}", ex);
+                    return 1;
+                }
+
+                return 0;
+            }
+
 			if (args.Length != 1)
 			{
 				Console.WriteLine("Usage: Ceen.Httpd.Cli [path-to-config-file]");
@@ -19,25 +37,30 @@ namespace Ceen.Httpd.Cli
 
 			if (!File.Exists(args[0]))
 			{
+                Console.WriteLine("CWD: {0}", Directory.GetCurrentDirectory());
 				Console.WriteLine("File not found: {0}", args[0]);
 				return 1;
 			}
 
-			AppDomainHandler app = null;
+			IAppDomainHandler app = null;
 			var tcs = new System.Threading.CancellationTokenSource();
 			var config = ConfigParser.ParseTextFile(args[0]);
 			var tasks = new List<Task>();
 
-
-			if (config.IsolatedProcesses)
-			{
-				throw new Exception("Isolated processes not yet implemented");
-			}
-			else if (config.IsolatedAppDomain)
-			{
-				app = new AppDomainHandler(args[0]);
-				tasks.Add(app.StoppedAsync);
-			}
+            if (config.IsolatedProcesses)
+            {
+                app = new SubProcess.ProcessSpawnHandler(args[0]);
+                tasks.Add(app.StoppedAsync);
+            }
+            else if (config.IsolatedAppDomain)
+            {
+#if NETCOREAPP
+                throw new Exception("AppDomains are not supported under .Net Core");
+#else
+                app = new AppDomainSpawn.AppDomainHandler(args[0]);
+                tasks.Add(app.StoppedAsync);
+#endif
+            }
 			else
 			{
 				var serverconfig = ConfigParser.ValidateConfig(config);
@@ -194,61 +217,87 @@ namespace Ceen.Httpd.Cli
 		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
 		private static Task SignalHandler(System.Threading.CancellationToken token, Func<bool> reload, Func<bool> stop)
 		{
-			var asm = System.Reflection.Assembly.Load(new System.Reflection.AssemblyName("Mono.Posix, Culture=neutral, PublicKeyToken=0738eb9f132ed756"));
-			var unixsignal_t = Type.GetType("Mono.Unix.UnixSignal, Mono.Posix");
-			var unixsignum_t = Type.GetType("Mono.Unix.Native.Signum, Mono.Posix");
+            if (!SystemHelper.IsCurrentOSPosix)
+                return Task.FromResult(true);
 
-			if (unixsignal_t == null || unixsignum_t == null)
-				return Task.FromResult(true);
+            var signals = new Mono.Unix.UnixSignal[] {
+                new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGHUP),
+                new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGINT),
+                new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGQUIT),
+            };
 
-			var sighup = unixsignum_t
-				.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
-				.Where(x => x.Name == "SIGHUP")
-				.Select(x => x.GetValue(null))
-				.First();
-			var sigint = unixsignum_t
-				.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
-				.Where(x => x.Name == "SIGINT")
-				.Select(x => x.GetValue(null))
-				.First();
-			var sigquit = unixsignum_t
-				.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
-				.Where(x => x.Name == "SIGQUIT")
-				.Select(x => x.GetValue(null))
-				.First();
+            return Task.Run(() => {
+                while (!token.IsCancellationRequested)
+                {
+                   var sig = Mono.Unix.UnixSignal.WaitAny(new Mono.Unix.UnixSignal[] {
+                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGHUP),
+                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGINT),
+                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGQUIT),
+                    }, TimeSpan.FromSeconds(5));
 
-			var sighup_int = 0;
-			var sigint_int = 1;
-			var sigquit_int = 2;
+                    if (sig == 0 || sig == 1)
+                        reload();
+                    else if (sig == 2)
+                        stop();
+                }
+            });
 
-			var sigarray = Array.CreateInstance(unixsignal_t, 3);
-			sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sighup), sighup_int);
-			sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sigint), sigint_int);
-			sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sigquit), sigquit_int);
 
-			var method = unixsignal_t.GetMethod(
-				"WaitAny",
-				System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
-				null,
-				new Type[] { sigarray.GetType(), typeof(TimeSpan) },
-				null
-			);
+			//var asm = System.Reflection.Assembly.Load(new System.Reflection.AssemblyName("Mono.Posix, Culture=neutral, PublicKeyToken=0738eb9f132ed756"));
+			//var unixsignal_t = Type.GetType("Mono.Unix.UnixSignal, Mono.Posix");
+			//var unixsignum_t = Type.GetType("Mono.Unix.Native.Signum, Mono.Posix");
 
-			if (method == null)
-				return Task.FromResult(true);
+			//if (unixsignal_t == null || unixsignum_t == null)
+			//	return Task.FromResult(true);
 
-			var args = new object[] { sigarray, TimeSpan.FromSeconds(5) };
+			//var sighup = unixsignum_t
+			//	.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
+			//	.Where(x => x.Name == "SIGHUP")
+			//	.Select(x => x.GetValue(null))
+			//	.First();
+			//var sigint = unixsignum_t
+			//	.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
+			//	.Where(x => x.Name == "SIGINT")
+			//	.Select(x => x.GetValue(null))
+			//	.First();
+			//var sigquit = unixsignum_t
+			//	.GetFields(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
+			//	.Where(x => x.Name == "SIGQUIT")
+			//	.Select(x => x.GetValue(null))
+			//	.First();
 
-			return Task.Run(() => {
-				while (!token.IsCancellationRequested)
-				{
-					var sig = (int)method.Invoke(null, args);
-					if (sig == sighup_int || sig == sigint_int)
-						reload();
-					else if (sig == sigquit_int)
-						stop();
-				}
-			});
+			//var sighup_int = 0;
+			//var sigint_int = 1;
+			//var sigquit_int = 2;
+
+			//var sigarray = Array.CreateInstance(unixsignal_t, 3);
+			//sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sighup), sighup_int);
+			//sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sigint), sigint_int);
+			//sigarray.SetValue(Activator.CreateInstance(unixsignal_t, sigquit), sigquit_int);
+
+			//var method = unixsignal_t.GetMethod(
+			//	"WaitAny",
+			//	System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+			//	null,
+			//	new Type[] { sigarray.GetType(), typeof(TimeSpan) },
+			//	null
+			//);
+
+			//if (method == null)
+			//	return Task.FromResult(true);
+
+			//var args = new object[] { sigarray, TimeSpan.FromSeconds(5) };
+
+			//return Task.Run(() => {
+			//	while (!token.IsCancellationRequested)
+			//	{
+			//		var sig = (int)method.Invoke(null, args);
+			//		if (sig == sighup_int || sig == sigint_int)
+			//			reload();
+			//		else if (sig == sigquit_int)
+			//			stop();
+			//	}
+			//});
 		}
 	}
 }

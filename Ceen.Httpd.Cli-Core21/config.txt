@@ -1,0 +1,34 @@
+IsolatedProcesses true
+IsolatedAppDomain false
+
+httpport 8080
+httpaddress loopback
+
+#logger Ceen.Httpd Ceen.Httpd.Logging.SyslogLogger
+handler "" Ceen.Httpd.Handler.SessionHandler
+
+handler "/*.html" Ceen.Security.Login.XSRFTokenGeneratorHandler
+
+handler "/*.html" Ceen.Security.Login.XSRFTokenRequiredHandler
+set XSRFErrorStatusCode 302
+set XSRFErrorStatusMessage "Found"
+set XSRFErrorRedirectUrl "/xsrf-expired-explanation"
+
+handler "/api/*" Ceen.Security.Login.XSRFTokenRequiredHandler
+set XSRFErrorStatusCode 403
+set XSRFErrorStatusMessage "XSRF token expired"
+set XSRFErrorRedirectUrl ""
+
+serve "/data" "/Users/kenneth/Udvikler/duplicati-git/Duplicati/Server/webroot"
+serve "/" "/Users/kenneth/ghtest/www.duplicati.com"
+
+SSLEnabledProtocols "Tls11|Tls12"
+
+#IgnoreDefaultMimeTypes true
+SupressDefaultHeaders true
+
+mime ".txt" "text/plain"
+
+header "x-server" "Rock Me!"
+
+index index.html
