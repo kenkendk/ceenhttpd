@@ -16,6 +16,86 @@ namespace Ceen.Httpd
 	/// </summary>
 	public static class HttpServer
 	{
+        /// <summary>
+        /// Handler class that encapsulates a configured server,
+        /// such that it is callable by an interprocess setup
+        /// </summary>
+        public class InterProcessBridge
+        {
+            /// <summary>
+            /// The controller instance
+            /// </summary>
+            private RunnerControl Controller;
+            /// <summary>
+            /// The stop token source
+            /// </summary>
+            private CancellationTokenSource StopToken;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpServer.InterProcessBridge"/> class.
+            /// </summary>
+            protected InterProcessBridge()
+            {
+            }
+
+            /// <summary>
+            /// Setup this instance
+            /// </summary>
+            /// <param name="usessl">If set to <c>true</c> use ssl.</param>
+            /// <param name="config">The configuration.</param>
+            public InterProcessBridge(bool usessl, ServerConfig config)
+            {
+                Setup(usessl, config);
+            }
+
+            /// <summary>
+            /// Setup this instance
+            /// </summary>
+            /// <param name="usessl">If set to <c>true</c> use ssl.</param>
+            /// <param name="config">The configuration.</param>
+            protected void Setup(bool usessl, ServerConfig config)
+            {
+                if (StopToken != null)
+                    throw new Exception("Cannot call setup more than once");
+                if (config == null)
+                    throw new ArgumentNullException(nameof(config));
+
+                StopToken = new CancellationTokenSource();
+                Controller = new RunnerControl(StopToken.Token, usessl, config);
+            }
+
+            /// <summary>
+            /// Handles a request
+            /// </summary>
+            /// <param name="socket">The socket to use.</param>
+            /// <param name="remoteEndPoint">The remote endpoint.</param>
+            /// <param name="logtaskid">The task ID to use.</param>
+            public void HandleRequest(Socket socket, EndPoint remoteEndPoint, string logtaskid)
+            {
+                RunClient(new TcpClient() { Client = socket }, remoteEndPoint, logtaskid, Controller);
+            }
+
+            /// <summary>
+            /// Requests that this instance stops serving requests
+            /// </summary>
+            public void Stop()
+            {
+                StopToken.Cancel();
+            }
+
+            /// <summary>
+            /// Returns an awaitable task that can be used to wait for termination
+            /// </summary>
+            /// <returns><c>true</c>, if for stop succeeded, <c>false</c> otherwise.</returns>
+            public Task StopTask => Controller.FinishedTask;
+
+            /// <summary>
+            /// Gets the number of active clients.
+            /// </summary>
+            public int ActiveClients => Controller.ActiveClients;
+
+        }
+
 		/// <summary>
 		/// Handler class that encapsulates a configured server setup,
 		/// in a way that is callable from another AppDomain
@@ -411,6 +491,17 @@ namespace Ceen.Httpd
 		{
 			return new AppDomainBridge(usessl, config);
 		}
+
+        /// <summary>
+        /// Creates and initializes a new InterProcess bridge
+        /// </summary>
+        /// <returns>The app domain bridge.</returns>
+        /// <param name="usessl">If set to <c>true</c> use ssl.</param>
+        /// <param name="config">The server config.</param>
+        public static InterProcessBridge CreateInterProcessBridge(bool usessl, ServerConfig config)
+        {
+            return new InterProcessBridge(usessl, config);
+        }
 
 		/// <summary>
 		/// Listens to incoming connections and calls the spawner method for each new connection
