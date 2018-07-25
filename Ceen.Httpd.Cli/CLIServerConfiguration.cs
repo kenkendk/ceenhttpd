@@ -104,6 +104,16 @@ namespace Ceen.Httpd.Cli
 		public string HttpsAddress { get; set; }
 
 		/// <summary>
+		/// Value indicating if configuration allows the server to listen for http requests
+		/// </summary>
+		public bool ListenHttp { get { return !string.IsNullOrWhiteSpace(this.HttpAddress); } }
+
+		/// <summary>
+		/// Value indicating if configuration allows the server to listen for https requests
+		/// </summary>
+		public bool ListenHttps { get { return !string.IsNullOrWhiteSpace(this.HttpsAddress) && !string.IsNullOrWhiteSpace(this.CertificatePath); } }		
+
+		/// <summary>
 		/// Gets or sets the maximum number of seconds to wait for the old domain to unload
 		/// </summary>
 		public int MaxUnloadWaitSeconds { get; set; } = 30;

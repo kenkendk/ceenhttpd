@@ -46,14 +46,14 @@ namespace Ceen.Httpd.Cli
 					ExpireCheckInterval = TimeSpan.FromSeconds(config.StorageExpirationCheckIntervalSeconds) 
 				};
 
-				if (!string.IsNullOrWhiteSpace(config.HttpAddress))
+                if (config.ListenHttp)
 					tasks.Add(HttpServer.ListenAsync(
 						new IPEndPoint(ConfigParser.ParseIPAddress(config.HttpAddress), config.HttpPort),
 						false,
 						serverconfig,
 						tcs.Token));
 
-				if (!string.IsNullOrWhiteSpace(config.HttpsAddress) && !string.IsNullOrWhiteSpace(config.CertificatePath))
+                if (config.ListenHttps)
 					tasks.Add(HttpServer.ListenAsync(
 						new IPEndPoint(ConfigParser.ParseIPAddress(config.HttpsAddress), config.HttpsPort),
 						true,
@@ -121,7 +121,8 @@ namespace Ceen.Httpd.Cli
 					Console.WriteLine($"Crashed for {(ssl ? "https" : "http")} {address}: {ex}");
 					reloadevent.SetResult(true);
 				};
-				var primarytask = app.ReloadAsync(true, true);
+
+                var primarytask = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
 				primarytask.Wait();
 				if (primarytask.IsFaulted)
 					throw primarytask.Exception;
@@ -149,7 +150,8 @@ namespace Ceen.Httpd.Cli
 					Console.WriteLine("Reloading configuration ...");
 					try
 					{
-						var tr = app.ReloadAsync(true, true);
+                        config = ConfigParser.ParseTextFile(args[0]);
+                        var tr = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
 						tr.Wait();
 						if (tr.IsFaulted)
 							throw tr.Exception;
