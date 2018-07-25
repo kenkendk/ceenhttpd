@@ -38,6 +38,7 @@
     <Compile Include="CLIServerConfiguration.cs" />
     <Compile Include="ConfigParser.cs" />
     <Compile Include="AppDomainHandler.cs" />
+    <Compile Include="SystemHelper.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
