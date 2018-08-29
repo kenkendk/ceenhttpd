@@ -213,7 +213,7 @@ namespace Ceen.Httpd
 				if (components.Length != 3)
 					throw new HttpException(HttpStatusCode.BadRequest);
 
-				if (components[2] != "HTTP/1.1")
+				if (components[2] != "HTTP/1.1" && components[2] != "HTTP/1.0")
 					throw new HttpException(HttpStatusCode.HTTPVersionNotSupported);
 
 				if (string.IsNullOrWhiteSpace(components[0]) || string.IsNullOrWhiteSpace(components[1]))
@@ -432,7 +432,7 @@ namespace Ceen.Httpd
 			}
 			else
 			{
-				this.Body = new LimitedBodyStream(reader, this.ContentLength, idletime, timeouttask, stoptask);
+                this.Body = new LimitedBodyStream(reader, this.ContentLength, idletime, timeouttask, stoptask);
 			}
 		}
 
