@@ -4,25 +4,34 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Net;
 using System.Collections.Generic;
-using Ceen.Httpd.Cli.Spawn;
 
 namespace Ceen.Httpd.Cli
 {
-	public class MainClass
+	public static class Program
 	{
+        public static void DebugConsoleOutput(string msg, params object[] args)
+        {
+            //Console.WriteLine(msg, args);
+        }
+
+        public static void ConsoleOutput(string msg, params object[] args)
+        {
+            Console.WriteLine(msg, args);
+        }
+
 		public static int Main(string[] args)
 		{
-            Console.WriteLine("Started new process");
-            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(SubProcess.SpawnedRunner.SOCKET_PATH_VARIABLE_NAME)))
+            DebugConsoleOutput("Started new process");
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Runner.SubProcess.SpawnedRunner.SOCKET_PATH_VARIABLE_NAME)))
             {
                 try
                 {
-                    Console.WriteLine("Starting child process");
-                    SubProcess.SpawnedRunner.RunClientRPCListenerAsync().Wait();
+                    DebugConsoleOutput("Starting child process");
+                    Runner.SubProcess.SpawnedRunner.RunClientRPCListenerAsync().Wait();
                 }
                 catch(Exception ex)
                 {
-                    Console.WriteLine("Crashed child: {0}", ex);
+                    DebugConsoleOutput("Crashed child: {0}", ex);
                     return 1;
                 }
 
@@ -31,58 +40,40 @@ namespace Ceen.Httpd.Cli
 
 			if (args.Length != 1)
 			{
-				Console.WriteLine("Usage: Ceen.Httpd.Cli [path-to-config-file]");
+                ConsoleOutput("Usage: Ceen.Httpd.Cli [path-to-config-file]");
 				return 1;
 			}
 
 			if (!File.Exists(args[0]))
 			{
-                Console.WriteLine("CWD: {0}", Directory.GetCurrentDirectory());
-				Console.WriteLine("File not found: {0}", args[0]);
+                ConsoleOutput("CWD: {0}", Directory.GetCurrentDirectory());
+                ConsoleOutput("File not found: {0}", args[0]);
 				return 1;
 			}
 
-			IAppDomainHandler app = null;
 			var tcs = new System.Threading.CancellationTokenSource();
 			var config = ConfigParser.ParseTextFile(args[0]);
 			var tasks = new List<Task>();
 
+            Runner.IRunnerHandler app;
             if (config.IsolatedProcesses)
             {
-                app = new SubProcess.ProcessSpawnHandler(args[0]);
-                tasks.Add(app.StoppedAsync);
+                app = new Runner.SubProcess.Runner(args[0]);
             }
             else if (config.IsolatedAppDomain)
             {
 #if NETCOREAPP
                 throw new Exception("AppDomains are not supported under .Net Core");
 #else
-                app = new AppDomainSpawn.AppDomainHandler(args[0]);
-                tasks.Add(app.StoppedAsync);
+                app = new Runner.AppDomain.Runner(args[0]);
 #endif
             }
 			else
 			{
-				var serverconfig = ConfigParser.ValidateConfig(config);
-				serverconfig.Storage = new MemoryStorageCreator() 
-				{ 
-					ExpireCheckInterval = TimeSpan.FromSeconds(config.StorageExpirationCheckIntervalSeconds) 
-				};
-
-                if (config.ListenHttp)
-					tasks.Add(HttpServer.ListenAsync(
-						new IPEndPoint(ConfigParser.ParseIPAddress(config.HttpAddress), config.HttpPort),
-						false,
-						serverconfig,
-						tcs.Token));
-
-                if (config.ListenHttps)
-					tasks.Add(HttpServer.ListenAsync(
-						new IPEndPoint(ConfigParser.ParseIPAddress(config.HttpsAddress), config.HttpsPort),
-						true,
-						serverconfig,
-						tcs.Token));
+                app = new Runner.InProcess.Runner(args[0]);
 			}
+
+            tasks.Add(app.StoppedAsync);
 
 			var reloadevent = new TaskCompletionSource<bool>();
 			var stopevent = new TaskCompletionSource<bool>();
@@ -90,14 +81,11 @@ namespace Ceen.Httpd.Cli
 			var hasrequestedreload = false;
 			IDisposable fsw = null;
 
-			if (app == null)
-				Console.WriteLine("Server is running, press CTRL+C to stop...");
-			else
-				Console.WriteLine("Server is running, press CTRL+C to reload config...");
+            ConsoleOutput("Server is running, press CTRL+C to reload config...");
 
 			Func<bool> stop = () =>
 			{
-				if (app != null && !hasrequestedstop)
+				if (!hasrequestedstop)
 				{
 					hasrequestedstop = true;
 					stopevent.SetResult(true);
@@ -109,7 +97,7 @@ namespace Ceen.Httpd.Cli
 
 			Func<bool> reload = () =>
 			{
-				if (app != null && !hasrequestedreload)
+				if (!hasrequestedreload)
 				{
 					hasrequestedreload = true;
 					reloadevent.SetResult(true);
@@ -137,19 +125,16 @@ namespace Ceen.Httpd.Cli
 				fsw = f;
 			}
 
-			if (app != null)
+			app.InstanceCrashed += (address, ssl, ex) =>
 			{
-				app.InstanceCrashed += (address, ssl, ex) =>
-				{
-					Console.WriteLine($"Crashed for {(ssl ? "https" : "http")} {address}: {ex}");
-					reloadevent.SetResult(true);
-				};
+                ConsoleOutput($"Crashed for {(ssl ? "https" : "http")} {address}: {ex}");
+				reloadevent.SetResult(true);
+			};
 
-                var primarytask = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
-				primarytask.Wait();
-				if (primarytask.IsFaulted)
-					throw primarytask.Exception;
-			}
+            var primarytask = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
+			primarytask.Wait();
+			if (primarytask.IsFaulted)
+				throw primarytask.Exception;
 
 			var sigtask = SignalHandler(tcs.Token, () =>
 			{
@@ -170,7 +155,7 @@ namespace Ceen.Httpd.Cli
 				var waitdelay = Task.Delay(TimeSpan.FromSeconds(2));
 				if (app != null)
 				{
-					Console.WriteLine("Reloading configuration ...");
+                    ConsoleOutput("Reloading configuration ...");
 					try
 					{
                         config = ConfigParser.ParseTextFile(args[0]);
@@ -178,16 +163,16 @@ namespace Ceen.Httpd.Cli
 						tr.Wait();
 						if (tr.IsFaulted)
 							throw tr.Exception;
-						Console.WriteLine("Configuration reloaded!");
+                        ConsoleOutput("Configuration reloaded!");
 					}
 					catch(Exception ex)
 					{
-						Console.WriteLine("Failed to reload configuration with message: {0}", ex);
+                        ConsoleOutput("Failed to reload configuration with message: {0}", ex);
 					}
 				}
 				else
-				{
-					Console.WriteLine("Not reloading as we are not using isolated domains or processes ...");
+                {
+			        ConsoleOutput("Not reloading as we are not using isolated domains or processes ...");
 				}
 
 				waitdelay.Wait();
@@ -198,7 +183,7 @@ namespace Ceen.Httpd.Cli
 
 			if (t == stopevent.Task)
 			{
-				Console.WriteLine("Got stop signal, stopping server ...");
+                ConsoleOutput("Got stop signal, stopping server ...");
 				if (app != null)
 					app.StopAsync();
 				tcs.Cancel();
@@ -206,7 +191,7 @@ namespace Ceen.Httpd.Cli
 				sigtask.Wait();
 			}
 
-			Console.WriteLine("Server has stopped...");
+            ConsoleOutput("Server has stopped...");
 
 			return 0;
 		}

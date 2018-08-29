@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using LeanIPC;
 
-namespace Ceen.Httpd.Cli.SubProcess
+namespace Ceen.Httpd.Cli.Runner.SubProcess
 {
     /// <summary>
     /// The inital data send over the file descriptor socket
@@ -41,14 +41,6 @@ namespace Ceen.Httpd.Cli.SubProcess
         /// The handle in the source process
         /// </summary>
         public long Handle;
-        /// <summary>
-        /// The socket options from the source process
-        /// </summary>
-        public SocketInformationOptions SocketOptions;
-        /// <summary>
-        /// The serialized socket data from the source process
-        /// </summary>
-        public byte[] SocketData;
         /// <summary>
         /// The remote client IP
         /// </summary>
@@ -90,7 +82,7 @@ namespace Ceen.Httpd.Cli.SubProcess
         /// <param name="ip">The remote endpoint IP.</param>
         /// <param name="port">The remote endpoint port</param>
         /// <param name="logtaskid">The task ID to use.</param>
-        Task HandleRequestSimple(int handle, string ip, int port, string logtaskid);
+        Task HandleRequestSimple(int handle, EndPoint remoteEndPoint, string logtaskid);
 
         /// <summary>
         /// Requests that this instance stops serving requests
@@ -117,6 +109,11 @@ namespace Ceen.Httpd.Cli.SubProcess
         /// The method used to create a socket from the handle
         /// </summary>
         //private readonly Func<long, Socket> m_createSocket;
+
+        /// <summary>
+        /// The epoll handler instance
+        /// </summary>
+        private readonly SockRock.ISocketHandler m_pollhandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.UnixSpawn.SpawnedServer"/> class.
@@ -146,6 +143,22 @@ namespace Ceen.Httpd.Cli.SubProcess
             var config = ConfigParser.ValidateConfig(ConfigParser.ParseTextFile(configfile));
             config.Storage = storage ?? new MemoryStorageCreator();
 
+            try
+            {
+                m_pollhandler = new SockRock.KqueueHandler();
+            }
+            catch (Exception e1)
+            {
+                try
+                {
+                    m_pollhandler = new SockRock.EpollHandler();
+                }
+                catch (Exception e2)
+                {
+                    throw new PlatformNotSupportedException("Unable to create kqueue or epoll instance", new AggregateException(e1, e2));
+                }
+            }
+
             base.Setup(usessl, config);
         }
 
@@ -168,32 +181,13 @@ namespace Ceen.Httpd.Cli.SubProcess
         /// <param name="ip">The remote endpoint IP.</param>
         /// <param name="port">The remote endpoint port</param>
         /// <param name="logtaskid">The task ID to use.</param>
-        public Task HandleRequestSimple(int handle, string ip, int port, string logtaskid)
+        public Task HandleRequestSimple(int handle, EndPoint remoteEndPoint, string logtaskid)
         {
-            Console.WriteLine("Got simple handling request for handle {0}", handle);
+            Program.DebugConsoleOutput("Got simple handling request for handle {0}", handle);
 
-            //var data = ScmRightsImplementation.recv_fds(SpawnedRunner.fd_socket.Handle.ToInt32());
-
-            //if (data.Item1 == null || data.Item1.Length != 1)
-            //{
-            //    Console.WriteLine("Unexpected number of file handles captured");
-            //    throw new Exception("Unexpected number of file handles captured");
-            //}
-
-            //if (data.Item2 == null || data.Item2.Length != sizeof(int))
-            //{
-            //    Console.WriteLine("Unexpected number of data bytes captured");
-            //    throw new Exception("Unexpected number of data bytes captured");
-            //}
-
-            //var remotehandle = BitConverter.ToInt32(data.Item2, 0);
-            //Console.WriteLine("Remote handle {0}, local fd: {1}", handle, data.Item1[0]);
-
-            //if (remotehandle != handle)
-                //throw new Exception(string.Format("Unexpected handle. Got {0} but expected {1}", BitConverter.ToInt32(data.Item2, 0), handle));
-
-            Console.WriteLine("Would handle request, if we could turn the handle into a socket/stream");
-            throw new NotImplementedException("Got request, but cannot handle it");
+            var stream = m_pollhandler.MonitorHandle(handle);
+            base.HandleRequest(stream, remoteEndPoint, logtaskid, () => stream.ReaderClosed);
+            return Task.FromResult(true);
         }
     }
 
@@ -228,7 +222,7 @@ namespace Ceen.Httpd.Cli.SubProcess
             var prefix = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(SOCKET_PREFIX_VARIABLE_NAME)) ? string.Empty : "\0";
 
             var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
-            socket.Connect(new UnixEndPoint(prefix + path));
+            socket.Connect(new SockRock.UnixEndPoint(prefix + path));
 
             var ipc = new LeanIPC.InterProcessConnection(new NetworkStream(socket));
             var peer = new LeanIPC.RPCPeer(ipc, typeof(SpawnedServer));
@@ -252,14 +246,14 @@ namespace Ceen.Httpd.Cli.SubProcess
 
         private static async Task ListenForRequests(RPCPeer peer, string prefix, string path)
         {
-            Console.WriteLine($"Setting up listener ...");
+            Program.DebugConsoleOutput($"Setting up listener ...");
 
             var tp = new TypeSerializer(false, false);
 
             var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
-            socket.Connect(new UnixEndPoint(prefix + path + "_fd"));
+            socket.Connect(new SockRock.UnixEndPoint(prefix + path + "_fd"));
 
-            Console.WriteLine($"Connected to fd socket, reading initial data");
+            Program.DebugConsoleOutput($"Connected to fd socket, reading initial data");
 
             SpawnedServer server;
 
@@ -267,7 +261,7 @@ namespace Ceen.Httpd.Cli.SubProcess
             var buffer = new byte[1024];
             var count = socket.Receive(buffer);
 
-            Console.WriteLine($"Got protocol data with {count} bytes");
+            Program.DebugConsoleOutput($"Got protocol data with {count} bytes");
 
             using (var ms = new System.IO.MemoryStream(buffer, 0, count, false))
             using (var bcs = new BinaryConverterStream(ms, tp, false))
@@ -284,7 +278,7 @@ namespace Ceen.Httpd.Cli.SubProcess
                     throw new Exception($"Unable to find the instance with the given handle: {desc.ServerHandle}, got something that is not a server ...");
             }
 
-            Console.WriteLine($"Protocol verification completed, starting main loop");
+            Program.DebugConsoleOutput($"Protocol verification completed, starting main loop");
 
             // Prepare the handle
             var rchandle = socket.Handle.ToInt32();
@@ -298,9 +292,9 @@ namespace Ceen.Httpd.Cli.SubProcess
                     try
                     {
                         // Get the next request from the socket
-                        var req = ScmRightsImplementation.recv_fds(rchandle);
+                        var req = SockRock.ScmRightsImplementation.recv_fds(rchandle);
 
-                        Console.WriteLine("Got request, parsing ...");
+                        Program.DebugConsoleOutput("Got request, parsing ...");
 
                         // Copy the buffer into the stream we read from
                         ms.Position = 0;
@@ -310,35 +304,17 @@ namespace Ceen.Httpd.Cli.SubProcess
                         // Extract the data
                         var data = await bcs.ReadAnyAsync<SocketRequest>();
 
-                        Console.WriteLine("Decoded request, local handle is {0} remote handle is {1}", req.Item1[0], data.Handle);
-
-                        // Reconstruct the socket information
-                        var sockinfo = new SocketInformation();
-                        sockinfo.Options = data.SocketOptions;
-                        sockinfo.ProtocolInformation = data.SocketData;
-
-                        // Patch the socket information with the handle from this process
-                        Array.Copy(BitConverter.GetBytes((long)req.Item1[0]), 0, sockinfo.ProtocolInformation, sockinfo.ProtocolInformation.Length - sizeof(long), sizeof(long));
-
-                        var rsocket = new Socket(sockinfo);
-                        Console.WriteLine("Reconstructed socket has handle: {0}", rsocket.Handle.ToInt64());
-
-                        var r = Mono.Unix.Native.Syscall.recv(rsocket.Handle.ToInt32(), new byte[1], 1, 0);
-                        Console.WriteLine("Read {0} bytes from socket via syscall", r);
-
-                        r = rsocket.Receive(new byte[1]);
-                        Console.WriteLine("Socket read gave {0} bytes", r);
-
-                        Console.WriteLine("Forwarding request");
+                        Program.DebugConsoleOutput("Decoded request, local handle is {0} remote handle is {1}", req.Item1[0], data.Handle);
 
                         // All set, fire the request
-                        server.HandleRequest(sockinfo, new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID);
+                        server.HandleRequestSimple(req.Item1[0], new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID);
 
-                        Console.WriteLine("Request handling completed");
+                        Program.DebugConsoleOutput("Request handling completed");
                     }
                     catch(Exception ex)
                     {
-                        Console.WriteLine("Processing failed: {0}", ex);
+                        Program.ConsoleOutput("Processing failed: {0}", ex);
+                        return;
                     }
                 }
             }

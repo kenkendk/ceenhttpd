@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
 using System.IO;
 using System.Net.Security;
+using System.Collections.Generic;
 
 namespace Ceen.Httpd
 {
@@ -73,6 +74,29 @@ namespace Ceen.Httpd
             public void HandleRequest(Socket socket, EndPoint remoteEndPoint, string logtaskid)
             {
                 RunClient(new TcpClient() { Client = socket }, remoteEndPoint, logtaskid, Controller);
+            }
+
+            /// <summary>
+            /// Handles a request
+            /// </summary>
+            /// <param name="client">The TcpClient instance to use.</param>
+            /// <param name="remoteEndPoint">The remote endpoint.</param>
+            /// <param name="logtaskid">The task ID to use.</param>
+            public void HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
+            {
+                RunClient(client, remoteEndPoint, logtaskid, Controller);
+            }
+
+            /// <summary>
+            /// Handles a request
+            /// </summary>
+            /// <param name="stream">The stream to use.</param>
+            /// <param name="remoteEndPoint">The remote endpoint.</param>
+            /// <param name="logtaskid">The task ID to use.</param>
+            /// <param name="isConnected">A method that checks if the socket is connected</param>
+            public void HandleRequest(Stream stream, EndPoint remoteEndPoint, string logtaskid, Func<bool> isConnected)
+            {
+                RunClient(stream, remoteEndPoint, logtaskid, Controller, isConnected);
             }
 
             /// <summary>
@@ -517,16 +541,88 @@ namespace Ceen.Httpd
 			return ListenToSocketInternalAsync(addr, usessl, stoptoken, config, (client, remoteendpoint, logid, controller) => spawner(client, remoteendpoint, logid));
 		}
 
-		/// <summary>
-		/// Listens to incoming connections and calls the spawner method for each new connection
-		/// </summary>
-		/// <returns>Awaitable task.</returns>
-		/// <param name="addr">The address to listen to.</param>
-		/// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
-		/// <param name="stoptoken">The stoptoken.</param>
-		/// <param name="config">The server configuration</param>
-		/// <param name="spawner">The method handling the new connection.</param>
-		private static async Task ListenToSocketInternalAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, EndPoint, string, RunnerControl> spawner)
+        /// <summary>
+        /// Listens to incoming connections and calls the spawner method for each new connection
+        /// </summary>
+        /// <returns>Awaitable task.</returns>
+        /// <param name="acceptAsync">Method that returns an accepted socket.</param>
+        /// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
+        /// <param name="stoptoken">The stoptoken.</param>
+        /// <param name="config">The server configuration</param>
+        /// <param name="spawner">The method handling the new connection.</param>
+        public static Task ListenToSocketAsync(Func<CancellationToken, Task<KeyValuePair<long, EndPoint>>> acceptAsync, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<long, EndPoint, string> spawner)
+        {
+            return ListenToSocketInternalAsync(acceptAsync, usessl, stoptoken, config, (client, remoteendpoint, logid, controller) => spawner(client, remoteendpoint, logid));
+        }
+
+        /// <summary>
+        /// Listens to incoming connections and calls the spawner method for each new connection
+        /// </summary>
+        /// <returns>Awaitable task.</returns>
+        /// <param name="acceptAsync">Method that returns an accepted socket.</param>
+        /// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
+        /// <param name="stoptoken">The stoptoken.</param>
+        /// <param name="config">The server configuration</param>
+        /// <param name="spawner">The method handling the new connection.</param>
+        private static async Task ListenToSocketInternalAsync(Func<CancellationToken, Task<KeyValuePair<long, EndPoint>>> acceptAsync, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<long, EndPoint, string, RunnerControl> spawner)
+        {
+            if (acceptAsync == null)
+                throw new ArgumentNullException(nameof(acceptAsync));
+
+            var rc = new RunnerControl(stoptoken, usessl, config);
+
+            var taskid = SetLoggingSocketHandlerID();
+
+            while (!stoptoken.IsCancellationRequested)
+            {
+                // Wait if there are too many active
+                if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for throttle", taskid, null);
+                await rc.ThrottleTask;
+                if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for socket", taskid, null);
+                var ls = acceptAsync(stoptoken);
+
+                if (await Task.WhenAny(rc.StopTask, ls) == ls)
+                {
+                    if (config.DebugLogHandler != null) config.DebugLogHandler("Re-waiting for socket", taskid, null);
+                    var client = await ls;
+                    var newtaskid = SetLoggingTaskHandlerID();
+
+                    try
+                    {
+                        int wt, cpt;
+                        ThreadPool.GetAvailableThreads(out wt, out cpt);
+                        if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
+
+                        if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
+
+                        ThreadPool.QueueUserWorkItem(x => spawner(client.Key, client.Value, newtaskid, rc));
+                    }
+                    catch (Exception ex)
+                    {
+                        if (config.DebugLogHandler != null) config.DebugLogHandler("Failed to listen to socket", taskid, ex);
+                    }
+                }
+            }
+
+            if (config.DebugLogHandler != null) config.DebugLogHandler("Stopping", taskid, null);
+            rc.Stop(taskid);
+
+            if (config.DebugLogHandler != null) config.DebugLogHandler("Socket stopped, waiting for workers ...", taskid, null);
+            await rc.FinishedTask;
+
+            if (config.DebugLogHandler != null) config.DebugLogHandler("Stopped", taskid, null);
+        }
+
+        /// <summary>
+        /// Listens to incoming connections and calls the spawner method for each new connection
+        /// </summary>
+        /// <returns>Awaitable task.</returns>
+        /// <param name="addr">The address to listen to.</param>
+        /// <param name="usessl">A flag indicating if the socket listens for SSL requests</param>
+        /// <param name="stoptoken">The stoptoken.</param>
+        /// <param name="config">The server configuration</param>
+        /// <param name="spawner">The method handling the new connection.</param>
+        private static async Task ListenToSocketInternalAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, EndPoint, string, RunnerControl> spawner)
 		{
 			var rc = new RunnerControl(stoptoken, usessl, config);
 
@@ -637,32 +733,45 @@ namespace Ceen.Httpd
 			RunClient(client, remoteEndPoint, logtaskid, controller);
 		}
 
-		/// <summary>
-		/// Handler method for connections
-		/// </summary>
-		/// <param name="client">The new connection.</param>
-		/// <param name="remoteEndPoint">The remote endpoint.</param>
-		/// <param name="logtaskid">The task id for logging and tracing</param>
-		/// <param name="controller">The runner controller.</param>
-		private static async void RunClient(TcpClient client, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
+        /// <summary>
+        /// Handler method for connections
+        /// </summary>
+        /// <param name="client">The new connection.</param>
+        /// <param name="remoteEndPoint">The remote endpoint.</param>
+        /// <param name="logtaskid">The task id for logging and tracing</param>
+        /// <param name="controller">The runner controller.</param>
+        private static async void RunClient(TcpClient client, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
+        {
+            using (client)
+                await RunClient(client.GetStream(), remoteEndPoint, logtaskid, controller, () => client.Connected);
+        }
+
+        /// <summary>
+        /// Handler method for connections
+        /// </summary>
+        /// <param name="stream">The stream.</param>
+        /// <param name="remoteEndPoint">The remote endpoint.</param>
+        /// <param name="logtaskid">The task id for logging and tracing</param>
+        /// <param name="controller">The runner controller.</param>
+        private static async Task RunClient(Stream stream, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller, Func<bool> isConnected)
 		{
 			var config = controller.Config;
 			var storage = config.Storage;
 
-			using (var s = client.GetStream())
-			using (var ssl = controller.m_useSSL ? new SslStream(s, false) : null)
+            using (stream)
+			using (var ssl = controller.m_useSSL ? new SslStream(stream, false) : null)
 			{
-				if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Running {0}", controller.m_useSSL ? "SSL" : "plain"), logtaskid, client);
+                if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Running {0}", controller.m_useSSL ? "SSL" : "plain"), logtaskid, remoteEndPoint);
 
 				// Slightly higher value here to avoid races with the other timeout mechanisms
-				s.ReadTimeout = s.WriteTimeout = (controller.Config.RequestIdleTimeoutSeconds + 1) * 1000;
+				stream.ReadTimeout = stream.WriteTimeout = (controller.Config.RequestIdleTimeoutSeconds + 1) * 1000;
 
 				X509Certificate clientcert = null;
 
 				// For SSL only: negotiate the connection
 				if (ssl != null)
 				{
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Authenticate SSL", logtaskid, client);
+                    if (config.DebugLogHandler != null) config.DebugLogHandler("Authenticate SSL", logtaskid, remoteEndPoint);
 
 					try
 					{
@@ -670,7 +779,7 @@ namespace Ceen.Httpd
 					}
 					catch (Exception aex)
 					{
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, client);
+						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, remoteEndPoint);
 
 						// Log a message indicating that we failed setting up SSL
                         await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
@@ -678,26 +787,27 @@ namespace Ceen.Httpd
 						return;
 					}
 
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Run SSL", logtaskid, client);
+					if (config.DebugLogHandler != null) config.DebugLogHandler("Run SSL", logtaskid, remoteEndPoint);
 					clientcert = ssl.RemoteCertificate;
 				}
 
-				await Runner(client, ssl == null ? (Stream)s : ssl, remoteEndPoint, logtaskid, clientcert, ssl == null ? SslProtocols.None : ssl.SslProtocol, controller);
+                await Runner(ssl == null ? (Stream)stream : ssl, remoteEndPoint, logtaskid, clientcert, ssl == null ? SslProtocols.None : ssl.SslProtocol, controller, isConnected);
 
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, client);
+				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, remoteEndPoint);
 			}
 		}
 
 		/// <summary>
 		/// Dispatcher method for handling a request
 		/// </summary>
-		/// <param name="client">The underlying socket</param>
 		/// <param name="stream">The underlying stream.</param>
 		/// <param name="endpoint">The remote endpoint.</param>
 		/// <param name="logtaskid">The task id for logging and tracing</param>
 		/// <param name="clientcert">The client certificate if any.</param>
 		/// <param name="controller">The runner controller.</param>
-		private static async Task Runner(TcpClient client, Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, SslProtocols sslProtocol, RunnerControl controller)
+        /// <param name="sslProtocol">The SSL protocol being used</param>
+        /// <param name="isConnected">A method for checking if the socket is connected</param>
+		private static async Task Runner(Stream stream, EndPoint endpoint, string logtaskid, X509Certificate clientcert, SslProtocols sslProtocol, RunnerControl controller, Func<bool> isConnected)
 		{
 			var config = controller.Config;
 			var storage = config.Storage;
@@ -710,7 +820,6 @@ namespace Ceen.Httpd
 			HttpResponse resp = null;
 			DateTime started = new DateTime();
 
-			using (client)
 			using (var bs = new BufferedStreamReader(stream))
 			{
 				try
@@ -725,7 +834,7 @@ namespace Ceen.Httpd
 						bs.ResetReadLength(config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
-                            cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol, () => client.Connected),
+                            cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol, isConnected),
 							resp = new HttpResponse(stream, config),
 							storage
 						);
@@ -737,28 +846,33 @@ namespace Ceen.Httpd
 						cur.SetProcessingTimeout(TimeSpan.FromSeconds(config.MaxProcessingTimeSeconds));
 
 						if (config.DebugLogHandler != null) config.DebugLogHandler("Parsing headers", logtaskid, endpoint);
-						try
-						{
+                        try
+                        {
                             var ct = new CancellationTokenSource();
                             ct.CancelAfter(TimeSpan.FromSeconds(keepingalive ? config.KeepAliveTimeoutSeconds : config.RequestIdleTimeoutSeconds));
                             using (ct.Token.Register(() => timeoutcontroltask.TrySetCanceled(), useSynchronizationContext: false))
                                 await cur.Parse(bs, config, idletime, timeoutcontroltask.Task, controller.StopTask);
-						}
-						catch (EmptyStreamClosedException)
-						{
-							// Client has closed the connection
-							break;
-						}
-						catch (HttpException hex)
-						{
-							// Errors during header parsing are unlikely to
-							// keep the connection in a consistent state
-							resp.StatusCode = hex.StatusCode;
-							resp.StatusMessage = hex.StatusMessage;
-							await resp.FlushHeadersAsync();
+                        }
+                        catch (EmptyStreamClosedException)
+                        {
+                            // Client has closed the connection
+                            break;
+                        }
+                        catch (HttpException hex)
+                        {
+                            // Errors during header parsing are unlikely to
+                            // keep the connection in a consistent state
+                            resp.StatusCode = hex.StatusCode;
+                            resp.StatusMessage = hex.StatusMessage;
+                            await resp.FlushHeadersAsync();
 
-							throw;
-						}
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("Failed while reading header: {0}", ex);
+                            throw;
+                        }
 
 						string keepalive;
 						cur.Headers.TryGetValue("Connection", out keepalive);

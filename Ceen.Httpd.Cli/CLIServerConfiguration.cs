@@ -119,12 +119,12 @@ namespace Ceen.Httpd.Cli
 		public int MaxUnloadWaitSeconds { get; set; } = 30;
 
 		/// <summary>
-		/// Gets or sets a value indicating if app domains are created to handle reloads
+        /// Gets or sets a value indicating if isolated AppDomains are used to handle reloads
 		/// </summary>
-		public bool IsolatedAppDomain { get; set; } = true;
+		public bool IsolatedAppDomain { get; set; } = false;
 
 		/// <summary>
-		/// Gets or sets a value indicating if isolated processes are used to handle reloads
+        /// Gets or sets a value indicating if isolated processes are used to handle reloads
 		/// </summary>
 		public bool IsolatedProcesses { get; set; } = false;
 

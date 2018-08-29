@@ -39,7 +39,7 @@ namespace ToDoList
 			var config = ConfigParser.ParseTextFile(args[0]);
 			Console.WriteLine("Listening to port {0}, serving {1}", config.HttpPort, config.Routes.Where(x => x.Assembly == "Ceen.Httpd" && x.Classname == "Ceen.Httpd.Handler.FileHandler").Select(x => ConfigParser.ExpandEnvironmentVariables(x.ConstructorArguments.FirstOrDefault())).FirstOrDefault());
 
-			return Ceen.Httpd.Cli.MainClass.Main(args);
+			return Ceen.Httpd.Cli.Program.Main(args);
 		}
 	}
 }

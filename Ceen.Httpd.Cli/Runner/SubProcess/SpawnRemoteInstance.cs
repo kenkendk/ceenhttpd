@@ -5,21 +5,20 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Ceen.Httpd.Cli.Spawn;
 using LeanIPC;
 
-namespace Ceen.Httpd.Cli.SubProcess
+namespace Ceen.Httpd.Cli.Runner.SubProcess
 {
     /// <summary>
     /// Handler for spawning a remote process and interfacing with it
     /// </summary>
-    public class ProcessSpawnHandler : Spawn.SpawnHandler
+    public class Runner : RunHandlerBase
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.SubProcess.ProcessSpawnHandler"/> class.
         /// </summary>
         /// <param name="path">The path to the configuration file.</param>
-        public ProcessSpawnHandler(string path)
+        public Runner(string path)
             : base(path)
         {
         }
@@ -41,7 +40,7 @@ namespace Ceen.Httpd.Cli.SubProcess
     /// <summary>
     /// Class to keep the connection with the spawned process
     /// </summary>
-    internal class SpawnRemoteInstance : Spawn.IWrappedRunner
+    internal class SpawnRemoteInstance : IWrappedRunner, ISelfListen
     {
         /// <summary>
         /// The RPC peer
@@ -124,6 +123,11 @@ namespace Ceen.Httpd.Cli.SubProcess
         public bool ShouldStop { get; private set; } = false;
 
         /// <summary>
+        /// The socket used to listen for new connections
+        /// </summary>
+        private SockRock.ListenSocket m_listenSocket;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.SubProcess.SpawnRemoteInstance"/> class.
         /// </summary>
         /// <param name="path">The path to the config file</param>
@@ -142,10 +146,10 @@ namespace Ceen.Httpd.Cli.SubProcess
             {
                 if (SystemHelper.IsCurrentOSPosix)
                 {
-                    serveripcsocket.Bind(new UnixEndPoint(prefix + m_socketpath));
+                    serveripcsocket.Bind(new SockRock.UnixEndPoint(prefix + m_socketpath));
                     serveripcsocket.Listen(1);
 
-                    serverfdsocket.Bind(new UnixEndPoint(prefix + m_socketpath + "_fd"));
+                    serverfdsocket.Bind(new SockRock.UnixEndPoint(prefix + m_socketpath + "_fd"));
                     serverfdsocket.Listen(1);
                 }
 
@@ -162,6 +166,7 @@ namespace Ceen.Httpd.Cli.SubProcess
                 if (SystemHelper.IsCurrentOSPosix)
                 {
                     //TODO: need to be able to kill this on timeout
+
                     // Get the first connection,
                     m_ipcSocket = serveripcsocket.Accept();
                     m_fdSocket = serverfdsocket.Accept();
@@ -221,7 +226,7 @@ namespace Ceen.Httpd.Cli.SubProcess
         /// <returns>The async.</returns>
         private System.Diagnostics.Process StartRemoteProcess()
         {
-            var FAKE_SPAWN = false;
+            var FAKE_SPAWN = true;
 
             if (FAKE_SPAWN)
             {
@@ -296,7 +301,7 @@ namespace Ceen.Httpd.Cli.SubProcess
                 await bcs.FlushAsync();
                 m_fdSocket.Send(ms.ToArray());
 
-                Console.WriteLine($"Sent protocol data with {ms.Length} bytes");
+                Program.DebugConsoleOutput($"Sent protocol data with {ms.Length} bytes");
             }
         }
 
@@ -313,70 +318,10 @@ namespace Ceen.Httpd.Cli.SubProcess
             // actually close the connection, just the socket in this process
             using (client)
             {
-                Console.WriteLine("Processing new request");
+                Program.DebugConsoleOutput("Processing new request with .net handler");
 
-                // On POSIX systems we use SCM_RIGHTS
-                if (SystemHelper.IsCurrentOSPosix)
-                {
-                    try
-                    {
-                        // Extract the OS handle
-                        var handle = client.Client.Handle.ToInt64();
-
-#if NETCOREAPP
-                        SocketInformation sr = default(SocketInformation);
-#else
-
-                        // Create a serialized version of the socket
-                        var sr = client.Client.DuplicateAndClose(m_proc.Handle.ToInt32());
-
-                        // Check that the serialized for is implemented as expected
-                        if (BitConverter.ToInt64(sr.ProtocolInformation, sr.ProtocolInformation.Length - sizeof(long)) != handle)
-                            throw new Exception("Expected the serialized socket information to contain the handle as the last 8 bytes");
-#endif
-
-                        // Prepare a stream
-                        using (var ms = new System.IO.MemoryStream())
-                        using (var bcs = new BinaryConverterStream(ms, m_fdSocketTypeSerializer))
-                        {
-                            // Serialize the request
-                            await bcs.WriteObjectAsync(new SocketRequest()
-                            {
-                                Handle = handle,
-                                SocketOptions = sr.Options,
-                                SocketData = sr.ProtocolInformation,
-                                RemoteIP = ((IPEndPoint)endPoint).Address.ToString(),
-                                RemotePort = ((IPEndPoint)endPoint).Port,
-                                LogTaskID = logtaskid
-                            });
-                            await bcs.FlushAsync();
-
-                            Console.WriteLine($"Sending socket {handle} with {ms.Length} bytes of data");
-
-                            // Send the request data with the handle to the remote process
-                            using (await m_lock.LockAsync())
-                                ScmRightsImplementation.send_fds(m_fdSocket.Handle.ToInt32(), new int[] { (int)handle }, ms.ToArray());
-
-                            //Console.WriteLine("Data sent, closing local socket");
-                            // Make sure the handle is no longer in this process
-                            //ScmRightsImplementation.native_close((int)handle);
-
-#if NETCOREAPP
-                            // We cannot use DuplicateAndClose() so we hack it in here
-                            client.Client.Close();
-#endif
-
-                            Console.WriteLine("Completed sending the socket");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Failed to handle request: {0}", ex);
-                    }
-
-                }
                 // On Windows we can send directly, as the DuplicateAndClose() call does all the work for us
-                else if (SystemHelper.CurrentOS == Platform.Windows)
+                if (SystemHelper.CurrentOS == Platform.Windows)
                 {
                     var sr = client.Client.DuplicateAndClose(m_proc.Handle.ToInt32());
                     await m_proxy.HandleRequest(sr, endPoint, logtaskid);
@@ -425,5 +370,90 @@ namespace Ceen.Httpd.Cli.SubProcess
             Kill();
             return m_main;
         }
+
+        /// <summary>
+        /// Listens for a new connection
+        /// </summary>
+        /// <returns>The async.</returns>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public Task<KeyValuePair<long, EndPoint>> ListenAsync(CancellationToken cancellationToken)
+        {
+            return m_listenSocket.AcceptAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Handles a request on this instance
+        /// </summary>
+        /// <param name="client">The socket to transfer.</param>
+        /// <param name="remoteEndPoint">The remote endpoint</param>
+        /// <param name="logtaskid">The log task ID</param>
+        public async Task HandleRequest(long client, EndPoint remoteEndPoint, string logtaskid)
+        {
+            Program.DebugConsoleOutput("Processing new request with native handle");
+
+            // On POSIX systems we use SCM_RIGHTS
+            if (SystemHelper.IsCurrentOSPosix)
+            {
+                try
+                {
+                    // Prepare a stream
+                    using (var ms = new System.IO.MemoryStream())
+                    using (var bcs = new BinaryConverterStream(ms, m_fdSocketTypeSerializer))
+                    {
+                        // Serialize the request
+                        await bcs.WriteObjectAsync(new SocketRequest()
+                        {
+                            Handle = client,
+                            RemoteIP = ((IPEndPoint)remoteEndPoint).Address.ToString(),
+                            RemotePort = ((IPEndPoint)remoteEndPoint).Port,
+                            LogTaskID = logtaskid
+                        });
+                        await bcs.FlushAsync();
+
+                        Program.DebugConsoleOutput($"Sending socket {client} with {ms.Length} bytes of data");
+
+                        // Send the request data with the handle to the remote process
+                        using (await m_lock.LockAsync())
+                            SockRock.ScmRightsImplementation.send_fds(m_fdSocket.Handle.ToInt32(), new int[] { (int)client }, ms.ToArray());
+
+                        Program.DebugConsoleOutput("Data sent, closing local socket");
+
+                        // Make sure the handle is no longer in this process
+                        SockRock.ScmRightsImplementation.native_close((int)client);
+
+                        Program.DebugConsoleOutput("Completed sending the socket");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Program.ConsoleOutput("Failed to handle request: {0}", ex);
+                }
+            }
+            else
+            {
+                throw new PlatformNotSupportedException($"Unable to transmit the socket on the current platform: {SystemHelper.CurrentOS}");
+            }
+        }
+
+        /// <summary>
+        /// Binds this instance to the given endpoint
+        /// </summary>
+        /// <param name="endPoint">The endpoint to use.</param>
+        /// <param name="backlog">The connection backlog.</param>
+        public void Bind(EndPoint endPoint, int backlog)
+        {
+            m_listenSocket?.Dispose();
+
+            m_listenSocket = new SockRock.ListenSocket();
+            m_listenSocket.Bind(endPoint, backlog);
+        }
+
+
+        /// <summary>
+        /// Gets a value indicating whether this <see cref="T:Ceen.Httpd.Cli.Runner.SubProcess.SpawnRemoteInstance"/>
+        /// uses managed listen.
+        /// </summary>
+        /// <value><c>true</c> if using managed listen; otherwise, <c>false</c>.</value>
+        public bool UseManagedListen => !SystemHelper.IsCurrentOSPosix;
     }
 }

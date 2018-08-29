@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Net;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Ceen.Httpd.Cli.Spawn
+namespace Ceen.Httpd.Cli.Runner
 {
     /// <summary>
     /// Class for keeping the state of a listener
@@ -81,13 +80,27 @@ namespace Ceen.Httpd.Cli.Spawn
             Address = address;
             ShouldStop = false;
 
-            RunnerTask = HttpServer.ListenToSocketAsync(
-                new IPEndPoint(ConfigParser.ParseIPAddress(address), port),
-                usessl,
-                m_token.Token,
-                config,
-                (c, e, l) => Wrapper.HandleRequest(c, e, l)
-            );
+            if (Wrapper is ISelfListen isl && !isl.UseManagedListen)
+            {
+                isl.Bind(new IPEndPoint(ConfigParser.ParseIPAddress(address), port), config.SocketBacklog);
+                RunnerTask = HttpServer.ListenToSocketAsync(
+                    isl.ListenAsync, 
+                    usessl, 
+                    m_token.Token, 
+                    config,
+                    (c, e, l) => isl.HandleRequest(c, e, l)
+                );
+            }
+            else
+            {
+                RunnerTask = HttpServer.ListenToSocketAsync(
+                    new IPEndPoint(ConfigParser.ParseIPAddress(address), port),
+                    usessl,
+                    m_token.Token,
+                    config,
+                    (c, e, l) => Wrapper.HandleRequest(c, e, l)
+                );
+            }
         }
     }
 }

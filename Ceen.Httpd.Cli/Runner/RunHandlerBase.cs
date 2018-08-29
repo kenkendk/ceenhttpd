@@ -2,9 +2,12 @@
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Ceen.Httpd.Cli.Spawn
+namespace Ceen.Httpd.Cli.Runner
 {
-    public abstract class SpawnHandler : IAppDomainHandler
+    /// <summary>
+    /// Base class for handling the logic around starting and stopping instances
+    /// </summary>
+    public abstract class RunHandlerBase : IRunnerHandler
     {
         /// <summary>
         /// Path to the configuration file
@@ -38,7 +41,7 @@ namespace Ceen.Httpd.Cli.Spawn
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.UnixSpawn.UnixSpawnHandler"/> class.
         /// </summary>
         /// <param name="path">The config file path.</param>
-        public SpawnHandler(string path)
+        public RunHandlerBase(string path)
         {
             m_path = path;
         }

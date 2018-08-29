@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -7,7 +7,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Ceen.Httpd.Cli</RootNamespace>
     <AssemblyName>Ceen.Httpd.Cli</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <ReleaseVersion>0.9.3</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -31,21 +31,27 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Net" />
+    <Reference Include="Mono.Posix.NETStandard">
+      <HintPath>..\packages\Mono.Posix.NETStandard.1.0.0\lib\net40\Mono.Posix.NETStandard.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Posix" />
+    <Reference Include="SockRock">
+      <HintPath>..\packages\SockRock.1.0.0\lib\netstandard2.0\SockRock.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="CLIServerConfiguration.cs" />
     <Compile Include="ConfigParser.cs" />
-    <Compile Include="SubProcess\UnixEndPoint.cs" />
-    <Compile Include="SubProcess\SpawnRemoteInstance.cs" />
-    <Compile Include="SubProcess\SpawnedRunner.cs" />
-    <Compile Include="AppDomainSpawn\AppDomainHandler.cs" />
-    <Compile Include="Spawn\InstanceRunner.cs" />
-    <Compile Include="Spawn\IAppDomainHandler.cs" />
-    <Compile Include="Spawn\SpawnHandler.cs" />
     <Compile Include="SystemHelper.cs" />
-    <Compile Include="SubProcess\ScmRightsImplementation.cs" />
+    <Compile Include="Runner\InProcess\Runner.cs" />
+    <Compile Include="Runner\IRunner.cs" />
+    <Compile Include="Runner\RunHandlerBase.cs" />
+    <Compile Include="Runner\AppDomain\AppDomainHandler.cs" />
+    <Compile Include="Runner\SubProcess\SpawnedRunner.cs" />
+    <Compile Include="Runner\SubProcess\SpawnRemoteInstance.cs" />
+    <Compile Include="Runner\InstanceRunner.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -78,6 +84,12 @@
   <ItemGroup>
     <Folder Include="SubProcess\" />
     <Folder Include="AppDomainSpawn\" />
-    <Folder Include="Spawn\" />
+    <Folder Include="Runner\" />
+    <Folder Include="Runner\InProcess\" />
+    <Folder Include="Runner\AppDomain\" />
+    <Folder Include="Runner\SubProcess\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

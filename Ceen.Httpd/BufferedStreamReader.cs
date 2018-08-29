@@ -496,7 +496,7 @@ namespace Ceen.Httpd
 				throw new NotImplementedException();
 			}
 		}
-		#endregion
-	}
+        #endregion
+    }
 }
 

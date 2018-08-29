@@ -72,10 +72,18 @@ namespace ToDoList
 		static TodoHandler()
 		{
 			var env = Environment.GetEnvironmentVariable("DATA_FOLDER");
-			if (string.IsNullOrWhiteSpace(env))
-				env = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "data");
+            if (string.IsNullOrWhiteSpace(env))
+            {
+                var basepath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+                if (string.IsNullOrWhiteSpace(basepath))
+                    basepath = Directory.GetCurrentDirectory();
+                else
+                    basepath = Path.GetDirectoryName(basepath);
 
-			if (!Directory.Exists(env))
+                env = Path.Combine(basepath, "data");
+            }
+
+            if (!Directory.Exists(env))
 				Directory.CreateDirectory(env);
 
 			STORAGE_FOLDER = env;

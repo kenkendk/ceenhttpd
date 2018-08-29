@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace Ceen.Httpd.Cli.Spawn
+namespace Ceen.Httpd.Cli.Runner
 {
     /// <summary>
     /// Interface for a wrapped runner instance
@@ -18,6 +20,7 @@ namespace Ceen.Httpd.Cli.Spawn
         /// <param name="logtaskid">The task ID to use.</param>
         Task HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid);
 
+
         /// <summary>
         /// Requests that this instance stops serving requests
         /// </summary>
@@ -27,52 +30,46 @@ namespace Ceen.Httpd.Cli.Spawn
         /// Kill the remote instance.
         /// </summary>
         void Kill();
-
     }
 
     /// <summary>
-    /// Interface for sending requests over a domain or process boundary
+    /// The runner performs the listen step
     /// </summary>
-    public interface IRemotingWrapper
+    public interface ISelfListen : IWrappedRunner
     {
         /// <summary>
-        /// Setup this instance
+        /// Flag used to toggle using managed listening
         /// </summary>
-        /// <param name="usessl">If set to <c>true</c> usessl.</param>
-        /// <param name="configfile">Path to the configuration file</param>
-        /// <param name="storage">The storage instance or null</param>
-        void SetupFromFile(bool usessl, string configfile, IStorageCreator storage);
+        /// <value><c>true</c> if using managed listen; otherwise, <c>false</c>.</value>
+        bool UseManagedListen { get; }
+
+        /// <summary>
+        /// Listens for a new connection
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The connection and endpoint.</returns>
+        Task<KeyValuePair<long, EndPoint>> ListenAsync(CancellationToken cancellationToken);
 
         /// <summary>
         /// Handles a request
         /// </summary>
-        /// <param name="socket">The socket handle.</param>
+        /// <param name="client">The socket handle.</param>
         /// <param name="remoteEndPoint">The remote endpoint.</param>
         /// <param name="logtaskid">The task ID to use.</param>
-        void HandleRequest(SocketInformation socket, EndPoint remoteEndPoint, string logtaskid);
+        Task HandleRequest(long client, EndPoint remoteEndPoint, string logtaskid);
 
         /// <summary>
-        /// Requests that this instance stops serving requests
+        /// Binds this instance to the given endpoint
         /// </summary>
-        void Stop();
-
-        /// <summary>
-        /// Waits for all clients to finish processing
-        /// </summary>
-        /// <returns><c>true</c>, if for stop succeeded, <c>false</c> otherwise.</returns>
-        /// <param name="waitdelay">The maximum time to wait for the clients to stop.</param>
-        bool WaitForStop(TimeSpan waitdelay);
-
-        /// <summary>
-        /// Gets the number of active clients.
-        /// </summary>
-        int ActiveClients { get; }
+        /// <param name="endPoint">End point.</param>
+        /// <param name="backlog">The connection backlog</param>
+        void Bind(EndPoint endPoint, int backlog);
     }
 
     /// <summary>
     /// Shared interface for an isolated handler
     /// </summary>
-    public interface IAppDomainHandler
+    public interface IRunnerHandler
     {
         /// <summary>
         /// Gets a task that signals completion
@@ -95,3 +92,4 @@ namespace Ceen.Httpd.Cli.Spawn
         Task StopAsync();
     }
 }
+
