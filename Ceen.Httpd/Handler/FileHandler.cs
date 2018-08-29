@@ -53,7 +53,23 @@ namespace Ceen.Httpd.Handler
         /// The regular expression used to extract etags from the request
         /// </summary>
         protected readonly Regex ETAG_RE = new Regex(@"\s*(?<isWeak>W\\)?""(?<etag>\w+)""\s*,?");
+        /// <summary>
+        /// The etag salt in byte-array format
+        /// </summary>
+        private byte[] m_etagsalt = null;
+        /// <summary>
+        /// The etag salt in string format
+        /// </summary>
+        private string m_etagsaltstring = null;
 
+        /// <summary>
+        /// Gets or sets the etag hashing algorithm.
+        /// </summary>
+        public string EtagAlgorithm { get; set; } = "MD5";
+        /// <summary>
+        /// An optional etag salt
+        /// </summary>
+        public string EtagSalt { get; set; } = null;
 		/// <summary>
 		/// Gets or sets the path prefix
 		/// </summary>
@@ -153,12 +169,18 @@ namespace Ceen.Httpd.Handler
         public virtual async Task<string> ComputeETag(Stream sourcedata)
         {
             var buffer = new byte[8 * 1024];
-            using (var hasher = System.Security.Cryptography.MD5.Create())
+            using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : System.Security.Cryptography.HashAlgorithm.Create(EtagAlgorithm))
             {
+                if (m_etagsaltstring != EtagSalt)
+                    m_etagsalt = System.Text.Encoding.UTF8.GetBytes(m_etagsaltstring = EtagSalt);
+                if (m_etagsalt != null)
+                    hasher.TransformBlock(m_etagsalt, 0, m_etagsalt.Length, m_etagsalt, 0);
+
                 int r = 0;
                 while ((r = await sourcedata.ReadAsync(buffer, 0, buffer.Length)) != 0)
                     hasher.TransformBlock(buffer, 0, r, buffer, 0);
-                return Convert.ToString(hasher.TransformFinalBlock(buffer, 0, 0));
+                hasher.TransformFinalBlock(buffer, 0, 0);
+                return Convert.ToBase64String(hasher.Hash).TrimEnd('=');
             }
         }
 
