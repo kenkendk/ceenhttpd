@@ -959,7 +959,7 @@ namespace Ceen.Httpd
 				catch (Exception ex)
 				{
 					// If possible, report a 500 error to the client
-					if (resp != null)
+                    if (resp != null)
 					{
 						try
 						{

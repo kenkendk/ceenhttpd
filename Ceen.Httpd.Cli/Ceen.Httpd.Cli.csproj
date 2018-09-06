@@ -8,7 +8,6 @@
     <RootNamespace>Ceen.Httpd.Cli</RootNamespace>
     <AssemblyName>Ceen.Httpd.Cli</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
-    <ReleaseVersion>0.9.3</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
