@@ -37,22 +37,41 @@ namespace Ceen
 		{
 		}
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
-		/// </summary>
-		/// <param name="statuscode">The statuscode.</param>
-		/// <param name="statusmessage">The statusmessage.</param>
-		public HttpException(HttpStatusCode statuscode, string statusmessage)
-		{
-			this.StatusCode = statuscode;
-			this.StatusMessage = statusmessage;
-		}			
-	}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
+        /// </summary>
+        /// <param name="statuscode">The statuscode.</param>
+        /// <param name="statusmessage">The statusmessage.</param>
+        public HttpException(HttpStatusCode statuscode, string statusmessage)
+        {
+            this.StatusCode = statuscode;
+            this.StatusMessage = statusmessage;
+        }
 
-	/// <summary>
-	/// Exception indicating that the stream closed without sending content
-	/// </summary>
-	[Serializable]
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
+        /// </summary>
+        /// <param name="statuscode">The statuscode.</param>
+        public HttpException(System.Net.HttpStatusCode statuscode)
+            : this((HttpStatusCode)(int)statuscode)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Ceen.HttpException"/> class.
+        /// </summary>
+        /// <param name="statuscode">The statuscode.</param>
+        /// <param name="statusmessage">The statusmessage.</param>
+        public HttpException(System.Net.HttpStatusCode statuscode, string statusmessage)
+            : this((HttpStatusCode)(int)statuscode, statusmessage)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Exception indicating that the stream closed without sending content
+    /// </summary>
+    [Serializable]
 	public class EmptyStreamClosedException : Exception
 	{
 	}
