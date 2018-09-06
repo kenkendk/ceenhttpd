@@ -274,7 +274,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                 }
 
                 // This bug is fixed in mono, but we need to wait to get the version number
-                if (monoRuntime != null && monoVersion <= new Version(4, 6, 2))
+                if (monoRuntime != null /* && monoVersion <= new Version(4, 6, 2) */ )
                 {
                     safe_handle_field = typeof(Socket).GetField("safe_handle", BindingFlags.NonPublic | BindingFlags.Instance);
                     if (safe_handle_field == null)
