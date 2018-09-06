@@ -81,8 +81,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="SubProcess\" />
-    <Folder Include="AppDomainSpawn\" />
     <Folder Include="Runner\" />
     <Folder Include="Runner\InProcess\" />
     <Folder Include="Runner\AppDomain\" />
