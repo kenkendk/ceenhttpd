@@ -11,36 +11,36 @@ namespace Ceen.Httpd.Handler
 	/// <summary>
 	/// Basic implementation of a file-serving module
 	/// </summary>
-	public class FileHandler : IHttpModule
+	public class FileHandler : IHttpModuleWithSetup
 	{
 		/// <summary>
 		/// The folder where files are served from
 		/// </summary>
-		protected readonly string m_sourcefolder;
+        public string SourceFolder { get; set; }
 		/// <summary>
 		/// Cached copy of the directory separator as a string
 		/// </summary>
-		private static readonly string DIRSEP = Path.DirectorySeparatorChar.ToString();
-		/// <summary>
-		/// Parser to match Range requests
-		/// </summary>
-		private static readonly Regex RANGE_MATCHER = new Regex("bytes=(?<start>\\d*)-(?<end>\\d*)");
-		/// <summary>
-		/// Chars that are not allowed in the path
-		/// </summary>
-		private static readonly string[] FORBIDDENCHARS = new string[]{ "\\", "..", ":" };
+		protected static readonly string DIRSEP = Path.DirectorySeparatorChar.ToString();
+        /// <summary>
+        /// Parser to match Range requests
+        /// </summary>
+        protected static readonly Regex RANGE_MATCHER = new Regex("bytes=(?<start>\\d*)-(?<end>\\d*)");
+        /// <summary>
+        /// Chars that are not allowed in the path
+        /// </summary>
+        protected static readonly string[] FORBIDDENCHARS = new string[]{ "\\", "..", ":" };
 		/// <summary>
 		/// Function that maps a request to a mime type
 		/// </summary>
-		private Func<IHttpRequest, string, string> m_mimetypelookup;
-		/// <summary>
-		/// List of allowed index files
-		/// </summary>
-		private readonly string[] m_indexfiles;
-		/// <summary>
-		/// List of allowed index file extensions
-		/// </summary>
-		private readonly string[] m_autoprobeextensions;
+        protected Func<IHttpRequest, string, string> m_mimetypelookup;
+        /// <summary>
+        /// List of allowed index documents
+        /// </summary>
+        public string[] IndexDocuments { get; set; } = new string[] { "index.html", "index.htm" };
+        /// <summary>
+        /// List of allowed index file extensions
+        /// </summary>
+        public string[] AutoProbeExtensions { get; set; } = new string[] { ".html", ".htm" };
         /// <summary>
         /// The current etag cache
         /// </summary>
@@ -56,11 +56,7 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// The etag salt in byte-array format
         /// </summary>
-        private byte[] m_etagsalt = null;
-        /// <summary>
-        /// The etag salt in string format
-        /// </summary>
-        private string m_etagsaltstring = null;
+        protected byte[] m_etagsalt = null;
 
         /// <summary>
         /// Gets or sets the etag hashing algorithm.
@@ -101,51 +97,18 @@ namespace Ceen.Httpd.Handler
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		public FileHandler(string sourcefolder)
-			: this(sourcefolder, new string[] { "index.html", "index.htm" }, new string[] { ".html", ".htm" }, null)
+			: this(sourcefolder, null)
 		{
 		}
-
+        		
 		/// <summary>
 		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
 		/// </summary>
 		/// <param name="sourcefolder">The folder to server files from.</param>
 		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
-		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup)
-			: this(sourcefolder, new string[] {"index.html", "index.htm"}, new string[] { ".html", ".htm" }, mimetypelookup)
+		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup = null)
 		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
-		/// </summary>
-		/// <param name="sourcefolder">The folder to server files from.</param>
-		/// <param name="indexfiles">List of filenames allowed as index files.</param>
-		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
-		public FileHandler(string sourcefolder, string[] indexfiles, Func<IHttpRequest, string, string> mimetypelookup = null)
-			: this(sourcefolder, indexfiles, new string[] { ".html", ".htm" }, mimetypelookup)
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
-		/// </summary>
-		/// <param name="sourcefolder">The folder to server files from.</param>
-		/// <param name="indexfiles">List of filenames allowed as index files.</param>
-		/// <param name="autoprobeextensions">List of automatically probed extensions</param>
-		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
-		public FileHandler(string sourcefolder, string[] indexfiles, string[] autoprobeextensions, Func<IHttpRequest, string, string> mimetypelookup = null)
-		{
-			m_indexfiles = indexfiles ?? new string[0];
-			m_autoprobeextensions = 
-				(autoprobeextensions ?? new string[0])
-					.Where(x => !string.IsNullOrWhiteSpace(x))
-					.Select(x => x.StartsWith(".", StringComparison.Ordinal) ? x : "." + x)
-					.ToArray();
-			
-			m_sourcefolder = Path.GetFullPath(sourcefolder);
-			if (!m_sourcefolder.StartsWith(DIRSEP, StringComparison.Ordinal))
-				m_sourcefolder = DIRSEP + m_sourcefolder;
-
+            SourceFolder = sourcefolder;
 			m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
 		}
 
@@ -171,8 +134,6 @@ namespace Ceen.Httpd.Handler
             var buffer = new byte[8 * 1024];
             using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : System.Security.Cryptography.HashAlgorithm.Create(EtagAlgorithm))
             {
-                if (m_etagsaltstring != EtagSalt)
-                    m_etagsalt = System.Text.Encoding.UTF8.GetBytes(m_etagsaltstring = EtagSalt);
                 if (m_etagsalt != null)
                     hasher.TransformBlock(m_etagsalt, 0, m_etagsalt.Length, m_etagsalt, 0);
 
@@ -213,77 +174,92 @@ namespace Ceen.Httpd.Handler
             return true;
         }
 
-		#region IHttpModule implementation
-		/// <summary>
-		/// Handles the request.
-		/// </summary>
-		/// <returns>The awaitable task.</returns>
-		/// <param name="context">The http context.</param>
-		public virtual async Task<bool> HandleAsync(IHttpContext context)
-		{
-			if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
-				throw new HttpException(HttpStatusCode.MethodNotAllowed);
+        /// <summary>
+        /// Extracts and validates the local path from the remote request
+        /// </summary>
+        /// <returns>The local path.</returns>
+        /// <param name="context">The request context.</param>
+        protected virtual string GetLocalPath(IHttpContext context)
+        {
+            var pathrequest = Uri.UnescapeDataString(context.Request.Path);
 
-			var pathrequest = Uri.UnescapeDataString(context.Request.Path);
+            foreach (var c in FORBIDDENCHARS)
+                if (pathrequest.Contains(c))
+                    throw new HttpException(HttpStatusCode.BadRequest);
 
-			foreach(var c in FORBIDDENCHARS)
-				if (pathrequest.Contains(c))
-					throw new HttpException(HttpStatusCode.BadRequest);
+            if (!pathrequest.StartsWith(PathPrefix, StringComparison.Ordinal))
+                return null;
 
-			if (!pathrequest.StartsWith(PathPrefix, StringComparison.Ordinal))
-				return false;
+            pathrequest = pathrequest.Substring(PathPrefix.Length);
 
-			pathrequest = pathrequest.Substring(PathPrefix.Length);
 
-			var path = MapToLocalPath(pathrequest);
-			if (!path.StartsWith(m_sourcefolder, StringComparison.Ordinal))
-				throw new HttpException(HttpStatusCode.BadRequest);
+            var path = pathrequest.Replace("/", DIRSEP);
+            while (path.StartsWith(DIRSEP, StringComparison.Ordinal))
+                path = path.Substring(1);
 
-			if (!File.Exists(path))
-			{
-				if (string.IsNullOrWhiteSpace(Path.GetExtension(path)) && !path.EndsWith("/", StringComparison.Ordinal) && !path.EndsWith(".", StringComparison.Ordinal))
-				{
-					var ix = m_autoprobeextensions.FirstOrDefault(p => File.Exists(path + p));
-					if (!string.IsNullOrWhiteSpace(ix))
-					{
-						context.Response.InternalRedirect(context.Request.Path + ix);
-						return true;
-					}					
-				}
+            path = Path.Combine(SourceFolder, path);
+            if (!path.StartsWith(SourceFolder, StringComparison.Ordinal))
+                throw new HttpException(HttpStatusCode.BadRequest);
 
-				if (Directory.Exists(path))
-				{
-					if (!context.Request.Path.EndsWith("/", StringComparison.Ordinal))
-					{
-						if (!m_indexfiles.Any(p => File.Exists(Path.Combine(path, p))))
-							throw new HttpException(HttpStatusCode.NotFound);
+            return path;
+        }
 
-						context.Response.Redirect(context.Request.Path + "/");
-						return true;
-					}
+        /// <summary>
+        /// Performs internal redirects on paths with missing trailings slashes
+        /// and handles redirects to index files
+        /// </summary>
+        /// <returns><c>true</c>, if redirect was issued, <c>false</c> otherwise.</returns>
+        /// <param name="path">The local path to use.</param>
+        /// <param name="context">The request context.</param>
+        protected virtual bool AutoRedirect(string path, IHttpContext context)
+        {
+            if (!File.Exists(path))
+            {
+                if (string.IsNullOrWhiteSpace(Path.GetExtension(path)) && !path.EndsWith("/", StringComparison.Ordinal) && !path.EndsWith(".", StringComparison.Ordinal))
+                {
+                    var ix = AutoProbeExtensions.FirstOrDefault(p => File.Exists(path + p));
+                    if (!string.IsNullOrWhiteSpace(ix))
+                    {
+                        context.Response.InternalRedirect(context.Request.Path + ix);
+                        return true;
+                    }
+                }
 
-					var ix = m_indexfiles.FirstOrDefault(p => File.Exists(Path.Combine(path, p)));
-					if (!string.IsNullOrWhiteSpace(ix))
-					{
-						context.Response.InternalRedirect(context.Request.Path + ix);
-						return true;
-					}
-				}
+                if (Directory.Exists(path))
+                {
+                    if (!context.Request.Path.EndsWith("/", StringComparison.Ordinal))
+                    {
+                        if (!IndexDocuments.Any(p => File.Exists(Path.Combine(path, p))))
+                            throw new HttpException(HttpStatusCode.NotFound);
 
-				// No alternatives available
-				throw new HttpException(HttpStatusCode.NotFound);
-			}
+                        context.Response.Redirect(context.Request.Path + "/");
+                        return true;
+                    }
 
-			// If this is just a rewrite handler, stop now as we did not handle it
-			if (RedirectOnly)
-				return false;
+                    var ix = IndexDocuments.FirstOrDefault(p => File.Exists(Path.Combine(path, p)));
+                    if (!string.IsNullOrWhiteSpace(ix))
+                    {
+                        context.Response.InternalRedirect(context.Request.Path + ix);
+                        return true;
+                    }
+                }
 
-			var mimetype = m_mimetypelookup(context.Request, path);
-			if (mimetype == null)
-				throw new HttpException(HttpStatusCode.NotFound);
+            }
 
-			try
-			{
+            return false;
+        }
+
+        /// <summary>
+        /// Serves the request
+        /// </summary>
+        /// <returns>An awaitable task.</returns>
+        /// <param name="path">The local path to a file to send.</param>
+        /// <param name="mimetype">The mime type to report.</param>
+        /// <param name="context">The request context.</param>
+        protected virtual async Task<bool> ServeRequest(string path, string mimetype, IHttpContext context)
+        {
+            try
+            {
                 string etag = null;
                 string etagkey = ETagCacheSize < 0 ? null : File.GetLastWriteTimeUtc(path).Ticks + path;
                 string[] clientetags = new string[0];
@@ -291,9 +267,9 @@ namespace Ceen.Httpd.Handler
                 if (etagkey != null)
                 {
                     KeyValuePair<string, long> etagcacheddata;
-                    using(await m_etagLock.LockAsync())
+                    using (await m_etagLock.LockAsync())
                         m_etagCache.TryGetValue(etagkey, out etagcacheddata);
-                    
+
                     etag = etagcacheddata.Key;
 
                     var ce = ETAG_RE.Matches(context.Request.Headers["If-None-Match"] ?? string.Empty);
@@ -307,44 +283,44 @@ namespace Ceen.Httpd.Handler
                                 return SetNotModified(context, etag);
                         }
                     }
-                }          
+                }
 
-				using (var fs = File.OpenRead(path))
-				{
-					var startoffset = 0L;
-					var bytecount = fs.Length;
-					var endoffset = bytecount - 1;
+                using (var fs = File.OpenRead(path))
+                {
+                    var startoffset = 0L;
+                    var bytecount = fs.Length;
+                    var endoffset = bytecount - 1;
 
-					var rangerequest = context.Request.Headers["Range"];
-					if (!string.IsNullOrWhiteSpace(rangerequest))
-					{
-						var m = RANGE_MATCHER.Match(rangerequest);
+                    var rangerequest = context.Request.Headers["Range"];
+                    if (!string.IsNullOrWhiteSpace(rangerequest))
+                    {
+                        var m = RANGE_MATCHER.Match(rangerequest);
                         if (!m.Success || m.Length != rangerequest.Length)
                             return SetInvalidRangeHeader(context, bytecount);
 
-						if (m.Groups["start"].Length != 0)
-							if (!long.TryParse(m.Groups["start"].Value, out startoffset))
+                        if (m.Groups["start"].Length != 0)
+                            if (!long.TryParse(m.Groups["start"].Value, out startoffset))
                                 return SetInvalidRangeHeader(context, bytecount);
 
-						if (m.Groups["end"].Length != 0)
-							if (!long.TryParse(m.Groups["end"].Value, out endoffset))
+                        if (m.Groups["end"].Length != 0)
+                            if (!long.TryParse(m.Groups["end"].Value, out endoffset))
                                 return SetInvalidRangeHeader(context, bytecount);
 
-						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length == 0)
+                        if (m.Groups["start"].Length == 0 && m.Groups["end"].Length == 0)
                             return SetInvalidRangeHeader(context, bytecount);
 
-						if (m.Groups["start"].Length == 0 && m.Groups["end"].Length != 0)
-						{
-							startoffset = bytecount - endoffset;
-							endoffset = bytecount - 1;
-						}
+                        if (m.Groups["start"].Length == 0 && m.Groups["end"].Length != 0)
+                        {
+                            startoffset = bytecount - endoffset;
+                            endoffset = bytecount - 1;
+                        }
 
-						if (endoffset > bytecount - 1)
-							endoffset = bytecount - 1;
+                        if (endoffset > bytecount - 1)
+                            endoffset = bytecount - 1;
 
-						if (endoffset < startoffset)
+                        if (endoffset < startoffset)
                             return SetInvalidRangeHeader(context, bytecount);
-					}
+                    }
 
                     if (etagkey != null)
                     {
@@ -374,70 +350,101 @@ namespace Ceen.Httpd.Handler
                     if (etag != null && clientetags != null && clientetags.Any(x => string.Equals(x, etag, StringComparison.Ordinal)))
                         return SetNotModified(context, etag);
 
-					var lastmodified = File.GetLastWriteTimeUtc(path);
-					context.Response.ContentType = mimetype;
-					context.Response.StatusCode = HttpStatusCode.OK;
-					context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
-					context.Response.AddHeader("Accept-Ranges", "bytes");
+                    var lastmodified = File.GetLastWriteTimeUtc(path);
+                    context.Response.ContentType = mimetype;
+                    context.Response.StatusCode = HttpStatusCode.OK;
+                    context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
+                    context.Response.AddHeader("Accept-Ranges", "bytes");
                     context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
 
-					DateTime modifiedsincedate;
-					DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
+                    DateTime modifiedsincedate;
+                    DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
 
-					if (modifiedsincedate == lastmodified)
-					{
+                    if (modifiedsincedate == lastmodified)
+                    {
                         return SetNotModified(context, etag);
-					}
-					else
-					{
+                    }
+                    else
+                    {
                         if (etag != null)
                             context.Response.Headers["ETag"] = $"\"{etag}\"";
 
-						context.Response.ContentLength = endoffset - startoffset + 1;
+                        context.Response.ContentLength = endoffset - startoffset + 1;
                         if (context.Response.ContentLength != bytecount)
                         {
                             context.Response.StatusCode = HttpStatusCode.PartialContent;
                             context.Response.AddHeader("Content-Range", string.Format("bytes {0}-{1}/{2}", startoffset, endoffset, bytecount));
                         }
-					}
+                    }
 
-					await BeforeResponseAsync(context, fs);
+                    await BeforeResponseAsync(context, fs);
 
-					if (context.Response.StatusCode == HttpStatusCode.NotModified)
-						return true;
+                    if (context.Response.StatusCode == HttpStatusCode.NotModified)
+                        return true;
 
-					if (string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
-					{
-						if (context.Response.ContentLength != 0)
-						{
-							context.Response.KeepAlive = false;
-							await context.Response.FlushHeadersAsync();
-						}
-						return true;
-					}
+                    if (string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+                    {
+                        if (context.Response.ContentLength != 0)
+                        {
+                            context.Response.KeepAlive = false;
+                            await context.Response.FlushHeadersAsync();
+                        }
+                        return true;
+                    }
 
-					fs.Position = startoffset;
-					var remain = context.Response.ContentLength;
-					var buf = new byte[8 * 1024];
+                    fs.Position = startoffset;
+                    var remain = context.Response.ContentLength;
+                    var buf = new byte[8 * 1024];
 
-					using (var os = context.Response.GetResponseStream())
-					{
-						while (remain > 0)
-						{
-							var r = await fs.ReadAsync(buf, 0, (int)Math.Min(buf.Length, remain));
-							await os.WriteAsync(buf, 0, r);
-							remain -= r;
-						}
-					}
-				}
-			}
-			catch
-			{
-				throw new HttpException(HttpStatusCode.Forbidden);
-			}
+                    using (var os = context.Response.GetResponseStream())
+                    {
+                        while (remain > 0)
+                        {
+                            var r = await fs.ReadAsync(buf, 0, (int)Math.Min(buf.Length, remain));
+                            await os.WriteAsync(buf, 0, r);
+                            remain -= r;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                throw new HttpException(HttpStatusCode.Forbidden);
+            }
 
-			return true;
+            return true;
+        }
 
+		#region IHttpModule implementation
+		/// <summary>
+		/// Handles the request.
+		/// </summary>
+		/// <returns>The awaitable task.</returns>
+		/// <param name="context">The http context.</param>
+		public virtual Task<bool> HandleAsync(IHttpContext context)
+		{
+            if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+                throw new HttpException(HttpStatusCode.MethodNotAllowed);
+
+            var path = GetLocalPath(context);
+            if (string.IsNullOrWhiteSpace(path))
+                return Task.FromResult(false);
+
+            if (AutoRedirect(path, context))
+                return Task.FromResult(true);
+
+            if (!File.Exists(path))
+                throw new HttpException(HttpStatusCode.NotFound);
+                
+            // If this is just a rewrite handler, stop now as we did not handle it
+            if (RedirectOnly)
+               return Task.FromResult(false);
+
+			var mimetype = m_mimetypelookup(context.Request, path);
+			if (mimetype == null)
+				throw new HttpException(HttpStatusCode.NotFound);
+
+            return ServeRequest(path, mimetype, context);
 		}
 		#endregion
 
@@ -481,7 +488,8 @@ namespace Ceen.Httpd.Handler
 					return "image/vnd.microsoft.icon";
 				case ".css":
 					return "text/css";
-				case ".gzip":
+                case ".gz":
+                case ".gzip":
 					return "application/x-gzip";
 				case ".zip":
 					return "application/x-zip";
@@ -534,14 +542,23 @@ namespace Ceen.Httpd.Handler
 			}
 		}	
 
-		protected virtual string MapToLocalPath(string path)
-		{
-			path = path.Replace("/", DIRSEP);
-			while (path.StartsWith(DIRSEP, StringComparison.Ordinal))
-				path = path.Substring(1);
+        /// <summary>
+        /// Handles post-configuration setup
+        /// </summary>
+        public virtual void AfterConfigure()
+        {
+            if (!string.IsNullOrWhiteSpace(EtagSalt))
+                m_etagsalt = System.Text.Encoding.UTF8.GetBytes(EtagSalt);
 
-			return Path.Combine(m_sourcefolder, path);
-		}
-	}
+            SourceFolder = Path.GetFullPath(SourceFolder);
+
+            IndexDocuments = IndexDocuments ?? new string[0];
+            AutoProbeExtensions =
+                (AutoProbeExtensions ?? new string[0])
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.StartsWith(".", StringComparison.Ordinal) ? x : "." + x)
+                    .ToArray();
+        }
+    }
 }
 
