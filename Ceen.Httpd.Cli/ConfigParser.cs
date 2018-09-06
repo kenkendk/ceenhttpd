@@ -15,7 +15,7 @@ namespace Ceen.Httpd.Cli
 		/// <summary>
 		/// The types the parser supports + enums
 		/// </summary>
-		private static readonly Type[] SUPPORTED_RETURN_TYPES = new Type[] { typeof(string), typeof(int), typeof(bool) };
+        private static readonly Type[] SUPPORTED_RETURN_TYPES = new Type[] { typeof(string), typeof(int), typeof(bool), typeof(long) };
 
 		/// <summary>
 		/// Helper method to get all properties in a case-insensitive dictionary
@@ -36,7 +36,7 @@ namespace Ceen.Httpd.Cli
 		{
 			return item
 				.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				.Where(x => SUPPORTED_RETURN_TYPES.Contains(x.PropertyType) || x.PropertyType.IsEnum)
+                .Where(x => SUPPORTED_RETURN_TYPES.Contains(x.PropertyType) || x.PropertyType.IsEnum || (x.PropertyType.IsArray && SUPPORTED_RETURN_TYPES.Contains(x.PropertyType.GetElementType())))
 				.ToDictionary(x => x.Name.ToLowerInvariant(), x => x, StringComparer.OrdinalIgnoreCase);
 		}
 
@@ -111,6 +111,19 @@ namespace Ceen.Httpd.Cli
 					);
 					
 			}
+
+            if (targettype.IsArray)
+            {
+                // TODO: Handle embedded comma values in strings?
+                return
+                    (value ?? "")
+                        .Split(',')
+                        .Select(x => ArgumentFromString(ExpandEnvironmentVariables(x), targettype.GetElementType()))
+                        .ToArray();
+            }
+
+            if ((targettype.IsArray || targettype == typeof(string)) && string.Equals(value, "null", StringComparison.OrdinalIgnoreCase))
+                return null;
 				
 			return Convert.ChangeType(ExpandEnvironmentVariables(value), targettype);
 		}
@@ -606,17 +619,18 @@ namespace Ceen.Httpd.Cli
 								mimehandler = (req, path) => null;
 							}
 
-							if (config.IndexDocuments.Count == 0)
-								handler = new Ceen.Httpd.Handler.FileHandler(
-									ExpandEnvironmentVariables(route.ConstructorArguments.First()),
-									mimehandler
-								);
-							else
-								handler = new Ceen.Httpd.Handler.FileHandler(
-									ExpandEnvironmentVariables(route.ConstructorArguments.First()),
-									config.IndexDocuments.ToArray(),
-									mimehandler
-								);
+                            handler = Activator.CreateInstance(
+                                moduletype,
+                                ExpandEnvironmentVariables(route.ConstructorArguments.First()),
+                                mimehandler
+                            );
+
+                            if (config.IndexDocuments.Count != 0)
+                            {
+                                if (route.Options.ContainsKey(nameof(Handler.FileHandler.IndexDocuments)))
+                                    throw new Exception($"Cannot use both the `Index` option and {nameof(Handler.FileHandler.IndexDocuments)} in the configuration for {moduletype.FullName}");
+                                route.Options[nameof(Handler.FileHandler.IndexDocuments)] = string.Join(", ", config.IndexDocuments.Select(x => $"\"{x}\""));
+                            }
 						}
 						else
 						{
@@ -652,7 +666,7 @@ namespace Ceen.Httpd.Cli
 						if (route.Options != null)
 							SetProperties(rt, route.Options);
 
-						cfg.AddRoute(new Ceen.Mvc.ControllerRouter(rt, assembly));
+                        cfg.AddRoute(new Ceen.Mvc.ControllerRouter(rt, assembly));
 					}
 				}
 			}
