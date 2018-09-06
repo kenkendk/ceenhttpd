@@ -626,6 +626,9 @@ namespace Ceen.Httpd.Cli
 						if (route.Options != null)
 							SetProperties(handler, route.Options);
 
+                        if (handler is IHttpModuleWithSetup mse)
+                            mse.AfterConfigure();
+
 						if (string.IsNullOrWhiteSpace(route.RoutePrefix))
 							cfg.AddRoute((IHttpModule)handler);
 						else

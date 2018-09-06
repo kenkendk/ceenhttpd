@@ -478,6 +478,15 @@ namespace Ceen
 		Task<bool> HandleAsync(IHttpContext context);
 	}
 
+    /// <summary>
+    /// A module based on <see cref="IHttpModule"/> which is notified after being configured.
+    /// Items that use this interface can do one-time setups in this call.
+    /// </summary>
+    public interface IHttpModuleWithSetup : IHttpModule
+    {
+        void AfterConfigure();
+    }
+
 	/// <summary>
 	/// Interface for implementing a storage creator
 	/// </summary>
