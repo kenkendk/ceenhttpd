@@ -21,11 +21,11 @@ namespace Ceen
         /// <summary>
         /// The handler method that is used to return the size of each element
         /// </summary>
-        private readonly Func<T, Task<long>> m_sizecalculator;
+        private readonly Func<string, T, Task<long>> m_sizecalculator;
         /// <summary>
-        /// The handler invoked whne an item is expired
+        /// The handler invoked when an item is expired
         /// </summary>
-        private readonly Func<T, Task> m_expirehandler;
+        private readonly Func<string, T, bool, Task> m_expirehandler;
 
         /// <summary>
         /// The lock guarding the cache
@@ -46,13 +46,23 @@ namespace Ceen
         private readonly long m_countlimit;
 
         /// <summary>
+        /// Gets maximum allowed size of the cache
+        /// </summary>
+        public long SizeLimit => m_sizelimit;
+
+        /// <summary>
+        /// Gets the maximum number of elements in the cache.
+        /// </summary>
+        public long CountLimit => m_countlimit;
+
+        /// <summary>
         /// Creates a new least-recent-used cache
         /// </summary>
         /// <param name="sizelimit">The limit for the size of the cache.</param>
         /// <param name="countlimit">The limit for the number of items in the cache.</param>
         /// <param name="expirationHandler">A callback method invoked when items are expired from the cache.</param>
         /// <param name="sizeHandler">A callback handler used to compute the size of elements add and removed from the queue.</param>
-        public LRUCache(long sizelimit = long.MaxValue, long countlimit = long.MaxValue, Func<T, Task> expirationHandler = null, Func<T, Task<long>> sizeHandler = null)
+        public LRUCache(long sizelimit = long.MaxValue, long countlimit = long.MaxValue, Func<string, T, bool, Task> expirationHandler = null, Func<string, T, Task<long>> sizeHandler = null)
         {
             if (sizelimit != long.MaxValue && sizeHandler == null)
                 throw new Exception("Must supply a size handler to enforce the cache size");
@@ -60,7 +70,7 @@ namespace Ceen
             m_sizelimit = sizelimit;
             m_countlimit = countlimit;
             m_expirehandler = expirationHandler;
-            m_sizecalculator = sizeHandler ?? (_ => Task.FromResult(0L));
+            m_sizecalculator = sizeHandler ?? ((k, v) => Task.FromResult(0L));
         }
 
         /// <summary>
@@ -69,7 +79,7 @@ namespace Ceen
         /// <returns><c>true</c> if the value was new, <c>false</c> otherwise</returns>
         /// <param name="key">The element key.</param>
         /// <param name="value">The element value.</param>
-        public async Task<bool> AddOrReplace(string key, T value)
+        public async Task<bool> AddOrReplaceAsync(string key, T value)
         {
             using (await m_lock.LockAsync())
             {
@@ -78,15 +88,15 @@ namespace Ceen
                 {
                     m_size -= vt.Value;
                     m_mru.Remove(key);
-                    await m_expirehandler.Invoke(vt.Key);
+                    await m_expirehandler?.Invoke(key, vt.Key, false);
                 }
 
-                var s = await m_sizecalculator(value);
+                var s = await m_sizecalculator(key, value);
                 m_size += s;
                 m_lookup[key] = new KeyValuePair<T, long>(value, s);
                 m_mru.Add(key);
 
-                await ExpireOverLimit();
+                await ExpireOverLimitAsync();
 
                 return !p;
             }
@@ -96,7 +106,7 @@ namespace Ceen
         /// Expires items that are outside the limits
         /// </summary>
         /// <returns>An awaitable task.</returns>
-        private async Task ExpireOverLimit()
+        private async Task ExpireOverLimitAsync()
         {
             while (m_mru.Count > 0 && m_size >= m_sizelimit || m_mru.Count >= m_countlimit)
             {
@@ -105,7 +115,45 @@ namespace Ceen
                 var v = m_lookup[k];
                 m_size -= v.Value;
                 m_lookup.Remove(k);
-                await m_expirehandler?.Invoke(v.Key);
+                await m_expirehandler?.Invoke(k, v.Key, true);
+            }
+        }
+
+        /// <summary>
+        /// Expires all items in the cache
+        /// </summary>
+        /// <returns>An awaitable task.</returns>
+        public Task ClearAsync()
+        {
+            return ClearAsync((key, value) => true);
+        }
+
+        /// <summary>
+        /// Expires items in the cache
+        /// </summary>
+        /// <param name="predicate">A predicate function returning true for items to remove</param>
+        /// <returns>An awaitable task.</returns>
+        public async Task ClearAsync(Func<string, T, bool> predicate)
+        {
+            using (await m_lock.LockAsync())
+            {
+                for (var i = m_mru.Count - 1; i > 0; i--)
+                {
+                    var k = m_mru[i];
+                    var v = m_lookup[k];
+                    if (predicate(k, v.Key))
+                    {
+                        m_size -= v.Value;
+                        m_mru.RemoveAt(i);
+                        m_lookup.Remove(k);
+                        await m_expirehandler?.Invoke(k, v.Key, true);
+                    }
+                }
+
+                // Just to be sure
+                m_mru.Clear();
+                m_lookup.Clear();
+                m_size = 0;
             }
         }
 
@@ -125,6 +173,56 @@ namespace Ceen
 
             value = default(T);
             return false;
+        }
+
+        /// <summary>
+        /// Attempts to get the value. If the value does not match the <paramref name="predicate"/> it is expired and nothing is returned.
+        /// </summary>
+        /// <returns>A flag indicating if any results are returned, and the result, if any.</returns>
+        /// <param name="key">The key to look for.</param>
+        /// <param name="predicate">The predicate method, returns true if the item is invalid.</param>
+        public async Task<KeyValuePair<bool, T>> TryGetUnless(string key, Func<string, T, Task<bool>> predicate)
+        {
+            using (await m_lock.LockAsync())
+            {
+                if (m_lookup.TryGetValue(key, out var n))
+                {
+                    if (!await predicate(key, n.Key))
+                        return new KeyValuePair<bool, T>(true, n.Key);
+
+                    m_mru.Remove(key);
+                    m_size -= n.Value;
+                    m_lookup.Remove(key);
+                    await m_expirehandler?.Invoke(key, n.Key, true);
+                }
+            }
+
+            return new KeyValuePair<bool, T>(false, default(T));
+        }
+
+        /// <summary>
+        /// Attempts to get the value. If the value does not match the <paramref name="predicate"/> it is expired and nothing is returned.
+        /// </summary>
+        /// <returns>A flag indicating if any results are returned, and the result, if any.</returns>
+        /// <param name="key">The key to look for.</param>
+        /// <param name="predicate">The predicate method, returns true if the item is invalid.</param>
+        public async Task<KeyValuePair<bool, T>> TryGetUnless(string key, Func<string, T, bool> predicate)
+        {
+            using (await m_lock.LockAsync())
+            {
+                if (m_lookup.TryGetValue(key, out var n))
+                {
+                    if (!predicate(key, n.Key))
+                        return new KeyValuePair<bool, T>(true, n.Key);
+
+                    m_mru.Remove(key);
+                    m_size -= n.Value;
+                    m_lookup.Remove(key);
+                    await m_expirehandler?.Invoke(key, n.Key, true);
+                }
+            }
+
+            return new KeyValuePair<bool, T>(false, default(T));
         }
 
         /// <summary>
