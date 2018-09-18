@@ -15,7 +15,7 @@
     <dependencies />
   </metadata>
   <files>
-    <file src="Ceen.Common.dll" target="lib/net45" />
-    <file src="Ceen.Httpd.dll" target="lib/net45" />
+    <file src="Ceen.Common.dll" target="lib/netstandard2.0" />
+    <file src="Ceen.Httpd.dll" target="lib/netstandard2.0" />
   </files>
 </package>
