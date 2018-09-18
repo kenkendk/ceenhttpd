@@ -65,7 +65,7 @@ Global
 		{77A69C2A-6FCA-479A-8B8C-B79B869230E8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		version = 0.9.3
+		version = 0.9.4
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1A4BF2A4-743C-4311-B7D0-E589B3F55D48} = {83C5E8E3-2BAD-4512-85DD-923076AA9CB3}
