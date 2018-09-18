@@ -216,39 +216,39 @@ namespace Ceen.Httpd
 			/// Backing field for the total number of active clients
 			/// </summary>
 			private static int m_totalActiveClients;
-			/// <summary>
-			/// Gets the total number of active clients.
-			/// </summary>
-			/// <value>The total active clients.</value>
-			public static int TotalActiveClients { get { return m_totalActiveClients; } }
-			/// <summary>
-			/// Backing field for the number of active clients
-			/// </summary>
-			private int m_activeClients;
-			/// <summary>
-			/// The number of active clients
-			/// </summary>
-			public int ActiveClients { get { return m_activeClients; } }
-			/// <summary>
-			/// The task that signals stopping the server
-			/// </summary>
-			/// <value>The stop task.</value>
-			public Task StopTask { get { return m_stoptask.Task; } }
-			/// <summary>
-			/// The task signalling that all clients have completed
-			/// </summary>
-			/// <value>The finished task.</value>
-			public Task FinishedTask { get { return m_finishedtask.Task; } }
-			/// <summary>
-			/// Gets a task that throttles start of new handlers
-			/// </summary>
-			/// <value>The throttle task.</value>
-			public Task ThrottleTask { get { return m_throttletask.Task; } }
-			/// <summary>
-			/// Gets the server configuration
-			/// </summary>
-			/// <value>The config.</value>
-			public ServerConfig Config { get; private set; }
+            /// <summary>
+            /// Gets the total number of active clients.
+            /// </summary>
+            /// <value>The total active clients.</value>
+            public static int TotalActiveClients => m_totalActiveClients;
+            /// <summary>
+            /// Backing field for the number of active clients
+            /// </summary>
+            private int m_activeClients;
+            /// <summary>
+            /// The number of active clients
+            /// </summary>
+            public int ActiveClients => m_activeClients;
+            /// <summary>
+            /// The task that signals stopping the server
+            /// </summary>
+            /// <value>The stop task.</value>
+            public Task StopTask => m_stoptask.Task;
+            /// <summary>
+            /// The task signalling that all clients have completed
+            /// </summary>
+            /// <value>The finished task.</value>
+            public Task FinishedTask => m_finishedtask.Task;
+            /// <summary>
+            /// Gets a task that throttles start of new handlers
+            /// </summary>
+            /// <value>The throttle task.</value>
+            public Task ThrottleTask => m_throttletask.Task;
+            /// <summary>
+            /// Gets the server configuration
+            /// </summary>
+            /// <value>The config.</value>
+            public ServerConfig Config { get; private set; }
 
 			/// <summary>
 			/// The stop token
@@ -261,15 +261,15 @@ namespace Ceen.Httpd
 			/// <summary>
 			/// A value indicating if the server is stopped
 			/// </summary>
-			public volatile bool m_isStopped = false;
-			/// <summary>
-			/// Gets a value indicating whether this <see cref="T:Ceen.Httpd.HttpServer.RunnerControl"/> is stopped.
-			/// </summary>
-			public bool IsStopped { get { return m_isStopped; } }
-			/// <summary>
-			/// The maximum number of active handlers
-			/// </summary>
-			private readonly int m_maxactive;
+			public volatile bool m_isStopped;
+            /// <summary>
+            /// Gets a value indicating whether this <see cref="T:Ceen.Httpd.HttpServer.RunnerControl"/> is stopped.
+            /// </summary>
+            public bool IsStopped => m_isStopped;
+            /// <summary>
+            /// The maximum number of active handlers
+            /// </summary>
+            private readonly int m_maxactive;
 			/// <summary>
 			/// The lock object
 			/// </summary>
@@ -291,7 +291,7 @@ namespace Ceen.Httpd
 			/// <summary>
 			/// A logger for reporting the internal log state
 			/// </summary>
-			private DebugLogDelegate m_debuglogger;
+			private readonly DebugLogDelegate m_debuglogger;
 
 			/// <summary>
 			/// Initializes a new instance of the <see cref="Ceen.Httpd+RunnerControl"/> class.
@@ -397,7 +397,7 @@ namespace Ceen.Httpd
 		/// Gets the total number of active clients
 		/// </summary>
 		/// <value>The total active clients.</value>
-		public static int TotalActiveClients { get { return RunnerControl.TotalActiveClients; } }
+		public static int TotalActiveClientCount { get { return RunnerControl.TotalActiveClients; } }
 
 		/// <summary>
 		/// The method used to set the current socket handlerID in log4net, if available.
@@ -462,7 +462,7 @@ namespace Ceen.Httpd
 					var ins = m.GetValue(null, null);
 					if (ins != null)
 					{
-						var rm = ins.GetType().GetProperties().Where(x => x.GetIndexParameters().Length > 0).FirstOrDefault();
+						var rm = ins.GetType().GetProperties().FirstOrDefault(x => x.GetIndexParameters().Length > 0);
 						if (rm != null)
 						{
 							// We have a default indexer, set up the helper methods
@@ -576,14 +576,14 @@ namespace Ceen.Httpd
             while (!stoptoken.IsCancellationRequested)
             {
                 // Wait if there are too many active
-                if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for throttle", taskid, null);
+                config.DebugLogHandler?.Invoke("Waiting for throttle", taskid, null);
                 await rc.ThrottleTask;
-                if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for socket", taskid, null);
+                config.DebugLogHandler?.Invoke("Waiting for socket", taskid, null);
                 var ls = acceptAsync(stoptoken);
 
                 if (await Task.WhenAny(rc.StopTask, ls) == ls)
                 {
-                    if (config.DebugLogHandler != null) config.DebugLogHandler("Re-waiting for socket", taskid, null);
+                    config.DebugLogHandler?.Invoke("Re-waiting for socket", taskid, null);
                     var client = await ls;
                     var newtaskid = SetLoggingTaskHandlerID();
 
@@ -591,26 +591,25 @@ namespace Ceen.Httpd
                     {
                         int wt, cpt;
                         ThreadPool.GetAvailableThreads(out wt, out cpt);
-                        if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
-
-                        if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
+                        config.DebugLogHandler?.Invoke(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
+                        config.DebugLogHandler?.Invoke(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
 
                         ThreadPool.QueueUserWorkItem(x => spawner(client.Key, client.Value, newtaskid, rc));
                     }
                     catch (Exception ex)
                     {
-                        if (config.DebugLogHandler != null) config.DebugLogHandler("Failed to listen to socket", taskid, ex);
+                        config.DebugLogHandler?.Invoke("Failed to listen to socket", taskid, ex);
                     }
                 }
             }
 
-            if (config.DebugLogHandler != null) config.DebugLogHandler("Stopping", taskid, null);
+            config.DebugLogHandler?.Invoke("Stopping", taskid, null);
             rc.Stop(taskid);
 
-            if (config.DebugLogHandler != null) config.DebugLogHandler("Socket stopped, waiting for workers ...", taskid, null);
+            config.DebugLogHandler?.Invoke("Socket stopped, waiting for workers ...", taskid, null);
             await rc.FinishedTask;
 
-            if (config.DebugLogHandler != null) config.DebugLogHandler("Stopped", taskid, null);
+            config.DebugLogHandler?.Invoke("Stopped", taskid, null);
         }
 
         /// <summary>
@@ -633,47 +632,47 @@ namespace Ceen.Httpd
 
 			while (!stoptoken.IsCancellationRequested)
 			{
-				// Wait if there are too many active
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for throttle", taskid, null);
-				await rc.ThrottleTask;
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Waiting for socket", taskid, null);
-				var ls = listener.AcceptTcpClientAsync();
+                // Wait if there are too many active
+                config.DebugLogHandler?.Invoke("Waiting for throttle", taskid, null);
+                await rc.ThrottleTask;
+                config.DebugLogHandler?.Invoke("Waiting for socket", taskid, null);
+                var ls = listener.AcceptTcpClientAsync();
 
 				if (await Task.WhenAny(rc.StopTask, ls) == ls)
 				{
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Re-waiting for socket", taskid, null);
-					var client = await ls;
+                    config.DebugLogHandler?.Invoke("Re-waiting for socket", taskid, null);
+                    var client = await ls;
 					var newtaskid = SetLoggingTaskHandlerID();
 
 					try
 					{
 						int wt, cpt;
 						ThreadPool.GetAvailableThreads(out wt, out cpt);
-						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
+                        config.DebugLogHandler?.Invoke(string.Format("Threadpool says {0}, {1}", wt, cpt), taskid, newtaskid);
 
-						if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
+                        config.DebugLogHandler?.Invoke(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
 
-						// Read the endpoint here to avoid crashes when invoking the spawner
-						var ep = client.Client.RemoteEndPoint;
+                        // Read the endpoint here to avoid crashes when invoking the spawner
+                        var ep = client.Client.RemoteEndPoint;
 						ThreadPool.QueueUserWorkItem(x => spawner(client, ep, newtaskid, rc));
 					}
 					catch(Exception ex)
 					{
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed to listen to socket", taskid, ex);
-					}
+                        config.DebugLogHandler?.Invoke("Failed to listen to socket", taskid, ex);
+                    }
 				}
 			}
 
-			if (config.DebugLogHandler != null) config.DebugLogHandler("Stopping", taskid, null);
+            config.DebugLogHandler?.Invoke("Stopping", taskid, null);
 
-			listener.Stop();
+            listener.Stop();
 			rc.Stop(taskid);
 
-			if (config.DebugLogHandler != null) config.DebugLogHandler("Socket stopped, waiting for workers ...", taskid, null);
-			await rc.FinishedTask;
+            config.DebugLogHandler?.Invoke("Socket stopped, waiting for workers ...", taskid, null);
+            await rc.FinishedTask;
 
-			if (config.DebugLogHandler != null) config.DebugLogHandler("Stopped", taskid, null);
-		}
+            config.DebugLogHandler?.Invoke("Stopped", taskid, null);
+        }
 
 		/// <summary>
 		/// Logs a message to all configured loggers
@@ -689,10 +688,9 @@ namespace Ceen.Httpd
 			if (config.Loggers == null)
 				return Task.FromResult(true);
 
-			if (CopyLogData != null)
-				CopyLogData(context);
+            CopyLogData?.Invoke(context);
 
-			var count = config.Loggers.Count;
+            var count = config.Loggers.Count;
 			if (count == 0)
 				return Task.FromResult(true);
 			else if (count == 1)
@@ -761,40 +759,40 @@ namespace Ceen.Httpd
             using (stream)
 			using (var ssl = controller.m_useSSL ? new SslStream(stream, false) : null)
 			{
-                if (config.DebugLogHandler != null) config.DebugLogHandler(string.Format("Running {0}", controller.m_useSSL ? "SSL" : "plain"), logtaskid, remoteEndPoint);
+                config.DebugLogHandler?.Invoke(string.Format("Running {0}", controller.m_useSSL ? "SSL" : "plain"), logtaskid, remoteEndPoint);
 
-				// Slightly higher value here to avoid races with the other timeout mechanisms
-				stream.ReadTimeout = stream.WriteTimeout = (controller.Config.RequestIdleTimeoutSeconds + 1) * 1000;
+                // Slightly higher value here to avoid races with the other timeout mechanisms
+                stream.ReadTimeout = stream.WriteTimeout = (controller.Config.RequestIdleTimeoutSeconds + 1) * 1000;
 
 				X509Certificate clientcert = null;
 
 				// For SSL only: negotiate the connection
 				if (ssl != null)
 				{
-                    if (config.DebugLogHandler != null) config.DebugLogHandler("Authenticate SSL", logtaskid, remoteEndPoint);
+                    config.DebugLogHandler?.Invoke("Authenticate SSL", logtaskid, remoteEndPoint);
 
-					try
+                    try
 					{
 						await ssl.AuthenticateAsServerAsync(config.SSLCertificate, config.SSLRequireClientCert, config.SSLEnabledProtocols, config.SSLCheckCertificateRevocation);
 					}
 					catch (Exception aex)
 					{
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Failed setting up SSL", logtaskid, remoteEndPoint);
+                        config.DebugLogHandler?.Invoke("Failed setting up SSL", logtaskid, remoteEndPoint);
 
-						// Log a message indicating that we failed setting up SSL
+                        // Log a message indicating that we failed setting up SSL
                         await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
 
 						return;
 					}
 
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Run SSL", logtaskid, remoteEndPoint);
-					clientcert = ssl.RemoteCertificate;
+                    config.DebugLogHandler?.Invoke("Run SSL", logtaskid, remoteEndPoint);
+                    clientcert = ssl.RemoteCertificate;
 				}
 
                 await Runner(ssl == null ? (Stream)stream : ssl, remoteEndPoint, logtaskid, clientcert, ssl == null ? SslProtocols.None : ssl.SslProtocol, controller, isConnected);
 
-				if (config.DebugLogHandler != null) config.DebugLogHandler("Done running", logtaskid, remoteEndPoint);
-			}
+                config.DebugLogHandler?.Invoke("Done running", logtaskid, remoteEndPoint);
+            }
 		}
 
 		/// <summary>
@@ -824,8 +822,8 @@ namespace Ceen.Httpd
 			{
 				try
 				{
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Running task", logtaskid, endpoint);
-					if (!controller.RegisterActive(logtaskid))
+                    config.DebugLogHandler?.Invoke("Running task", logtaskid, endpoint);
+                    if (!controller.RegisterActive(logtaskid))
 						return;
 
 					do
@@ -845,7 +843,7 @@ namespace Ceen.Httpd
 						// Set up timeout for processing
 						cur.SetProcessingTimeout(TimeSpan.FromSeconds(config.MaxProcessingTimeSeconds));
 
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Parsing headers", logtaskid, endpoint);
+                        config.DebugLogHandler?.Invoke("Parsing headers", logtaskid, endpoint);
                         try
                         {
                             var ct = new CancellationTokenSource();
@@ -870,7 +868,7 @@ namespace Ceen.Httpd
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("Failed while reading header: {0}", ex);
+                            config.DebugLogHandler?.Invoke($"Failed while reading header: {ex}", logtaskid, cur);
                             throw;
                         }
 
@@ -899,9 +897,9 @@ namespace Ceen.Httpd
 								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));
 						}
 
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Running handler", logtaskid, cur);
+                        config.DebugLogHandler?.Invoke("Running handler", logtaskid, cur);
 
-						try
+                        try
 						{
                             // Trigger the streams to stop reading/writing data when the timeout happens
                             using (cur.TimeoutCancellationToken.Register(() => timeoutcontroltask.TrySetCanceled(), useSynchronizationContext: false))
@@ -943,10 +941,10 @@ namespace Ceen.Httpd
 							resp.StatusMessage = hex.StatusMessage;
 						}
 
-						if (config.DebugLogHandler != null) config.DebugLogHandler("Flushing response", logtaskid, cur);
+                        config.DebugLogHandler?.Invoke("Flushing response", logtaskid, cur);
 
-						// If the handler has not flushed, we do it
-						await resp.FlushAndSetLengthAsync();
+                        // If the handler has not flushed, we do it
+                        await resp.FlushAndSetLengthAsync();
 
 						// Check if keep-alive is possible
 						keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength;
@@ -969,26 +967,27 @@ namespace Ceen.Httpd
 								resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.HttpStatusCode.InternalServerError);
 							}
 						}
-						catch { }
+                        catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to send headers: {nex}", logtaskid, cur); }
 
 						try { await resp.FlushAsErrorAsync(); }
-						catch { }
-					}
+                        catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to FlushAsErrors: {nex}", logtaskid, cur); }
+                    }
 
-					try { stream.Close(); }
-					catch { }
+                    try { stream.Close(); }
+                    catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to close stream: {nex}", logtaskid, cur); }
 
-					try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
-					catch { }
 
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Failed handler", logtaskid, cur);
+                    try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
+                    catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to log request: {nex}", logtaskid, cur); }
 
-				}
+                    config.DebugLogHandler?.Invoke("Failed handler", logtaskid, cur);
+
+                }
 				finally
 				{
 					controller.RegisterStopped(logtaskid);
-					if (config.DebugLogHandler != null) config.DebugLogHandler("Terminating handler", logtaskid, cur);
-				}
+                    config.DebugLogHandler?.Invoke("Terminating handler", logtaskid, cur);
+                }
 			}
 		}
 	}

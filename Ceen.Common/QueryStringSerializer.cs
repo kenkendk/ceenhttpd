@@ -23,9 +23,9 @@ namespace Ceen
 		{
 			var table = new Dictionary<string, MemberInfo>(StringComparer.OrdinalIgnoreCase);
 			foreach (var n in typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-				table[n.Name] = n;;
+				table[n.Name] = n;
 			foreach (var n in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-				table[n.Name] = n; ;
+				table[n.Name] = n;
 
 			_lookup = table;
 		}

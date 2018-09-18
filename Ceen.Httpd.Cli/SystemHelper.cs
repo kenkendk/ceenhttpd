@@ -107,5 +107,10 @@ namespace Ceen.Httpd.Cli
             }
             return ((bool)(_isDarwin = false));            
         }
+
+        /// <summary>
+        /// Gets a value indicating whether we are executing with .Net core
+        /// </summary>
+        public static bool IsNetCore => RuntimeInformation.FrameworkDescription.StartsWith(".NET Core", StringComparison.Ordinal);
     }
 }

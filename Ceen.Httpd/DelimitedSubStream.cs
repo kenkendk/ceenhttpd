@@ -43,15 +43,15 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// The maximum idle time
 		/// </summary>
-		private TimeSpan m_idletime;
+		private readonly TimeSpan m_idletime;
 		/// <summary>
 		/// The timeout task
 		/// </summary>
-		private Task m_timeouttask;
+		private readonly Task m_timeouttask;
 		/// <summary>
 		/// The stop task
 		/// </summary>
-		private Task m_stoptask;
+		private readonly Task m_stoptask;
 		/// <summary>
 		/// The cancellation token
 		/// </summary>
@@ -156,67 +156,24 @@ namespace Ceen.Httpd
 			return res;			
 		}
 
-		#region implemented abstract members of Stream
-		public override void Flush()
-		{
-			throw new NotImplementedException();
-		}
-		public override long Seek(long offset, SeekOrigin origin)
-		{
-			throw new NotImplementedException();
-		}
-		public override void SetLength(long value)
-		{
-			throw new NotImplementedException();
-		}
-		public override int Read(byte[] buffer, int offset, int count)
-		{
-			return this.ReadAsync(buffer, offset, count).Result;
-		}
-		public override void Write(byte[] buffer, int offset, int count)
-		{
-			throw new NotImplementedException();
-		}
-		public override bool CanRead
-		{
-			get
-			{
-				return true;
-			}
-		}
-		public override bool CanSeek
-		{
-			get
-			{
-				return false;
-			}
-		}
-		public override bool CanWrite
-		{
-			get
-			{
-				return false;
-			}
-		}
-		public override long Length
-		{
-			get
-			{
-				throw new NotImplementedException();
-			}
-		}
-		public override long Position
-		{
-			get
-			{
-				return m_read;
-			}
-			set
-			{
-				throw new NotImplementedException();
-			}
-		}
-		#endregion
-	}
+        #region implemented abstract members of Stream
+        public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).Result;
+
+        public override void Flush() => throw new NotImplementedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+        public override void SetLength(long value) => throw new NotImplementedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotImplementedException();
+
+        public override long Position
+        {
+            get => m_read;
+            set => throw new NotImplementedException();
+        }
+        #endregion
+    }
 }
 

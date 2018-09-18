@@ -355,32 +355,28 @@ namespace Ceen.Httpd
 		{
 			m_parent.Flush();
 		}
-		/// <summary>
-		/// Seek the specified offset and origin.
-		/// </summary>
-		/// <param name="offset">Offset.</param>
-		/// <param name="origin">Origin.</param>
-		public override long Seek(long offset, SeekOrigin origin)
-		{
-			throw new NotImplementedException();
-		}
-		/// <summary>
-		/// Sets the length.
-		/// </summary>
-		/// <param name="value">Value.</param>
-		public override void SetLength(long value)
-		{
-			throw new NotImplementedException();
-		}
-		/// <summary>
-		/// Read data from the stream into the buffer asynchronously, given offset and count.
-		/// </summary>
-		/// <returns>The awaitable task.</returns>
-		/// <param name="buffer">The buffer to read into.</param>
-		/// <param name="offset">The offset into the buffer where data is written.</param>
-		/// <param name="count">The number of bytes to read.</param>
-		/// <param name="cancellationToken">Cancellation token.</param>
-		public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
+        /// <summary>
+        /// Seek the specified offset and origin.
+        /// </summary>
+        /// <param name="offset">Offset.</param>
+        /// <param name="origin">Origin.</param>
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+
+        /// <summary>
+        /// Sets the length.
+        /// </summary>
+        /// <param name="value">Value.</param>
+        public override void SetLength(long value) => throw new NotImplementedException();
+
+        /// <summary>
+        /// Read data from the stream into the buffer asynchronously, given offset and count.
+        /// </summary>
+        /// <returns>The awaitable task.</returns>
+        /// <param name="buffer">The buffer to read into.</param>
+        /// <param name="offset">The offset into the buffer where data is written.</param>
+        /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
 		{
 			if (m_remainingbytes == 0)
 				return 0;
@@ -427,21 +423,19 @@ namespace Ceen.Httpd
 			}
 			return res;
 		}
-		/// <summary>
-		/// Writes data from the stream into the buffer, given offset and count.
-		/// </summary>
-		/// <param name="buffer">The buffer to write into.</param>
-		/// <param name="offset">The offset into the buffer where data is read from.</param>
-		/// <param name="count">The number of bytes to write.</param>
-		public override void Write(byte[] buffer, int offset, int count)
-		{
-			throw new NotImplementedException();
-		}
-		/// <summary>
-		/// Gets a value indicating whether this instance can be read.
-		/// </summary>
-		/// <value><c>true</c> if this instance can read; otherwise, <c>false</c>.</value>
-		public override bool CanRead
+        /// <summary>
+        /// Writes data from the stream into the buffer, given offset and count.
+        /// </summary>
+        /// <param name="buffer">The buffer to write into.</param>
+        /// <param name="offset">The offset into the buffer where data is read from.</param>
+        /// <param name="count">The number of bytes to write.</param>
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+
+        /// <summary>
+        /// Gets a value indicating whether this instance can be read.
+        /// </summary>
+        /// <value><c>true</c> if this instance can read; otherwise, <c>false</c>.</value>
+        public override bool CanRead
 		{
 			get
 			{
@@ -470,32 +464,29 @@ namespace Ceen.Httpd
 				return false;
 			}
 		}
-		/// <summary>
-		/// Gets the length of the stream.
-		/// </summary>
-		/// <value>The length.</value>
-		public override long Length
-		{
-			get
-			{
-				throw new NotImplementedException();
-			}
-		}
-		/// <summary>
-		/// Gets or sets the position.
-		/// </summary>
-		/// <value>The position.</value>
-		public override long Position
-		{
-			get
-			{
-				return m_maxread - m_remainingbytes;
-			}
-			set
-			{
-				throw new NotImplementedException();
-			}
-		}
+        /// <summary>
+        /// Gets the length of the stream.
+        /// </summary>
+        /// <value>The length.</value>
+        public override long Length => throw new NotImplementedException();
+
+        /// <summary>
+        /// Gets or sets the position.
+        /// </summary>
+        /// <returns>The position.</returns>
+        public override long GetPosition()
+        {
+            return m_maxread - m_remainingbytes;
+        }
+
+        /// <summary>
+        /// Gets or sets the position.
+        /// </summary>
+        /// <param name="value">The position.</param>
+        public override void SetPosition(long value)
+        {
+            throw new NotImplementedException();
+        }
         #endregion
     }
 }

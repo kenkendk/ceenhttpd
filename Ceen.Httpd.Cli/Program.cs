@@ -19,10 +19,25 @@ namespace Ceen.Httpd.Cli
             Console.WriteLine(msg, args);
         }
 
-		public static int Main(string[] args)
+        /// <summary>
+        /// Gets a value indicating whether the current process is launched as a spawned child.
+        /// </summary>
+        public static bool IsSpawnedChild => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Runner.SubProcess.SpawnedRunner.SOCKET_PATH_VARIABLE_NAME));
+
+        /// <summary>
+        /// The current config file (null if the instance is a spawned child)
+        /// </summary>
+        public static string ConfigFile { get; private set; }
+
+        /// <summary>
+        /// The current parsed configuration (null if the instance is a spawned child)
+        /// </summary>
+        public static CLIServerConfiguration CLIConfiguration { get; private set; }
+
+        public static int Main(string[] args)
 		{
             DebugConsoleOutput("Started new process");
-            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Runner.SubProcess.SpawnedRunner.SOCKET_PATH_VARIABLE_NAME)))
+            if (IsSpawnedChild)
             {
                 try
                 {
@@ -52,21 +67,17 @@ namespace Ceen.Httpd.Cli
 			}
 
 			var tcs = new System.Threading.CancellationTokenSource();
-			var config = ConfigParser.ParseTextFile(args[0]);
+            CLIConfiguration = ConfigParser.ParseTextFile(args[0]);
 			var tasks = new List<Task>();
 
             Runner.IRunnerHandler app;
-            if (config.IsolatedProcesses)
+            if (CLIConfiguration.IsolatedProcesses)
             {
                 app = new Runner.SubProcess.Runner(args[0]);
             }
-            else if (config.IsolatedAppDomain)
+            else if (CLIConfiguration.IsolatedAppDomain)
             {
-#if NETCOREAPP
-                throw new Exception("AppDomains are not supported under .Net Core");
-#else
                 app = new Runner.AppDomain.Runner(args[0]);
-#endif
             }
 			else
 			{
@@ -113,7 +124,7 @@ namespace Ceen.Httpd.Cli
 					e.Cancel = true;
 			};
 
-			if (config.WatchConfigFile)
+			if (CLIConfiguration.WatchConfigFile)
 			{
 				var configname = Path.GetFullPath(args[0]);
 				var f = new FileSystemWatcher(Path.GetDirectoryName(configname));
@@ -131,7 +142,7 @@ namespace Ceen.Httpd.Cli
 				reloadevent.SetResult(true);
 			};
 
-            var primarytask = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
+            var primarytask = app.ReloadAsync(CLIConfiguration.ListenHttp, CLIConfiguration.ListenHttps);
 			primarytask.Wait();
 			if (primarytask.IsFaulted)
 				throw primarytask.Exception;
@@ -153,26 +164,20 @@ namespace Ceen.Httpd.Cli
 			{
 				reloadevent = new TaskCompletionSource<bool>();
 				var waitdelay = Task.Delay(TimeSpan.FromSeconds(2));
-				if (app != null)
+                ConsoleOutput("Reloading configuration ...");
+				try
 				{
-                    ConsoleOutput("Reloading configuration ...");
-					try
-					{
-                        config = ConfigParser.ParseTextFile(args[0]);
-                        var tr = app.ReloadAsync(config.ListenHttp, config.ListenHttps);
-						tr.Wait();
-						if (tr.IsFaulted)
-							throw tr.Exception;
-                        ConsoleOutput("Configuration reloaded!");
-					}
-					catch(Exception ex)
-					{
-                        ConsoleOutput("Failed to reload configuration with message: {0}", ex);
-					}
+                    CLIConfiguration = ConfigParser.ParseTextFile(args[0]);
+                    var tr = app.ReloadAsync(CLIConfiguration.ListenHttp, CLIConfiguration.ListenHttps);
+
+                    tr.Wait();
+					if (tr.IsFaulted)
+						throw tr.Exception;
+                    ConsoleOutput("Configuration reloaded!");
 				}
-				else
-                {
-			        ConsoleOutput("Not reloading as we are not using isolated domains or processes ...");
+				catch(Exception ex)
+				{
+                    ConsoleOutput("Failed to reload configuration with message: {0}", ex);
 				}
 
 				waitdelay.Wait();

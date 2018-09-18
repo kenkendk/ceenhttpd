@@ -104,7 +104,10 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
             /// <param name="domain">The domain to wrap the instance in.</param>
             public AppDomainWrapper(System.AppDomain domain)
             {
-                m_wrapped = domain.CreateInstanceAndUnwrap(typeof(Runner.AppDomainBridge).Assembly.FullName, typeof(Runner.AppDomainBridge).FullName);
+                // Not a part of .Net Standard or .Net core, but we can call it if we run .Net Framework
+                //m_wrapped = domain.CreateInstanceAndUnwrap(typeof(Runner.AppDomainBridge).Assembly.FullName, typeof(Runner.AppDomainBridge).FullName);
+                var unwrapMethod = domain.GetType().GetMethod("CreateInstanceAndUnwrap", new Type[] { typeof(string), typeof(string) });
+                m_wrapped = unwrapMethod.Invoke(domain, new object[] { typeof(Runner.AppDomainBridge).Assembly.FullName, typeof(Runner.AppDomainBridge).FullName });
                 m_setupFromFile = m_wrapped.GetType().GetMethod(nameof(Runner.AppDomainBridge.SetupFromFile));
                 m_handleRequest = m_wrapped.GetType().GetMethod(nameof(Runner.AppDomainBridge.HandleRequest));
                 m_stop = m_wrapped.GetType().GetMethod(nameof(Runner.AppDomainBridge.Stop));
@@ -273,7 +276,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                     }
                 }
 
-                // This bug is fixed in mono, but we need to wait to get the version number
+                // This bug is supposedly fixed in mono, but seems to have issues still
                 if (monoRuntime != null /* && monoVersion <= new Version(4, 6, 2) */ )
                 {
                     safe_handle_field = typeof(Socket).GetField("safe_handle", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -402,13 +405,30 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
 
             ((MemoryStorageCreator)m_storage).ExpireCheckInterval = TimeSpan.FromSeconds(cfg.StorageExpirationCheckIntervalSeconds);
 
-            var domain = System.AppDomain.CreateDomain(
+            // Not a part of .Net Standard or .Net core, but we can call it if we run .Net Framework
+            var createMethod =
+                typeof(System.AppDomain)
+                    .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .Where(x => x.Name == nameof(System.AppDomain.CreateDomain))
+                    .Where(x => x.GetParameters().Length == 5)
+                    .Where(x => x.GetParameters().Last().ParameterType == typeof(bool))
+                    .FirstOrDefault();
+
+            var domain = (System.AppDomain)createMethod.Invoke(null, new object[] {
                 "CeenRunner-" + Guid.NewGuid().ToString(),
                 null,
                 cfg.Basepath,
                 cfg.Assemblypath,
                 true
-            );
+            });
+
+            //var domain = System.AppDomain.CreateDomain(
+            //    "CeenRunner-" + Guid.NewGuid().ToString(),
+            //    null,
+            //    cfg.Basepath,
+            //    cfg.Assemblypath,
+            //    true
+            //);
 
             // For debugging, use the same domain
             //domain = AppDomain.CurrentDomain;

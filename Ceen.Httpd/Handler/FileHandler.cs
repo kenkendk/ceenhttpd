@@ -8,19 +8,19 @@ using System.Collections.Generic;
 
 namespace Ceen.Httpd.Handler
 {
-	/// <summary>
-	/// Basic implementation of a file-serving module
-	/// </summary>
-	public class FileHandler : IHttpModuleWithSetup
-	{
-		/// <summary>
-		/// The folder where files are served from
-		/// </summary>
+    /// <summary>
+    /// Basic implementation of a file-serving module
+    /// </summary>
+    public class FileHandler : IHttpModuleWithSetup
+    {
+        /// <summary>
+        /// The folder where files are served from
+        /// </summary>
         public string SourceFolder { get; set; }
-		/// <summary>
-		/// Cached copy of the directory separator as a string
-		/// </summary>
-		protected static readonly string DIRSEP = Path.DirectorySeparatorChar.ToString();
+        /// <summary>
+        /// Cached copy of the directory separator as a string
+        /// </summary>
+        protected static readonly string DIRSEP = Path.DirectorySeparatorChar.ToString();
         /// <summary>
         /// Parser to match Range requests
         /// </summary>
@@ -28,10 +28,10 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// Chars that are not allowed in the path
         /// </summary>
-        protected static readonly string[] FORBIDDENCHARS = new string[]{ "\\", "..", ":" };
-		/// <summary>
-		/// Function that maps a request to a mime type
-		/// </summary>
+        protected static readonly string[] FORBIDDENCHARS = new string[] { "\\", "..", ":" };
+        /// <summary>
+        /// Function that maps a request to a mime type
+        /// </summary>
         protected Func<IHttpRequest, string, string> m_mimetypelookup;
         /// <summary>
         /// List of allowed index documents
@@ -66,18 +66,18 @@ namespace Ceen.Httpd.Handler
         /// An optional etag salt
         /// </summary>
         public string EtagSalt { get; set; } = null;
-		/// <summary>
-		/// Gets or sets the path prefix
-		/// </summary>
-		public string PathPrefix { get; set; } = "";
+        /// <summary>
+        /// Gets or sets the path prefix
+        /// </summary>
+        public string PathPrefix { get; set; } = "";
 
-		/// <summary>
-		/// Gets or sets a value indicating if this module is simply acting as a rewrite filter,
-		/// that is it converts /test to /test.html or /test/index.html if possible.
-		/// Using a rewrite filter can simplify other filters as you can write a *.html filter,
-		/// and avoid other triggers activating on non *.html files
-		/// </summary>
-		public bool RedirectOnly { get; set; } = false;
+        /// <summary>
+        /// Gets or sets a value indicating if this module is simply acting as a rewrite filter,
+        /// that is it converts /test to /test.html or /test/index.html if possible.
+        /// Using a rewrite filter can simplify other filters as you can write a *.html filter,
+        /// and avoid other triggers activating on non *.html files
+        /// </summary>
+        public bool RedirectOnly { get; set; } = false;
 
         /// <summary>
         /// Enable the ETag header output, which returns an MD5 value for each.
@@ -92,37 +92,37 @@ namespace Ceen.Httpd.Handler
         /// </summary>
         public int CacheSeconds { get; set; } = 60 * 60 * 24;
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
-		/// </summary>
-		/// <param name="sourcefolder">The folder to server files from.</param>
-		public FileHandler(string sourcefolder)
-			: this(sourcefolder, null)
-		{
-		}
-        		
-		/// <summary>
-		/// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
-		/// </summary>
-		/// <param name="sourcefolder">The folder to server files from.</param>
-		/// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
-		public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup = null)
-		{
-            SourceFolder = sourcefolder;
-			m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
-		}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
+        /// </summary>
+        /// <param name="sourcefolder">The folder to server files from.</param>
+        public FileHandler(string sourcefolder)
+            : this(sourcefolder, null)
+        {
+        }
 
-		/// <summary>
-		/// An overrideable method to hook in logic before
-		/// flushing the headers and sending content, allows
-		/// an overriding class to alter the response
-		/// </summary>
-		/// <param name="context">The request context.</param>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Ceen.Httpd.Handler.FileHandler"/> class.
+        /// </summary>
+        /// <param name="sourcefolder">The folder to server files from.</param>
+        /// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
+        public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup = null)
+        {
+            SourceFolder = sourcefolder;
+            m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
+        }
+
+        /// <summary>
+        /// An overrideable method to hook in logic before
+        /// flushing the headers and sending content, allows
+        /// an overriding class to alter the response
+        /// </summary>
+        /// <param name="context">The request context.</param>
         /// <param name="sourcedata">The file with the source data</param>
-		public virtual Task BeforeResponseAsync(IHttpContext context, Stream sourcedata)
-		{
-			return Task.FromResult(true);
-		}
+        public virtual Task BeforeResponseAsync(IHttpContext context, Stream sourcedata)
+        {
+            return Task.FromResult(true);
+        }
 
         /// <summary>
         /// Computes the ETag value for a given resources
@@ -324,7 +324,7 @@ namespace Ceen.Httpd.Handler
 
                     if (etagkey != null)
                     {
-                        fs.Position = 0;
+                        fs.SetPosition(0);
                         etag = await ComputeETag(fs);
 
                         if (ETagCacheSize > 0)
@@ -392,7 +392,7 @@ namespace Ceen.Httpd.Handler
                         return true;
                     }
 
-                    fs.Position = startoffset;
+                    fs.SetPosition(startoffset);
                     var remain = context.Response.ContentLength;
                     var buf = new byte[8 * 1024];
 
@@ -415,14 +415,14 @@ namespace Ceen.Httpd.Handler
             return true;
         }
 
-		#region IHttpModule implementation
-		/// <summary>
-		/// Handles the request.
-		/// </summary>
-		/// <returns>The awaitable task.</returns>
-		/// <param name="context">The http context.</param>
-		public virtual Task<bool> HandleAsync(IHttpContext context)
-		{
+        #region IHttpModule implementation
+        /// <summary>
+        /// Handles the request.
+        /// </summary>
+        /// <returns>The awaitable task.</returns>
+        /// <param name="context">The http context.</param>
+        public virtual Task<bool> HandleAsync(IHttpContext context)
+        {
             if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
                 throw new HttpException(HttpStatusCode.MethodNotAllowed);
 
@@ -435,112 +435,112 @@ namespace Ceen.Httpd.Handler
 
             if (!File.Exists(path))
                 throw new HttpException(HttpStatusCode.NotFound);
-                
+
             // If this is just a rewrite handler, stop now as we did not handle it
             if (RedirectOnly)
-               return Task.FromResult(false);
+                return Task.FromResult(false);
 
-			var mimetype = m_mimetypelookup(context.Request, path);
-			if (mimetype == null)
-				throw new HttpException(HttpStatusCode.NotFound);
+            var mimetype = m_mimetypelookup(context.Request, path);
+            if (mimetype == null)
+                throw new HttpException(HttpStatusCode.NotFound);
 
             return ServeRequest(path, mimetype, context);
-		}
-		#endregion
+        }
+        #endregion
 
-		/// <summary>
-		/// Returns the default mime type for a request
-		/// </summary>
-		/// <returns>The mime type.</returns>
-		/// <param name="request">The request.</param>
-		/// <param name="mappedpath">The mapped filepath.</param>
-		public static string DefaultMimeTypes(IHttpRequest request, string mappedpath)
-		{
-			return DefaultMimeTypes(mappedpath);
-		}
+        /// <summary>
+        /// Returns the default mime type for a request
+        /// </summary>
+        /// <returns>The mime type.</returns>
+        /// <param name="request">The request.</param>
+        /// <param name="mappedpath">The mapped filepath.</param>
+        public static string DefaultMimeTypes(IHttpRequest request, string mappedpath)
+        {
+            return DefaultMimeTypes(mappedpath);
+        }
 
-		/// <summary>
-		/// Returns the default mime type for a path
-		/// </summary>
-		/// <returns>The mime type.</returns>
-		/// <param name="mappedpath">The mapped file path.</param>
-		public static string DefaultMimeTypes(string mappedpath)
-		{
-			var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
+        /// <summary>
+        /// Returns the default mime type for a path
+        /// </summary>
+        /// <returns>The mime type.</returns>
+        /// <param name="mappedpath">The mapped file path.</param>
+        public static string DefaultMimeTypes(string mappedpath)
+        {
+            var ext = Path.GetExtension(mappedpath).ToLowerInvariant();
 
-			switch (ext)
-			{
-				case ".txt":
-					return "text/plain";
-				case ".htm":
-				case ".html":
-					return "text/html; charset=utf-8";
-				case ".jpg":
-				case ".jpeg":
-					return "image/jpg";
-				case ".bmp":
-					return "image/bmp";
-				case ".gif":
-					return "image/gif";
-				case ".png":
-					return "image/png";
-				case ".ico":
-					return "image/vnd.microsoft.icon";
-				case ".css":
-					return "text/css";
+            switch (ext)
+            {
+                case ".txt":
+                    return "text/plain";
+                case ".htm":
+                case ".html":
+                    return "text/html; charset=utf-8";
+                case ".jpg":
+                case ".jpeg":
+                    return "image/jpg";
+                case ".bmp":
+                    return "image/bmp";
+                case ".gif":
+                    return "image/gif";
+                case ".png":
+                    return "image/png";
+                case ".ico":
+                    return "image/vnd.microsoft.icon";
+                case ".css":
+                    return "text/css";
                 case ".gz":
                 case ".gzip":
-					return "application/x-gzip";
-				case ".zip":
-					return "application/x-zip";
-				case ".tar":
-					return "application/x-tar";
-				case ".pdf":
-					return "application/pdf";
-				case ".rtf":
-					return "application/rtf";
-				case ".js":
-					return "application/javascript";
-				case ".au":
-					return "audio/basic";
-				case ".snd":
-					return "audio/basic";
-				case ".es":
-					return "audio/echospeech";
-				case ".mp3":
-					return "audio/mpeg";
-				case ".mp2":
-					return "audio/mpeg";
-				case ".mid":
-					return "audio/midi";
-				case ".wav":
-					return "audio/x-wav";
-				case ".avi":
-					return "video/avi";
-				case ".htc":
-					return "text/x-component";
-				case ".map":
-					return "application/json";
-				case ".hbs":
-					return "application/x-handlebars-template";
-				case ".woff":
-				case ".woff2":
-					return "application/font-woff";
-				case ".ttf":
-					return "application/font-ttf";
-				case ".eot":
-					return "application/vnd.ms-fontobject";
-				case ".otf":
-					return "application/font-otf";
-				case ".svg":
-					return "application/svg+xml";
-				case ".xml":
-					return "application/xml";
+                    return "application/x-gzip";
+                case ".zip":
+                    return "application/x-zip";
+                case ".tar":
+                    return "application/x-tar";
+                case ".pdf":
+                    return "application/pdf";
+                case ".rtf":
+                    return "application/rtf";
+                case ".js":
+                    return "application/javascript";
+                case ".au":
+                    return "audio/basic";
+                case ".snd":
+                    return "audio/basic";
+                case ".es":
+                    return "audio/echospeech";
+                case ".mp3":
+                    return "audio/mpeg";
+                case ".mp2":
+                    return "audio/mpeg";
+                case ".mid":
+                    return "audio/midi";
+                case ".wav":
+                    return "audio/x-wav";
+                case ".avi":
+                    return "video/avi";
+                case ".htc":
+                    return "text/x-component";
+                case ".map":
+                    return "application/json";
+                case ".hbs":
+                    return "application/x-handlebars-template";
+                case ".woff":
+                case ".woff2":
+                    return "application/font-woff";
+                case ".ttf":
+                    return "application/font-ttf";
+                case ".eot":
+                    return "application/vnd.ms-fontobject";
+                case ".otf":
+                    return "application/font-otf";
+                case ".svg":
+                    return "application/svg+xml";
+                case ".xml":
+                    return "application/xml";
 
-				default:
-					return null;
-			}
-		}	
+                default:
+                    return null;
+            }
+        }
 
         /// <summary>
         /// Handles post-configuration setup

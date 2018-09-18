@@ -1,92 +1,21 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{AF13A77D-FD50-4ED1-943B-266E577CB28B}</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Ceen.Httpd.Cli</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Ceen.Httpd.Cli</AssemblyName>
-    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug</OutputPath>
-    <DefineConstants>DEBUG;</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <ConsolePause>false</ConsolePause>
-    <Commandlineparameters>/Users/kenneth/Udvikler/duplicati-git/Duplicati/Server/webroot</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release</OutputPath>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Externalconsole>true</Externalconsole>
+    <DebugType />
+    <DefineConstants>RELEASE;NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Net" />
-    <Reference Include="Mono.Posix.NETStandard">
-      <HintPath>..\packages\Mono.Posix.NETStandard.1.0.0\lib\net40\Mono.Posix.NETStandard.dll</HintPath>
-    </Reference>
-    <Reference Include="Mono.Posix" />
-    <Reference Include="SockRock">
-      <HintPath>..\packages\SockRock.1.0.0\lib\netstandard2.0\SockRock.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj" />
+    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj" />
+    <ProjectReference Include="..\..\SockRock\src\SockRock.csproj" />
+    <ProjectReference Include="..\..\LeanIPC\LeanIPC\LeanIPC.csproj" />
+    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="CLIServerConfiguration.cs" />
-    <Compile Include="ConfigParser.cs" />
-    <Compile Include="SystemHelper.cs" />
-    <Compile Include="Runner\InProcess\Runner.cs" />
-    <Compile Include="Runner\IRunner.cs" />
-    <Compile Include="Runner\RunHandlerBase.cs" />
-    <Compile Include="Runner\AppDomain\AppDomainHandler.cs" />
-    <Compile Include="Runner\SubProcess\SpawnedRunner.cs" />
-    <Compile Include="Runner\SubProcess\SpawnRemoteInstance.cs" />
-    <Compile Include="Runner\InstanceRunner.cs" />
-  </ItemGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>
-    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj">
-      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
-      <Name>Ceen.Httpd</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
-      <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
-      <Name>Ceen.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj">
-      <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
-      <Name>Ceen.Mvc</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Security\Ceen.Security.csproj">
-      <Project>{D5A92F56-9881-415C-B9D3-71833EE0DF65}</Project>
-      <Name>Ceen.Security</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\LeanIPC\LeanIPC\LeanIPC.csproj">
-      <Project>{CA157E34-AE38-426B-9A8C-B659D60C4B96}</Project>
-      <Name>LeanIPC</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="example_config.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Runner\" />
-    <Folder Include="Runner\InProcess\" />
-    <Folder Include="Runner\AppDomain\" />
-    <Folder Include="Runner\SubProcess\" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
+    <PackageReference Include="Mono.Posix.NETStandard" Version="1.0.0" />
   </ItemGroup>
 </Project>

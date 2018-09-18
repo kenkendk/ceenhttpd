@@ -128,6 +128,16 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         private SockRock.ListenSocket m_listenSocket;
 
         /// <summary>
+        /// The instance counter
+        /// </summary>
+        private static int INSTANCE_COUNTER = 0;
+
+        /// <summary>
+        /// The instance number
+        /// </summary>
+        private readonly int m_instanceNo = 0;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.SubProcess.SpawnRemoteInstance"/> class.
         /// </summary>
         /// <param name="path">The path to the config file</param>
@@ -137,6 +147,8 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             m_path = path;
             m_useSSL = usessl;
             m_storage = storage;
+            m_instanceNo = System.Threading.Interlocked.Increment(ref INSTANCE_COUNTER);
+            Console.WriteLine("Starting instance {0}", m_instanceNo);
 
             var prefix = m_hiddenSocketPath ? "\0" : string.Empty;
 
@@ -165,18 +177,29 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
 
                 if (SystemHelper.IsCurrentOSPosix)
                 {
-                    //TODO: need to be able to kill this on timeout
+                    var completed = false;
+                    var ct = new CancellationTokenSource();
 
-                    // Get the first connection,
+                    // Prepare cancellation after 5 seconds
+                    Task.Delay(5000, ct.Token).ContinueWith(_ =>
+                    {
+                        serveripcsocket.Dispose();
+                        serverfdsocket.Dispose();
+                    });
+
+                    // Get the first connection
                     m_ipcSocket = serveripcsocket.Accept();
                     m_fdSocket = serverfdsocket.Accept();
+
+                    // Stop the timer
+                    ct.Cancel();
                 }
 
                 //and then don't listen anymore
             }
 
 
-            var ipc = new InterProcessConnection(new NetworkStream(m_ipcSocket));
+            var ipc = new InterProcessConnection(new NetworkStream(m_ipcSocket, true));
             m_peer = new RPCPeer(
                 ipc,
                 typeof(IStorageEntry),
@@ -226,7 +249,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <returns>The async.</returns>
         private System.Diagnostics.Process StartRemoteProcess()
         {
-            var FAKE_SPAWN = true;
+            // If we fake spawn, we actually run in the same process,
+            // but send handles as if we were two different processes
+            // this helps with debugging, as it is possible to set 
+            // breakpoints in the spawned code
+            var FAKE_SPAWN = false;
 
             if (FAKE_SPAWN)
             {
@@ -251,8 +278,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             }
             else
             {
-
-                var exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var exe = System.Reflection.Assembly.GetEntryAssembly().Location;
                 var pi = new System.Diagnostics.ProcessStartInfo(exe)
                 {
                     RedirectStandardError = true,
@@ -262,20 +288,22 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                     CreateNoWindow = true,
                 };
 
-#if NETCOREAPP
-                // With .Net Core we need some workarounds, in non-compiled mode
-                if (string.Equals(System.IO.Path.GetExtension(exe), ".dll", StringComparison.OrdinalIgnoreCase))
+                // Special handling for .Net core
+                if (SystemHelper.IsNetCore)
                 {
-                    pi.FileName = "dotnet";
-                    pi.Arguments = exe;
+                    // With .Net Core we need some workarounds, in non-compiled mode
+                    if (string.Equals(System.IO.Path.GetExtension(exe), ".dll", StringComparison.OrdinalIgnoreCase))
+                    {
+                        pi.FileName = "dotnet";
+                        pi.Arguments = exe;
+                    }
+                    else if (SystemHelper.IsCurrentOSPosix && string.Equals(System.IO.Path.GetExtension(exe), ".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Even with a .exe file we need to wrap it on non-windows
+                        pi.FileName = "dotnet";
+                        pi.Arguments = exe;
+                    }
                 }
-                else if (SystemHelper.IsCurrentOSPosix && string.Equals(System.IO.Path.GetExtension(exe), ".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Even with a .exe file we need to wrap it on non-windows
-                    pi.FileName = "dotnet";
-                    pi.Arguments = exe;
-                }
-#endif
 
                 pi.EnvironmentVariables[SpawnedRunner.SOCKET_PATH_VARIABLE_NAME] = m_socketpath;
                 pi.EnvironmentVariables[SpawnedRunner.SOCKET_PREFIX_VARIABLE_NAME] = m_hiddenSocketPath ? "1" : "";
@@ -338,6 +366,8 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Stop()
         {
+            Console.WriteLine("Stopping instance {0}", m_instanceNo);
+
             ShouldStop = true;
             m_peer.Dispose();
         }
@@ -346,10 +376,12 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// Stops the remote process
         /// </summary>
         /// <returns>An awaitable task.</returns>
-        public Task StopAsync()
+        public async Task StopAsync()
         {
             Stop();
-            return m_main;
+            Console.WriteLine("Waiting for instance {0} to stop", m_instanceNo);
+            await m_main;
+            Console.WriteLine("Stopped instance {0}", m_instanceNo);
         }
 
         /// <summary>
@@ -357,6 +389,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Kill()
         {
+            Console.WriteLine("Killing instance {0}", m_instanceNo);
             ShouldStop = true;
             m_proc.Kill();
         }

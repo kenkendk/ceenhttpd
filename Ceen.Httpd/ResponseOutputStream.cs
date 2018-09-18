@@ -55,7 +55,7 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Sets the Content-Length header and flushes data to the stream.
+		/// Sets the Content-Length header and writes data to the stream.
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
 		/// <param name="forceLength">If set to <c>true</c> overwrite the Content-Length header.</param>
@@ -71,12 +71,10 @@ namespace Ceen.Httpd
 
 			if (m_buffer != null)
 			{
-				m_buffer.Position = 0;
+				m_buffer.SetPosition(0);
 				await m_buffer.CopyToAsync(m_parent, 8 * 1024, cancellationToken);
 				m_buffer = null;
 			}
-
-			await m_parent.FlushAsync(cancellationToken);
 		}
 
 		/// <summary>
@@ -98,9 +96,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		/// <returns>The async.</returns>
 		/// <param name="cancellationToken">The cancellation token.</param>
-		public override Task FlushAsync(CancellationToken cancellationToken)
+        public override async Task FlushAsync(CancellationToken cancellationToken)
 		{
-			return SetLengthAndFlushAsync(false);
+            await SetLengthAndFlushAsync(false);
+            await m_parent.FlushAsync(cancellationToken);
 		}
 
 		/// <summary>
@@ -108,7 +107,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		public override void Flush()
 		{
-			SetLengthAndFlushAsync(false).Wait();
+            FlushAsync(default(CancellationToken)).Wait();
 		}
 
 		/// <summary>
@@ -170,9 +169,9 @@ namespace Ceen.Httpd
 						return;
 				}
 
-				// If we get here, we dump what we have
-				await FlushAsync();
-			}
+                // If we get here, we dump what we have
+                await SetLengthAndFlushAsync(false);
+            }
 
 			await m_parent.WriteAsync(buffer, offset, count, cancellationToken);
 			m_written += count;
@@ -237,29 +236,31 @@ namespace Ceen.Httpd
 			}
 		}
 
-		/// <summary>
-		/// Gets or sets the position.
-		/// </summary>
-		/// <value>The position.</value>
-		public override long Position
-		{
-			get
-			{
-				return m_written;
-			}
-			set
-			{
-				throw new InvalidOperationException();
-			}
-		}
+        /// <summary>
+        /// Gets or sets the position.
+        /// </summary>
+        /// <returns>The position.</returns>
+        public override long GetPosition()
+        {
+            return m_written;
+        }
 
-		/// <summary>
-		/// Dispose the specified disposing.
-		/// </summary>
-		/// <param name="disposing">If set to <c>true</c> disposing.</param>
-		protected override void Dispose(bool disposing)
+        /// <summary>
+        /// Gets or sets the position.
+        /// </summary>
+        /// <param name="value">The position.</param>
+        public override void SetPosition(long value)
+        {
+            throw new InvalidOperationException();
+        }
+
+        /// <summary>
+        /// Dispose the specified disposing.
+        /// </summary>
+        /// <param name="disposing">If set to <c>true</c> disposing.</param>
+        protected override void Dispose(bool disposing)
 		{
-			SetLengthAndFlushAsync(false).Wait();
+            FlushAsync(default(CancellationToken)).Wait();
 		}
 
 		#endregion

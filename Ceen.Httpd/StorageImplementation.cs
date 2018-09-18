@@ -280,16 +280,16 @@ namespace Ceen.Httpd
 	/// </summary>
 	internal class MemoryStorageEntry : MarshalByRefObject, IStorageEntry
 	{
-		/// <summary>
-		/// The storage entry
-		/// </summary>
-		private DefaultableDictionary<string, string> m_dict = new DefaultableDictionary<string, string>(new Dictionary<string, string>(2));
+        /// <summary>
+        /// The storage entry
+        /// </summary>
+        private readonly DefaultableDictionary<string, string> m_dict = new DefaultableDictionary<string, string>(new Dictionary<string, string>(2));
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.MemoryStorageEntry"/> class.
-		/// </summary>
-		/// <param name="name">The storage element name.</param>
-		public MemoryStorageEntry(string name)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="T:Ceen.Httpd.MemoryStorageEntry"/> class.
+        /// </summary>
+        /// <param name="name">The storage element name.</param>
+        public MemoryStorageEntry(string name)
 		{
 			this.Name = name;
 		}

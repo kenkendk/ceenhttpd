@@ -80,7 +80,7 @@ namespace Ceen.Httpd
 				if (value == null)
 					Settings.Remove("Expires");
 				else
-					Settings["Expires"] = value.Value.ToString("R", CultureInfo.InvariantCulture);; 
+					Settings["Expires"] = value.Value.ToString("R", CultureInfo.InvariantCulture);
 			}
 		}
 

@@ -212,8 +212,12 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <returns>An awaitable task.</returns>
         public static Task RunClientRPCListenerAsync()
         {
-            // Make sure we have loaded these assemblies into the current domain
-            var myTypes = new Type[] { typeof(Ceen.AsyncLock), typeof(Ceen.Httpd.HttpServer), typeof(Ceen.Mvc.Controller), typeof(Ceen.Security.PRNG) };
+            // Make sure we have loaded these assemblies into the current process
+            var myTypes = new List<Type> { typeof(Ceen.AsyncLock), typeof(Ceen.Httpd.HttpServer), typeof(Ceen.Mvc.Controller) };
+
+            // Preload this, if possible
+            try { myTypes.Add(Type.GetType("Ceen.Security.PRNG, Ceen.Security")); }
+            catch { }
 
             // Read environment setup
             var path = Environment.GetEnvironmentVariable(SOCKET_PATH_VARIABLE_NAME);
@@ -224,7 +228,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
             socket.Connect(new SockRock.UnixEndPoint(prefix + path));
 
-            var ipc = new LeanIPC.InterProcessConnection(new NetworkStream(socket));
+            var ipc = new LeanIPC.InterProcessConnection(new NetworkStream(socket, true));
             var peer = new LeanIPC.RPCPeer(ipc, typeof(SpawnedServer));
 
             // Pass back the SpawnedServer instance as a reference
@@ -297,9 +301,9 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         Program.DebugConsoleOutput("Got request, parsing ...");
 
                         // Copy the buffer into the stream we read from
-                        ms.Position = 0;
+                        ms.SetPosition(0);
                         ms.Write(req.Item2, 0, req.Item2.Length);
-                        ms.Position = 0;
+                        ms.SetPosition(0);
 
                         // Extract the data
                         var data = await bcs.ReadAnyAsync<SocketRequest>();
@@ -307,7 +311,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         Program.DebugConsoleOutput("Decoded request, local handle is {0} remote handle is {1}", req.Item1[0], data.Handle);
 
                         // All set, fire the request
-                        server.HandleRequestSimple(req.Item1[0], new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID);
+                        Task.Run(() => server.HandleRequestSimple(req.Item1[0], new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID));
 
                         Program.DebugConsoleOutput("Request handling completed");
                     }

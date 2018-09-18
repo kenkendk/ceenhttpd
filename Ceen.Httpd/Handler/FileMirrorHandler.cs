@@ -236,7 +236,6 @@ namespace Ceen.Httpd.Handler
                 int r;
                 while ((r = (await local.ReadAsync(buf, 0, buf.Length))) != 0)
                     await os.WriteAsync(buf, 0, r);
-
             }
         }
 

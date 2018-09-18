@@ -88,7 +88,7 @@ namespace Ceen.Httpd.Cli.Runner
                     usessl, 
                     m_token.Token, 
                     config,
-                    (c, e, l) => isl.HandleRequest(c, e, l)
+                    (c, e, l) => ((ISelfListen)Wrapper).HandleRequest(c, e, l)
                 );
             }
             else

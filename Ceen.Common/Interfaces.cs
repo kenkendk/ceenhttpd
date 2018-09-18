@@ -366,7 +366,6 @@ namespace Ceen
 		/// </summary>
 		/// <returns>The awaitable task</returns>
 		/// <param name="data">The data to write.</param>
-		/// <param name="encoding">The encoding to apply.</param>
 		/// <param name="contenttype">An optional content type to set. Throws an exception if the headers are already sent.</param>
 		Task WriteAllAsync(string data, string contenttype = null);
 

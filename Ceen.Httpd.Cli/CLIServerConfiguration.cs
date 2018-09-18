@@ -63,11 +63,11 @@ namespace Ceen.Httpd.Cli
 		/// </summary>
 		public string Assemblypath { get; set; }
 
-		/// <summary>
-		/// Gets or sets a value indicating if assemblies are loaded automatically from
-		/// <see cref="Assemblypath"/> and <see cref="Basepath"/>, as well as the Ceen libraries.
-		/// </summary>
-		public bool AutoLoadAssemblies { get; set; } = true;
+        /// <summary>
+        /// Gets or sets a value indicating if assemblies are loaded automatically from
+        /// <see cref="Assemblypath"/> and <see cref="Basepath"/>, as well as the Ceen libraries.
+        /// </summary>
+        public bool AutoLoadAssemblies { get; set; } = true;
 
 		/// <summary>
 		/// Gets a value indicating if the config file is monitored for changes,

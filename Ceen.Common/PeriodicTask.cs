@@ -18,7 +18,7 @@ namespace Ceen
 		/// <summary>
 		/// A task to signal checking for expiration
 		/// </summary>
-		private TaskCompletionSource<bool> m_check { get; set; } = new TaskCompletionSource<bool>();
+		private TaskCompletionSource<bool> m_check = new TaskCompletionSource<bool>();
 
 		/// <summary>
 		/// A token to signal stopping the check for expiration

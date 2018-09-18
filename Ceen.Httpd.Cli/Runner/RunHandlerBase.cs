@@ -74,6 +74,7 @@ namespace Ceen.Httpd.Cli.Runner
             }
             catch
             {
+                // If we fail to start, just kill any of the instances we just started
                 if (new_http_runner != null)
                     try { new_http_runner.Kill(); }
                     catch { }
@@ -85,6 +86,7 @@ namespace Ceen.Httpd.Cli.Runner
                 throw;
             }
 
+            // Set up the new instances
             m_http_runner = await ReplaceOrRestartAsync(m_http_runner, prevhttp, new_http_runner, cfg.HttpAddress, cfg.HttpPort, false, config);
             m_https_runner = await ReplaceOrRestartAsync(m_https_runner, prevhttps, new_https_runner, cfg.HttpsAddress, cfg.HttpsPort, true, config);
 
@@ -93,7 +95,7 @@ namespace Ceen.Httpd.Cli.Runner
             if (new_https_runner == null)
             {
                 if (m_https_runner != null)
-                    m_http_runner.StopAsync();
+                    m_https_runner.StopAsync();
             }
             else
             {
@@ -105,11 +107,13 @@ namespace Ceen.Httpd.Cli.Runner
 
             // TODO: If the runner is reconfigured, then restart it
 
+            // Set up a crash handler to capture crash in log
             var dummy = m_http_runner?.RunnerTask.ContinueWith(x =>
             {
                 if (!m_http_runner.ShouldStop && InstanceCrashed != null)
                     InstanceCrashed(cfg.HttpAddress, false, x.IsFaulted ? x.Exception : new Exception("Unexpected stop"));
             });
+            // Set up a crash handler to capture crash in log
             dummy = m_https_runner?.RunnerTask.ContinueWith(x =>
             {
                 if (!m_https_runner.ShouldStop && InstanceCrashed != null)
@@ -120,23 +124,22 @@ namespace Ceen.Httpd.Cli.Runner
             {
                 await Task.Run(async () =>
                 {
+                    // We need both to stop
                     var t = Task.WhenAll(new[] { prevhttp?.StopAsync(), prevhttps?.StopAsync() }.Where(x => x != null));
 
-                    // Give old processes time to terminate
+                    // Give old processes time to terminate (if they are handling requests)
                     var maxtries = cfg.MaxUnloadWaitSeconds;
-                    while (maxtries-- > 0)
+                    while (maxtries-- > 0 && !t.IsCompleted)
+                        await Task.WhenAny(t, Task.Delay(1000));
+
+                    // If we failed to stop, request a kill
+                    if (!t.IsCompleted)
                     {
-                        // All done, then quit
-                        if (t.IsCompleted)
-                            return;
-
-                        await Task.Delay(1000);
+                        if (prevhttp != null)
+                            prevhttp.Kill();
+                        if (prevhttps != null)
+                            prevhttps.Kill();
                     }
-
-                    if (prevhttp != null)
-                        prevhttp.Kill();
-                    if (prevhttps != null)
-                        prevhttps.Kill();
                 });
             }
         }
@@ -154,11 +157,10 @@ namespace Ceen.Httpd.Cli.Runner
             else
             {
                 // We are starting, or restarting the handler
-
                 if (runner == null)
                 {
-                    runner = new InstanceRunner();
-                    runner.Wrapper = newhandler;
+                    // Just 
+                    runner = new InstanceRunner { Wrapper = newhandler };
                     await runner.RestartAsync(newaddr, newport, usessl, config);
                 }
                 else
@@ -167,8 +169,7 @@ namespace Ceen.Httpd.Cli.Runner
                     if (runner.Address != newaddr || runner.Port != newport)
                     {
                         // Start the new instance first
-                        var newrunner = new InstanceRunner();
-                        newrunner.Wrapper = newhandler;
+                        var newrunner = new InstanceRunner { Wrapper = newhandler };
                         await newrunner.RestartAsync(newaddr, newport, usessl, config);
 
                         runner.StopAsync();
