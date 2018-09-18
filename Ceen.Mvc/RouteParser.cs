@@ -34,8 +34,6 @@ namespace Ceen.Mvc
 			/// <returns>The copy of this entry.</returns>
 			/// <param name="children">The children to attach.</param>
 			IFragment AttachChildren(IFragment[] children);
-
-
 		}
 
 		/// <summary>
