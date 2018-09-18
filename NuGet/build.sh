@@ -61,21 +61,22 @@ done
 "${XBUILD}" "/p:Configuration=Release" "/target:Clean" "../Ceen.sln"
 "${XBUILD}" "/p:Configuration=Release" "../Ceen.sln"
 
-find . -type f -name "*.exe" | xargs rm
 find . -type f -name "*.dll" | xargs rm
-cp ../Ceen.Httpd.Cli/bin/Release/*.dll .
-cp ../Ceen.Httpd.Cli/bin/Release/*.exe .
+cp ../Ceen.Security/bin/Release/netstandard2.0/*.dll .
+cp ../Ceen.Httpd.Cli/bin/Release/netstandard2.0/*.dll .
 
 SED_EXPR="s/.*\<version\>.*/    \<version\>${VERSION}\<\/version\>/"
 SED_EXPR2="s/.*\<dependency.*id\=\"Ceen.Httpd\".*/        \<dependency id\=\"Ceen.Httpd\" version\=\"${VERSION}\" \/\>/"
+SED_EXPR3="s/.*\<dependency.*id\=\"Ceen.Mvc\".*/        \<dependency id\=\"Ceen.Mvc\" version\=\"${VERSION}\" \/\>/"
 for NUSPEC in $(find . -type f -name "*.nuspec"); do
-	sed "${SED_EXPR}" "${NUSPEC}" > "${NUSPEC}.tmp"
-	sed "${SED_EXPR2}" "${NUSPEC}.tmp" > "${NUSPEC}.tmp2.nuspec"
-	"${NUGET}" "pack" "${NUSPEC}.tmp2.nuspec"
-	rm "${NUSPEC}.tmp" "${NUSPEC}.tmp2.nuspec"
+	sed "${SED_EXPR}" "${NUSPEC}" > "tmp01.tmp"
+	sed "${SED_EXPR2}" "tmp01.tmp" > "tmp02.tmp"
+	sed "${SED_EXPR3}" "tmp02.tmp" > "${NUSPEC}.tmp.nuspec"
+	"${NUGET}" "pack" "${NUSPEC}.tmp.nuspec"
+	rm "tmp01.tmp" "tmp02.tmp" "${NUSPEC}.tmp.nuspec"
 done
 
-rm *.exe *.dll
+rm *.dll
 
 # Write updated version info back
 echo "${VERSION}" > "${VERSION_FILE}"
