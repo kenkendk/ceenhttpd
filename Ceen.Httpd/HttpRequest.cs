@@ -417,7 +417,7 @@ namespace Ceen.Httpd
                             }
 
                             await rtask;
-                            me.Data.SetPosition(0);
+                            me.Data.Position = 0;
 
                             this.Files.Add(me);
                         }

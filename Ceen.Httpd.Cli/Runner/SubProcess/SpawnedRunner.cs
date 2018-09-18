@@ -301,9 +301,9 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         Program.DebugConsoleOutput("Got request, parsing ...");
 
                         // Copy the buffer into the stream we read from
-                        ms.SetPosition(0);
+                        ms.Position = 0;
                         ms.Write(req.Item2, 0, req.Item2.Length);
-                        ms.SetPosition(0);
+                        ms.Position = 0;
 
                         // Extract the data
                         var data = await bcs.ReadAnyAsync<SocketRequest>();

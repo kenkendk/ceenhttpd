@@ -11,11 +11,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj" />
     <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj" />
-    <ProjectReference Include="..\..\SockRock\src\SockRock.csproj" />
     <ProjectReference Include="..\..\LeanIPC\LeanIPC\LeanIPC.csproj" />
     <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Mono.Posix.NETStandard" Version="1.0.0" />
+    <PackageReference Include="SockRock" Version="1.0.1" />
   </ItemGroup>
 </Project>

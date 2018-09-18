@@ -324,7 +324,7 @@ namespace Ceen.Httpd.Handler
 
                     if (etagkey != null)
                     {
-                        fs.SetPosition(0);
+                        fs.Position = 0;
                         etag = await ComputeETag(fs);
 
                         if (ETagCacheSize > 0)
@@ -392,7 +392,7 @@ namespace Ceen.Httpd.Handler
                         return true;
                     }
 
-                    fs.SetPosition(startoffset);
+                    fs.Position = startoffset;
                     var remain = context.Response.ContentLength;
                     var buf = new byte[8 * 1024];
 

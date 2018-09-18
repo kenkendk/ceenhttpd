@@ -71,7 +71,7 @@ namespace Ceen.Httpd
 
 			if (m_buffer != null)
 			{
-				m_buffer.SetPosition(0);
+				m_buffer.Position = 0;
 				await m_buffer.CopyToAsync(m_parent, 8 * 1024, cancellationToken);
 				m_buffer = null;
 			}
@@ -240,18 +240,10 @@ namespace Ceen.Httpd
         /// Gets or sets the position.
         /// </summary>
         /// <returns>The position.</returns>
-        public override long GetPosition()
+        public override long Position
         {
-            return m_written;
-        }
-
-        /// <summary>
-        /// Gets or sets the position.
-        /// </summary>
-        /// <param name="value">The position.</param>
-        public override void SetPosition(long value)
-        {
-            throw new InvalidOperationException();
+            get => m_written;
+            set => throw new NotImplementedException();
         }
 
         /// <summary>

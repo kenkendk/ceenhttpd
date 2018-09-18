@@ -474,18 +474,10 @@ namespace Ceen.Httpd
         /// Gets or sets the position.
         /// </summary>
         /// <returns>The position.</returns>
-        public override long GetPosition()
+        public override long Position 
         {
-            return m_maxread - m_remainingbytes;
-        }
-
-        /// <summary>
-        /// Gets or sets the position.
-        /// </summary>
-        /// <param name="value">The position.</param>
-        public override void SetPosition(long value)
-        {
-            throw new NotImplementedException();
+            get => m_maxread - m_remainingbytes;
+            set => throw new NotImplementedException();
         }
         #endregion
     }

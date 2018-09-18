@@ -439,7 +439,7 @@ namespace Ceen.Httpd
 			if (contenttype != null)
 				ContentType = contenttype;
 			if (!HasSentHeaders)
-				ContentLength = data.Length - data.GetPosition();
+				ContentLength = data.Length - data.Position;
 			return data.CopyToAsync(m_outstream);
 		}
 

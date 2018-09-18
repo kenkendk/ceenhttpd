@@ -177,7 +177,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
 
                 if (SystemHelper.IsCurrentOSPosix)
                 {
-                    var completed = false;
                     var ct = new CancellationTokenSource();
 
                     // Prepare cancellation after 5 seconds
