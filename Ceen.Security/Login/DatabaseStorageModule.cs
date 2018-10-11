@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using Ceen.Database;
 
 namespace Ceen.Security.Login
 {
@@ -62,8 +63,6 @@ namespace Ceen.Security.Login
 				new LoginSettingsModule().LongTermStorage = this;
 			if (default_authentication)
 				new LoginSettingsModule().Authentication = this;
-			
-			EnsureConnected();
 		}
 
 		/// <summary>
@@ -144,219 +143,60 @@ namespace Ceen.Security.Login
 		/// </summary>
 		protected System.Data.IDbCommand m_updateLoginEntryCommand;
 
-		/// <summary>
-		/// Establishes a connection to the database, must hold the lock before this method is called.
-		/// </summary>
-		protected virtual void EnsureConnected()
+        /// <summary>
+        /// Establishes a connection to the database, must hold the lock before this method is called.
+        /// </summary>
+        protected virtual void EnsureConnected()
+        {
+            if (m_connection != null && m_connection.State == System.Data.ConnectionState.Open)
+                return;
+
+            if (m_connection != null)
+                try
+                {
+                    m_connection.Close();
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    m_connection = null;
+                }
+
+            m_connection = DatabaseHelper.CreateConnection(ConnectionString, ConnectionClass);
+        }
+
+
+        /// <summary>
+        /// Sets up all the required commands, must hold the lock before this method is called.
+        /// </summary>
+        protected virtual void SetupCommands()
 		{
-			if (m_connection != null && m_connection.State == System.Data.ConnectionState.Open)
-				return;
+            var dialect = m_connection.GetDialect();
+            dialect.CreateTypeMap<SessionRecord>(SessionRecordTablename);
+            dialect.CreateTypeMap<LongTermToken>(LongTermLoginTablename);
+            dialect.CreateTypeMap<LoginEntry>(LoginEntryTablename);
 
-			if (m_connection != null)
-				try
-				{
-					m_connection.Close();
-				}
-				catch
-				{
-				}
-				finally
-				{
-					m_connection = null;
-				}
+			m_addSessionCommand = m_connection.SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"") VALUES (?, ?, ?, ?)", SessionRecordTablename));
+			m_dropSessionCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Cookie"" = ? AND ""XSRFToken"" = ?", SessionRecordTablename));
+			m_updateSessionCommand = m_connection.SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Expires"" = ? WHERE ""UserID"" = ? AND ""Cookie"" = ?  AND ""XSRFToken"" = ?", SessionRecordTablename));
+			m_getSessionFromCookieCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""Cookie"" = ?", SessionRecordTablename));
+			m_getSessionFromXSRFCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""XSRFToken"" = ?", SessionRecordTablename));
 
-			var classname = ConnectionClass;
-			var connstr = ConnectionString;
-			if (string.Equals(classname, "sqlite", StringComparison.OrdinalIgnoreCase) || string.Equals(classname, "sqlite3", StringComparison.OrdinalIgnoreCase))
-			{
-				classname = "Mono.Data.Sqlite.SqliteConnection, Mono.Data.Sqlite, Version=4.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756";
-				if (Type.GetType(classname) == null)
-					classname = "System.Data.SQLite.SQLiteConnection, System.Data.SQLite, Version=1.0.104.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139";
+			m_addLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Series"" = ?; INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
+			m_dropLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Series"" = ? AND ""Token"" = ?", LongTermLoginTablename));
+			m_dropAllLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? OR ""Series"" = ?", LongTermLoginTablename));
+			m_getLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
 
-				if (!string.IsNullOrWhiteSpace(connstr) && !connstr.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
-					connstr = "Data Source=" + connstr;
-			}
-			else if (string.Equals(classname, "odbc", StringComparison.OrdinalIgnoreCase))
-				classname = "System.Data.Odbc.OdbcConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089";
+			m_dropExpiredSessionsCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", SessionRecordTablename));
+			m_dropExpiredLongTermCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
 
-			var contype = Type.GetType(classname);
-			if (contype == null)
-				throw new Exception($"Failed to locate the requested database type: {classname}");
-			var e = Activator.CreateInstance(contype);
-			if (!(e is System.Data.IDbConnection))
-				throw new Exception($"The requested type {contype.FullName} is not implementing {typeof(System.Data.IDbConnection).FullName}");
-
-			m_connection = e as System.Data.IDbConnection;
-
-			m_connection.ConnectionString = connstr;
-			m_connection.Open();
-
-			SetupCommands();
-		}
-
-		/// <summary>
-		/// Sets up all the required commands, must hold the lock before this method is called.
-		/// </summary>
-		protected virtual void SetupCommands()
-		{
-			CreateTable(SessionRecordTablename, typeof(SessionRecord), "Cookie");
-			CreateTable(LongTermLoginTablename, typeof(LongTermToken), "Series");
-			CreateTable(LoginEntryTablename, typeof(LoginEntry), "Username", "Token");
-
-			m_addSessionCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"") VALUES (?, ?, ?, ?)", SessionRecordTablename));
-			m_dropSessionCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Cookie"" = ? AND ""XSRFToken"" = ?", SessionRecordTablename));
-			m_updateSessionCommand = SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Expires"" = ? WHERE ""UserID"" = ? AND ""Cookie"" = ?  AND ""XSRFToken"" = ?", SessionRecordTablename));
-			m_getSessionFromCookieCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""Cookie"" = ?", SessionRecordTablename));
-			m_getSessionFromXSRFCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""XSRFToken"" = ?", SessionRecordTablename));
-
-			m_addLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Series"" = ?; INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
-			m_dropLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Series"" = ? AND ""Token"" = ?", LongTermLoginTablename));
-			m_dropAllLongTermLoginCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? OR ""Series"" = ?", LongTermLoginTablename));
-			m_getLongTermLoginCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
-
-			m_dropExpiredSessionsCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", SessionRecordTablename));
-			m_dropExpiredLongTermCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
-
-			m_addLoginEntryCommand = SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Username"", ""Token"") VALUES (?, ?, ?)", LoginEntryTablename));
-			m_getLoginEntriesCommand = SetupCommand(string.Format(@"SELECT ""UserID"", ""Username"", ""Token"" FROM ""{0}"" WHERE ""Username"" = ?", LoginEntryTablename));
-			m_dropLoginEntryCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ? AND ""Token"" = ?", LoginEntryTablename));
-			m_dropAllLoginEntryCommand = SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
-			m_updateLoginEntryCommand = SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Token"" = ? WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
-		}
-
-		/// <summary>
-		/// Gets the SQL type for a given property
-		/// </summary>
-		/// <returns>The sql column type.</returns>
-		/// <param name="property">The property being examined.</param>
-		protected virtual string GetSqlColumnType(System.Reflection.PropertyInfo property)
-		{
-			if (property.PropertyType == typeof(int) || property.PropertyType == typeof(uint) || property.PropertyType == typeof(short) || property.PropertyType == typeof(ushort) || property.PropertyType == typeof(long) || property.PropertyType == typeof(ulong))
-			{
-				if (property.Name == "ID")
-					return "INTEGER PRIMARY KEY";
-				
-				return "INTEGER";
-			}
-			else if (property.PropertyType == typeof(DateTime))
-				return "DATETIME";
-			else
-				return "STRING";
-		}
-
-		/// <summary>
-		/// Creates the table for the given type.
-		/// </summary>
-		/// <param name="tablename">The name of the table to create.</param>
-		/// <param name="recordtype">The datatype to store in the table.</param>
-		/// <param name="unique">The list of unique columns.</param>
-		protected virtual void CreateTable(string tablename, Type recordtype, params string[] unique)
-		{
-			var fields =
-				string.Join(", ",
-					recordtype
-					.GetProperties()
-					.Select(x => string.Format(@"""{0}"" {1}", x.Name, GetSqlColumnType(x)))
-				);
-
-			var constr =
-				(unique == null || unique.Length == 0)
-				? string.Empty
-				: string.Format(@", CONSTRAINT ""{0}_unique"" UNIQUE({1})", tablename, string.Join(", ", unique));
-
-			var sql = string.Format(
-				@"CREATE TABLE ""{0}"" ({1} {2}) ",
-				tablename,
-				fields,
-				constr
-			);
-
-			using (var cmd = m_connection.CreateCommand())
-			{
-				try
-				{
-					// Check if the table exists
-					cmd.CommandText = string.Format(@"SELECT COUNT(*) FROM ""{0}""", tablename);
-					var r = cmd.ExecuteScalar();
-					if (r != null && r != DBNull.Value)
-						return;
-				}
-				catch
-				{
-				}
-
-				cmd.CommandText = sql;
-				cmd.ExecuteNonQuery();
-			}
-		}
-
-		/// <summary>
-		/// Helper method for creating a command and initializing the parameters
-		/// </summary>
-		/// <returns>The command.</returns>
-		/// <param name="commandtext">The commandtext.</param>
-		protected IDbCommand SetupCommand(string commandtext, IDbTransaction transaction = null)
-		{
-			if (string.IsNullOrWhiteSpace(commandtext))
-				throw new ArgumentNullException(nameof(commandtext));
-
-			var cmd = m_connection.CreateCommand();
-			cmd.CommandText = commandtext;
-			cmd.Transaction = transaction;
-			AddParameters(cmd, commandtext.Count(x => x == '?'));
-			return cmd;
-		}
-
-		/// <summary>
-		/// Adds a number of parameters to the command
-		/// </summary>
-		/// <param name="cmd">The command to add the parameters to.</param>
-		/// <param name="count">The number of parameters to add.</param>
-		public static void AddParameters(IDbCommand cmd, int count)
-		{
-			if (cmd == null)
-				throw new ArgumentNullException(nameof(cmd));
-			if (count < 0)
-				throw new ArgumentOutOfRangeException(nameof(count));
-
-			if (cmd.Parameters.Count > count)
-				cmd.Parameters.Clear();
-			for (var i = cmd.Parameters.Count; i < count; i++)
-				cmd.Parameters.Add(cmd.CreateParameter());
-		}
-
-		/// <summary>
-		/// Sets the parameter values.
-		/// </summary>
-		/// <param name="cmd">The command to set parameter values on.</param>
-		/// <param name="values">The values to set.</param>
-		public static void SetParameterValues(IDbCommand cmd, params object[] values)
-		{
-			if (cmd == null)
-				throw new ArgumentNullException(nameof(cmd));
-
-			values = values ?? new object[0];
-
-			AddParameters(cmd, values.Length);
-			for (var i = 0; i < values.Length; i++)
-				((IDbDataParameter)cmd.Parameters[i]).Value = values[i];
-		}
-
-		/// <summary>
-		/// Fixes a deficiency in the database mapping,
-		///  and returns string null values as null
-		/// </summary>
-		/// <returns>The string representation.</returns>
-		/// <param name="rd">The reader to use.</param>
-		/// <param name="index">The index to read the string from.</param>
-		public static string GetAsString(IDataReader rd, int index)
-		{
-			var val = rd.GetValue(index);
-
-			if (val == null || val == DBNull.Value)
-				return null;
-			else
-				return (string)val;
+			m_addLoginEntryCommand = m_connection.SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Username"", ""Token"") VALUES (?, ?, ?)", LoginEntryTablename));
+			m_getLoginEntriesCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Username"", ""Token"" FROM ""{0}"" WHERE ""Username"" = ?", LoginEntryTablename));
+			m_dropLoginEntryCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ? AND ""Token"" = ?", LoginEntryTablename));
+			m_dropAllLoginEntryCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
+			m_updateLoginEntryCommand = m_connection.SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Token"" = ? WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
 		}
 
         /// <summary>
@@ -368,9 +208,9 @@ namespace Ceen.Security.Login
         public virtual Task ExecuteCommandAsync(IDbCommand command, params object[] values)
         {
             return m_lock.LockedAsync(() => {
+
                 EnsureConnected();
-                SetParameterValues(command, values);
-                command.ExecuteNonQuery();
+                command.ExecuteNonQuery(values);
             });
         }
 
@@ -416,7 +256,7 @@ namespace Ceen.Security.Login
 			using (await m_lock.LockAsync())
 			{
 				EnsureConnected();
-				SetParameterValues(m_getSessionFromCookieCommand, cookie);
+                m_getSessionFromCookieCommand.SetParameterValues(cookie);
 				using (var rd = m_getSessionFromCookieCommand.ExecuteReader())
 				{
 					if (!rd.Read())
@@ -424,9 +264,9 @@ namespace Ceen.Security.Login
 					else
 						return new SessionRecord()
 						{
-							UserID = GetAsString(rd, 0),
-							Cookie = GetAsString(rd, 1),
-							XSRFToken = GetAsString(rd, 2),
+							UserID = rd.GetAsString(0),
+							Cookie = rd.GetAsString(1),
+							XSRFToken = rd.GetAsString(2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -443,7 +283,7 @@ namespace Ceen.Security.Login
 			using (await m_lock.LockAsync())
 			{
 				EnsureConnected();
-				SetParameterValues(m_getSessionFromXSRFCommand, xsrf);
+                m_getSessionFromXSRFCommand.SetParameterValues(xsrf);
 				using (var rd = m_getSessionFromXSRFCommand.ExecuteReader())
 				{
 					if (!rd.Read())
@@ -451,9 +291,9 @@ namespace Ceen.Security.Login
 					else
 						return new SessionRecord()
 						{
-							UserID = GetAsString(rd, 0),
-							Cookie = GetAsString(rd, 1),
-							XSRFToken = GetAsString(rd, 2),
+							UserID = rd.GetAsString(0),
+							Cookie = rd.GetAsString(1),
+							XSRFToken = rd.GetAsString(2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -533,7 +373,7 @@ namespace Ceen.Security.Login
 			using (await m_lock.LockAsync())
 			{
 				EnsureConnected();
-				SetParameterValues(m_getLongTermLoginCommand, series);
+                m_getLongTermLoginCommand.SetParameterValues(series);
 				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
 				{
 					if (!rd.Read())
@@ -541,9 +381,9 @@ namespace Ceen.Security.Login
 					else
 						return new LongTermToken()
 						{
-							UserID = GetAsString(rd, 0),
-							Series = GetAsString(rd, 1),
-							Token = GetAsString(rd, 2),
+							UserID = rd.GetAsString(0),
+							Series = rd.GetAsString(1),
+							Token = rd.GetAsString(2),
 							Expires = rd.GetDateTime(3)
 						};
 				}
@@ -558,9 +398,9 @@ namespace Ceen.Security.Login
 		{
             return m_lock.LockedAsync(() =>
             {
-                SetParameterValues(m_dropExpiredSessionsCommand, DateTime.Now);
+                m_dropExpiredSessionsCommand.SetParameterValues(DateTime.Now);
                 m_dropExpiredSessionsCommand.ExecuteNonQuery();
-                SetParameterValues(m_dropExpiredLongTermCommand, DateTime.Now);
+                m_dropExpiredLongTermCommand.SetParameterValues(DateTime.Now);
                 m_dropExpiredLongTermCommand.ExecuteNonQuery();
             });
 		}
@@ -599,15 +439,15 @@ namespace Ceen.Security.Login
 			using (await m_lock.LockAsync())
 			{
 				EnsureConnected();
-				SetParameterValues(m_getLoginEntriesCommand, username);
+                m_getLoginEntriesCommand.SetParameterValues(username);
 				using (var rd = m_getLoginEntriesCommand.ExecuteReader())
 				{
 					while (rd.Read())
 						lst.Add(new LoginEntry()
 						{
-							UserID = GetAsString(rd, 0),
-							Username = GetAsString(rd, 1),
-							Token = GetAsString(rd, 2)
+							UserID = rd.GetAsString(0),
+							Username = rd.GetAsString(1),
+							Token = rd.GetAsString(2)
 						});
 				}
 			}

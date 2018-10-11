@@ -1,4 +1,6 @@
 ﻿using System;
+using Ceen.Database;
+
 namespace Ceen.Security.Login
 {
 	/// <summary>
@@ -29,6 +31,7 @@ namespace Ceen.Security.Login
 		/// <summary>
 		/// Gets or sets the series value.
 		/// </summary>
+        [Unique]
 		public string Series { get; set; }
 		/// <summary>
 		/// Gets or sets the token value in PKBDF2 format.

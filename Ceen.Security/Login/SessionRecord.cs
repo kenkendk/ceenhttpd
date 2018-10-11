@@ -1,4 +1,6 @@
 ﻿using System;
+using Ceen.Database;
+
 namespace Ceen.Security.Login
 {
 	/// <summary>
@@ -29,6 +31,7 @@ namespace Ceen.Security.Login
 		/// <summary>
 		/// Gets or sets the cookie.
 		/// </summary>
+        [Unique]
 		public string Cookie { get; set; }
 		/// <summary>
 		/// Gets or sets the XSRF Token.
