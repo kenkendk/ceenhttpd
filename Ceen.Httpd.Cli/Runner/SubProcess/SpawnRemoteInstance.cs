@@ -137,10 +137,10 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             /// </summary>
             private readonly string[] m_filenames;
 
-        /// <summary>
+            /// <summary>
             /// Initializes a new instance of the
             /// <see cref="T:Ceen.Httpd.Cli.Runner.SubProcess.SpawnRemoteInstance.DeleteFilesHelper"/> class.
-        /// </summary>
+            /// </summary>
             /// <param name="filenames">The files to delete on dispose.</param>
             public DeleteFilesHelper(params string[] filenames)
             {

@@ -113,7 +113,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <summary>
         /// The epoll handler instance
         /// </summary>
-        public readonly SockRock.ISocketHandler PollHandler;
+        private readonly SockRock.ISocketHandler m_pollhandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.UnixSpawn.SpawnedServer"/> class.
@@ -145,13 +145,13 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
 
             try
             {
-                PollHandler = new SockRock.KqueueHandler();
+                m_pollhandler = new SockRock.KqueueHandler();
             }
             catch (Exception e1)
             {
                 try
                 {
-                    PollHandler = new SockRock.EpollHandler();
+                    m_pollhandler = new SockRock.EpollHandler();
                 }
                 catch (Exception e2)
                 {
@@ -185,7 +185,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         {
             Program.DebugConsoleOutput("Got simple handling request for handle {0}", handle);
 
-            var stream = PollHandler.MonitorWithStream(handle);
+            var stream = m_pollhandler.MonitorWithStream(handle);
             base.HandleRequest(stream, remoteEndPoint, logtaskid, () => stream.ReaderClosed);
             return Task.FromResult(true);
         }
@@ -197,7 +197,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         public void Stop(TimeSpan waittime)
         {
             base.Stop();
-            PollHandler.Stop(waittime);
+            m_pollhandler.Stop(waittime);
         }
     }
 
@@ -302,7 +302,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                 // Use a single allocated buffer for all requests
                 using (var ms = new System.IO.MemoryStream())
                 using (var bcs = new BinaryConverterStream(ms, tp, false))
-                //using (var mh = server.PollHandler.MonitoredHandle(rchandle))
                 {
                     Program.DebugConsoleOutput("{0} Entering main loop", System.Diagnostics.Process.GetCurrentProcess().Id);
                     while (socket.Connected)
@@ -311,28 +310,31 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         {
                             // Get the next request from the socket
                             Program.DebugConsoleOutput("{0} Getting file handle", System.Diagnostics.Process.GetCurrentProcess().Id);
-                            //foreach(var req in await SockRock.ScmRightsImplementation.recv_fds_async(mh))
+                            var req = SockRock.ScmRightsImplementation.recv_fds(rchandle);
+                            if (req == null)
                             {
-                                var req = SockRock.ScmRightsImplementation.recv_fds(rchandle);
-                                Program.DebugConsoleOutput("{0} Got request, parsing ...", System.Diagnostics.Process.GetCurrentProcess().Id);
-
-                                // Copy the buffer into the stream we read from
-                                ms.Position = 0;
-                                ms.Write(req.Item2, 0, req.Item2.Length);
-                                ms.Position = 0;
-
-                                // Extract the data
-                                var data = await bcs.ReadAnyAsync<SocketRequest>();
-
-                                Program.DebugConsoleOutput("{0}, Decoded request, local handle is {1} remote handle is {2}", System.Diagnostics.Process.GetCurrentProcess().Id, req.Item1[0], data.Handle);
-
-                                // All set, fire the request
-                                Task.Run(
-                                    () => server.HandleRequestSimple(req.Item1[0], new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID)
-                                ).ContinueWith(
-                                    _ => Program.DebugConsoleOutput("{0}: Request handling completed", System.Diagnostics.Process.GetCurrentProcess().Id)
-                                );
+                                Program.DebugConsoleOutput("{0} Socket closed", System.Diagnostics.Process.GetCurrentProcess().Id);
+                                break;
                             }
+
+                            Program.DebugConsoleOutput("{0} Got request, parsing ...", System.Diagnostics.Process.GetCurrentProcess().Id);
+
+                            // Copy the buffer into the stream we read from
+                            ms.Position = 0;
+                            ms.Write(req.Item2, 0, req.Item2.Length);
+                            ms.Position = 0;
+
+                            // Extract the data
+                            var data = await bcs.ReadAnyAsync<SocketRequest>();
+
+                            Program.DebugConsoleOutput("{0}, Decoded request, local handle is {1} remote handle is {2}", System.Diagnostics.Process.GetCurrentProcess().Id, req.Item1[0], data.Handle);
+
+                            // All set, fire the request
+                            Task.Run(
+                                () => server.HandleRequestSimple(req.Item1[0], new IPEndPoint(IPAddress.Parse(data.RemoteIP), data.RemotePort), data.LogTaskID)
+                            ).ContinueWith(
+                                _ => Program.DebugConsoleOutput("{0}: Request handling completed", System.Diagnostics.Process.GetCurrentProcess().Id)
+                            );
                         }
                         catch(Exception ex)
                         {
