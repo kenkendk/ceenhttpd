@@ -53,6 +53,7 @@ namespace Ceen.Httpd.Cli.Runner
         /// </summary>
         public async Task ReloadAsync(bool http, bool https)
         {
+            Program.DebugConsoleOutput("Reloading instance");
             var cfg = ConfigParser.ParseTextFile(m_path);
             var config = ConfigParser.CreateServerConfig(cfg);
             config.Storage = m_storage;
@@ -65,6 +66,8 @@ namespace Ceen.Httpd.Cli.Runner
             IWrappedRunner new_http_runner = null;
             IWrappedRunner new_https_runner = null;
 
+            Program.DebugConsoleOutput("Creating runners");
+
             try
             {
                 if (http)
@@ -72,8 +75,10 @@ namespace Ceen.Httpd.Cli.Runner
                 if (https)
                     new_https_runner = CreateRunner(m_path, true, m_storage, default(System.Threading.CancellationToken));
             }
-            catch
+            catch (Exception ex)
             {
+                Program.DebugConsoleOutput("Failed to create runners: {0}", ex);
+
                 // If we fail to start, just kill any of the instances we just started
                 if (new_http_runner != null)
                     try { new_http_runner.Kill(); }
@@ -86,11 +91,14 @@ namespace Ceen.Httpd.Cli.Runner
                 throw;
             }
 
+            Program.DebugConsoleOutput("Created runners, replacing existing runners");
+
             // Set up the new instances
             m_http_runner = await ReplaceOrRestartAsync(m_http_runner, prevhttp, new_http_runner, cfg.HttpAddress, cfg.HttpPort, false, config);
             m_https_runner = await ReplaceOrRestartAsync(m_https_runner, prevhttps, new_https_runner, cfg.HttpsAddress, cfg.HttpsPort, true, config);
 
 
+            Program.DebugConsoleOutput("Stopping old runners");
 
             if (new_https_runner == null)
             {
@@ -107,6 +115,8 @@ namespace Ceen.Httpd.Cli.Runner
 
             // TODO: If the runner is reconfigured, then restart it
 
+            Program.DebugConsoleOutput("Setting up crash handlers.");
+
             // Set up a crash handler to capture crash in log
             var dummy = m_http_runner?.RunnerTask.ContinueWith(x =>
             {
@@ -119,6 +129,8 @@ namespace Ceen.Httpd.Cli.Runner
                 if (!m_https_runner.ShouldStop && InstanceCrashed != null)
                     InstanceCrashed(cfg.HttpsAddress, true, x.IsFaulted ? x.Exception : new Exception("Unexpected stop"));
             });
+
+            Program.DebugConsoleOutput("Ensuring that old runners are stopped");
 
             if (prevhttp != null || prevhttps != null)
             {
@@ -135,6 +147,7 @@ namespace Ceen.Httpd.Cli.Runner
                     // If we failed to stop, request a kill
                     if (!t.IsCompleted)
                     {
+                        Program.DebugConsoleOutput("Requesting kill of old runners");
                         if (prevhttp != null)
                             prevhttp.Kill();
                         if (prevhttps != null)
@@ -142,6 +155,8 @@ namespace Ceen.Httpd.Cli.Runner
                     }
                 });
             }
+
+            Program.DebugConsoleOutput("Reloading completed");
         }
 
         private async Task<InstanceRunner> ReplaceOrRestartAsync(InstanceRunner runner, IWrappedRunner prevhandler, IWrappedRunner newhandler, string newaddr, int newport, bool usessl, ServerConfig config)

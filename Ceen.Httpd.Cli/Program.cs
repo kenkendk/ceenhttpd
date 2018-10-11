@@ -11,7 +11,8 @@ namespace Ceen.Httpd.Cli
 	{
         public static void DebugConsoleOutput(string msg, params object[] args)
         {
-            //Console.WriteLine(msg, args);
+			System.IO.File.AppendAllLines("/Users/kenneth/crashlog.txt", new string[] { string.Format(msg, args) });
+            Console.WriteLine(msg, args);
         }
 
         public static void ConsoleOutput(string msg, params object[] args)
@@ -36,17 +37,18 @@ namespace Ceen.Httpd.Cli
 
         public static int Main(string[] args)
 		{
-            DebugConsoleOutput("Started new process");
+            DebugConsoleOutput("{0}: Started new process", System.Diagnostics.Process.GetCurrentProcess().Id);
             if (IsSpawnedChild)
             {
                 try
                 {
-                    DebugConsoleOutput("Starting child process");
+                    DebugConsoleOutput("{0}: Starting child process", System.Diagnostics.Process.GetCurrentProcess().Id);
                     Runner.SubProcess.SpawnedRunner.RunClientRPCListenerAsync().Wait();
+                    DebugConsoleOutput("{0}: Finished child process", System.Diagnostics.Process.GetCurrentProcess().Id);
                 }
                 catch(Exception ex)
                 {
-                    DebugConsoleOutput("Crashed child: {0}", ex);
+                    DebugConsoleOutput("{0}: Crashed child: {1}", System.Diagnostics.Process.GetCurrentProcess().Id, ex);
                     return 1;
                 }
 
@@ -55,7 +57,7 @@ namespace Ceen.Httpd.Cli
 
 			if (args.Length != 1)
 			{
-                ConsoleOutput("Usage: Ceen.Httpd.Cli [path-to-config-file]");
+                ConsoleOutput("Usage: {0} [path-to-config-file]", Path.GetFileName(System.Reflection.Assembly.GetEntryAssembly().Location));
 				return 1;
 			}
 
@@ -219,11 +221,7 @@ namespace Ceen.Httpd.Cli
             return Task.Run(() => {
                 while (!token.IsCancellationRequested)
                 {
-                   var sig = Mono.Unix.UnixSignal.WaitAny(new Mono.Unix.UnixSignal[] {
-                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGHUP),
-                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGINT),
-                        new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGQUIT),
-                    }, TimeSpan.FromSeconds(5));
+                   var sig = Mono.Unix.UnixSignal.WaitAny(signals, TimeSpan.FromSeconds(5));
 
                     if (sig == 0 || sig == 1)
                         reload();

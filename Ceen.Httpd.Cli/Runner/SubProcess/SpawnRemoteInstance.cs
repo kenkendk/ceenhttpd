@@ -70,7 +70,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <summary>
         /// The socket path for this instance
         /// </summary>
-        private readonly string m_socketpath = string.Format("ceen-socket-{0}", new Random().Next().ToString("x8"));
+        private readonly string m_socketpath;
 
         /// <summary>
         /// A flag indicating if the instance is using SSL
@@ -128,14 +128,35 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         private SockRock.ListenSocket m_listenSocket;
 
         /// <summary>
-        /// The instance counter
+        /// Helper class to delete files after use
         /// </summary>
-        private static int INSTANCE_COUNTER = 0;
+        private class DeleteFilesHelper : IDisposable
+        {
+            /// <summary>
+            /// The list of files to delete
+            /// </summary>
+            private readonly string[] m_filenames;
 
         /// <summary>
-        /// The instance number
+            /// Initializes a new instance of the
+            /// <see cref="T:Ceen.Httpd.Cli.Runner.SubProcess.SpawnRemoteInstance.DeleteFilesHelper"/> class.
         /// </summary>
-        private readonly int m_instanceNo = 0;
+            /// <param name="filenames">The files to delete on dispose.</param>
+            public DeleteFilesHelper(params string[] filenames)
+            {
+                m_filenames = filenames ?? new string[0];
+            }
+
+            /// <summary>
+            /// Deletes all the files
+            /// </summary>
+            public void Dispose()
+            {
+                foreach (var f in m_filenames)
+                    try { System.IO.File.Delete(f); }
+                    catch { }
+            }
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.SubProcess.SpawnRemoteInstance"/> class.
@@ -147,12 +168,24 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             m_path = path;
             m_useSSL = usessl;
             m_storage = storage;
-            m_instanceNo = System.Threading.Interlocked.Increment(ref INSTANCE_COUNTER);
-            Console.WriteLine("Starting instance {0}", m_instanceNo);
 
             var prefix = m_hiddenSocketPath ? "\0" : string.Empty;
+            var sockid = string.Format("ceen-socket-{0}", new Random().Next().ToString("x8"));
+            if (m_hiddenSocketPath)
+            {
+                m_socketpath = sockid;
+            }
+            else
+            {
+                var pathPrefix = Environment.GetEnvironmentVariable("CEEN_SOCKET_FOLDER");
+                if (string.IsNullOrWhiteSpace(pathPrefix))
+                    pathPrefix = System.IO.Path.GetTempPath();
+
+                m_socketpath = System.IO.Path.GetFullPath(System.IO.Path.Combine(pathPrefix, sockid));
+            }
 
             // Setup a socket server, start the child, and stop the server
+            using ((SystemHelper.IsCurrentOSPosix && !m_hiddenSocketPath) ? new DeleteFilesHelper(m_socketpath, m_socketpath + "_fd") : null)
             using (var serveripcsocket = SystemHelper.IsCurrentOSPosix ? new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP) : null)
             using (var serverfdsocket = SystemHelper.IsCurrentOSPosix ? new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP) : null)
             {
@@ -213,7 +246,22 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             m_peer.TypeSerializer.RegisterEndPointSerializers();
             m_peer.TypeSerializer.RegisterIPEndPointSerializers();
 
-            m_main = Task.Run(() => ipc.RunMainLoopAsync(false));
+            m_main = Task.Run(async () => {
+                try
+                {
+                    using(m_fdSocket)
+                    using(m_ipcSocket)
+                        await ipc.RunMainLoopAsync(false);
+                }
+                finally
+                {
+                    Program.DebugConsoleOutput("{0}: Finished main loop, no longer connected to: {1}", System.Diagnostics.Process.GetCurrentProcess().Id, m_proc.Id);
+                    m_proc.WaitForExit((int)TimeSpan.FromMinutes(1).TotalMilliseconds);
+                    if (!m_proc.HasExited)
+                        m_proc.Kill();
+                    Program.DebugConsoleOutput("{0}: Target now stopped: {1}", System.Diagnostics.Process.GetCurrentProcess().Id, m_proc.Id);
+                }
+            });
 
             if (token.CanBeCanceled)
                 token.Register(() => this.Stop());
@@ -328,7 +376,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                 await bcs.FlushAsync();
                 m_fdSocket.Send(ms.ToArray());
 
-                Program.DebugConsoleOutput($"Sent protocol data with {ms.Length} bytes");
+                Program.DebugConsoleOutput($"Sent protocol data with {ms.Length} bytes to {m_proc.Id}");
             }
         }
 
@@ -365,8 +413,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Stop()
         {
-            Console.WriteLine("Stopping instance {0}", m_instanceNo);
-
             ShouldStop = true;
             m_peer.Dispose();
         }
@@ -375,12 +421,10 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// Stops the remote process
         /// </summary>
         /// <returns>An awaitable task.</returns>
-        public async Task StopAsync()
+        public Task StopAsync()
         {
             Stop();
-            Console.WriteLine("Waiting for instance {0} to stop", m_instanceNo);
-            await m_main;
-            Console.WriteLine("Stopped instance {0}", m_instanceNo);
+            return m_main;
         }
 
         /// <summary>
@@ -388,7 +432,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Kill()
         {
-            Console.WriteLine("Killing instance {0}", m_instanceNo);
             ShouldStop = true;
             m_proc.Kill();
         }
@@ -442,18 +485,18 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         });
                         await bcs.FlushAsync();
 
-                        Program.DebugConsoleOutput($"Sending socket {client} with {ms.Length} bytes of data");
+                        Program.DebugConsoleOutput($"Sending socket {client} with {ms.Length} bytes of data to {m_proc.Id}");
 
                         // Send the request data with the handle to the remote process
                         using (await m_lock.LockAsync())
                             SockRock.ScmRightsImplementation.send_fds(m_fdSocket.Handle.ToInt32(), new int[] { (int)client }, ms.ToArray());
 
-                        Program.DebugConsoleOutput("Data sent, closing local socket");
+                        Program.DebugConsoleOutput($"Data sent to {m_proc.Id}, closing local socket");
 
                         // Make sure the handle is no longer in this process
                         SockRock.ScmRightsImplementation.native_close((int)client);
 
-                        Program.DebugConsoleOutput("Completed sending the socket");
+                        Program.DebugConsoleOutput($"Completed sending the socket to {m_proc.Id}");
                     }
                 }
                 catch (Exception ex)
