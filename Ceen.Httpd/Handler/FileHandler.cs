@@ -13,6 +13,209 @@ namespace Ceen.Httpd.Handler
     /// </summary>
     public class FileHandler : IHttpModuleWithSetup
     {
+
+        /// <summary>
+        /// Helper method to allow syntax similar to the Linq Any() call with async methods
+        /// </summary>
+        /// <returns><c>true</c> if an item was found, <c>false</c> otherwise.</returns>
+        /// <param name="sequence">The items to look in.</param>
+        /// <param name="predicate">The async predicate function.</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        private static async Task<bool> Any<T>(IEnumerable<T> sequence, Func<T, Task<bool>> predicate)
+        {
+            foreach (var n in sequence)
+                if (await predicate(n))
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Helper method to allow syntax similar to the Linq FirstOrDefault() call with async methods
+        /// </summary>
+        /// <returns>The result or default(<typeparamref name="T"/>).</returns>
+        /// <param name="sequence">The items to look in.</param>
+        /// <param name="predicate">The async predicate function.</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        private static async Task<T> FirstOrDefault<T>(IEnumerable<T> sequence, Func<T, Task<bool>> predicate)
+        {
+            foreach (var n in sequence)
+                if (await predicate(n))
+                    return n;
+
+            return default(T);
+        }
+
+        /// <summary>
+        /// Interface for interacting with a virtual filesystem
+        /// </summary>
+        public interface IVirtualFileSystem
+        {
+            /// <summary>
+            /// Returns a value determining if the given file exists
+            /// </summary>
+            /// <returns><c>true</c>, if the file exists, <c>false</c> otherwise.</returns>
+            /// <param name="path">The full path to examine.</param>
+            Task<bool> FileExistsAsync(string path);
+
+            /// <summary>
+            /// Returns a value determining if the given folder exists
+            /// </summary>
+            /// <returns><c>true</c>, if the folder exists, <c>false</c> otherwise.</returns>
+            /// <param name="path">The full path to examine.</param>
+            Task<bool> FolderExistsAsync(string path);
+
+            /// <summary>
+            /// Returns the last time the file was written
+            /// </summary>
+            /// <returns>The last file write time in UTC.</returns>
+            /// <param name="path">The full path to examine.</param>
+            Task<DateTime> GetLastFileWriteTimeUtcAsync(string path);
+
+            /// <summary>
+            /// Opens the given file for reading
+            /// </summary>
+            /// <returns>The stream.</returns>
+            /// <param name="path">The full path of the file to open.</param>
+            Task<Stream> OpenReadAsync(string path);
+
+            /// <summary>
+            /// Returns the path used for MIME type checking
+            /// </summary>
+            /// <returns>The path used for MIME type checking.</returns>
+            /// <param name="path">The path to change</param>
+            Task<string> GetMimeTypePathAsync(string path);
+        }
+
+        /// <summary>
+        /// Implementation of a virtual filesystem that maps to the local filesystem
+        /// </summary>
+        public class FileSystem : IVirtualFileSystem
+        {
+            /// <inheritdoc />
+            public Task<bool> FolderExistsAsync(string path) => Task.FromResult(Directory.Exists(path));
+            /// <inheritdoc />
+            public Task<bool> FileExistsAsync(string path) => Task.FromResult(File.Exists(path));
+            /// <inheritdoc />
+            public Task<DateTime> GetLastFileWriteTimeUtcAsync(string path) => Task.FromResult(File.GetLastWriteTimeUtc(path));
+            /// <inheritdoc />
+            public Task<Stream> OpenReadAsync(string path) => Task.FromResult((Stream)File.OpenRead(path));
+            /// <inheritdoc />
+            public Task<string> GetMimeTypePathAsync(string path) => Task.FromResult(path);
+        }
+
+        /// <summary>
+        /// Simple composite virtual filesystem that picks the first match, if any
+        /// </summary>
+        public class CompositeFileSystem : IVirtualFileSystem
+        {
+            /// <summary>
+            /// The list of virtual filesystems
+            /// </summary>
+            private readonly IVirtualFileSystem[] m_vfsList;
+            /// <summary>
+            /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler.CompositeFileSystem"/> class.
+            /// </summary>
+            /// <param name="virtualFileSystems">The virtual file systems in prefered order.</param>
+            public CompositeFileSystem(params IVirtualFileSystem[] virtualFileSystems)
+            {
+                if (virtualFileSystems == null || virtualFileSystems.Any(x => x == null))
+                    throw new ArgumentNullException(nameof(virtualFileSystems));
+                m_vfsList = virtualFileSystems;
+            }
+
+            /// <summary>
+            /// Gets the first virtual filesystem where the file exists, or <c>null</c>
+            /// </summary>
+            /// <returns>The first match, or <c>null</c>.</returns>
+            /// <param name="path">The path to match.</param>
+            private Task<IVirtualFileSystem> MatchFileAsync(string path) => FirstOrDefault(m_vfsList, x => x.FileExistsAsync(path));
+
+            /// <summary>
+            /// Gets the first virtual filesystem where the directory exists, or <c>null</c>
+            /// </summary>
+            /// <returns>The first match, or <c>null</c>.</returns>
+            /// <param name="path">The path to match.</param>
+            private Task<IVirtualFileSystem> MatchFolderAsync(string path) => FirstOrDefault(m_vfsList, x => x.FolderExistsAsync(path));
+
+            /// <inheritdoc />
+            public async Task<bool> FileExistsAsync(string path) => await MatchFileAsync(path).ContinueWith(x => x.Result.FileExistsAsync(path)).ConfigureAwait(false) != null;
+            /// <inheritdoc />
+            public async Task<bool> FolderExistsAsync(string path) => await MatchFolderAsync(path).ConfigureAwait(false) != null;
+            /// <inheritdoc />
+            public async Task<DateTime> GetLastFileWriteTimeUtcAsync(string path) => await (await MatchFileAsync(path).ConfigureAwait(false)).GetLastFileWriteTimeUtcAsync(path).ConfigureAwait(false);
+            /// <inheritdoc />
+            public async Task<Stream> OpenReadAsync(string path) => await (await MatchFileAsync(path).ConfigureAwait(false)).OpenReadAsync(path).ConfigureAwait(false);
+            /// <inheritdoc />
+            public async Task<string> GetMimeTypePathAsync(string path) => await (await MatchFileAsync(path).ConfigureAwait(false)).GetMimeTypePathAsync(path).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// A virtual filesystem that works on remapped paths
+        /// </summary>
+        public class RemappedVirtualFileSystem : IVirtualFileSystem
+        {
+            /// <summary>
+            /// The remap function
+            /// </summary>
+            private readonly Func<string, string> m_pathRemap;
+
+            /// <summary>
+            /// The method used to perform mime-type remapping
+            /// </summary>
+            private readonly Func<string, Task<string>> m_mimeRemap;
+
+            /// <summary>
+            /// The method used to check for file existence
+            /// </summary>
+            private readonly Func<string, Task<bool>> m_fileExists;
+
+            /// <summary>
+            /// The method used to check for folder existince
+            /// </summary>
+            private readonly Func<string, Task<bool>> m_folderExists;
+
+            /// <summary>
+            /// The function used to get the last write time
+            /// </summary>
+            private readonly Func<string, Task<DateTime>> m_lastWriteTime;
+
+            /// <summary>
+            /// The method used to get the stream with contents
+            /// </summary>
+            private readonly Func<string, Task<Stream>> m_open;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler.RemappedVirtualFileSystem"/> class.
+            /// </summary>
+            /// <param name="pathRemap">The optional function used to remap paths.</param>
+            /// <param name="fileExists">The optional function used to check for a file</param>
+            /// <param name="folderExists">The optional function used to check for a folder</param>
+            /// <param name="lastWriteTime">The optional function used to get a files last write time</param>
+            /// <param name="openFile">The optional method used to get the file contents</param>
+            /// <param name="mimeRemap">The optional method used to get the mime path</param>
+            public RemappedVirtualFileSystem(Func<string, string> pathRemap = null, Func<string, Task<Stream>> openFile = null, Func<string, Task<bool>> fileExists = null, Func<string, Task<bool>> folderExists = null, Func<string, Task<DateTime>> lastWriteTime = null, Func<string, Task<string>> mimeRemap = null)
+            {
+                m_pathRemap = pathRemap ?? (x => x);
+                m_mimeRemap = mimeRemap ?? (x => Task.FromResult(x));
+                m_fileExists = fileExists ?? (x => Task.FromResult(File.Exists(x)));
+                m_folderExists = folderExists ?? (x => Task.FromResult(Directory.Exists(x)));
+                m_lastWriteTime = lastWriteTime ?? (x => Task.FromResult(File.GetLastWriteTimeUtc(x)));
+                m_open = openFile ?? (x => Task.FromResult((Stream)File.OpenRead(x)));
+            }
+
+            /// <inheritdoc />
+            public Task<bool> FileExistsAsync(string path) => m_fileExists(m_pathRemap(path));
+            /// <inheritdoc />
+            public Task<bool> FolderExistsAsync(string path) => m_folderExists(m_pathRemap(path));
+            /// <inheritdoc />
+            public Task<DateTime> GetLastFileWriteTimeUtcAsync(string path) => m_lastWriteTime(m_pathRemap(path));
+            /// <inheritdoc />
+            public Task<Stream> OpenReadAsync(string path) => m_open(m_pathRemap(path));
+            /// <inheritdoc />
+            public Task<string> GetMimeTypePathAsync(string path) => m_mimeRemap(m_pathRemap(path));
+        }
+
         /// <summary>
         /// The folder where files are served from
         /// </summary>
@@ -28,7 +231,7 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// Chars that are not allowed in the path
         /// </summary>
-        protected static readonly string[] FORBIDDENCHARS = new string[] { "\\", "..", ":" };
+        protected static readonly string[] FORBIDDENCHARS = { "\\", "..", ":" };
         /// <summary>
         /// Function that maps a request to a mime type
         /// </summary>
@@ -93,6 +296,20 @@ namespace Ceen.Httpd.Handler
         public int CacheSeconds { get; set; } = 60 * 60 * 24;
 
         /// <summary>
+        /// By default, the file handler module with report 404 - Not Found,
+        /// if the item could not be processed, along with other appropriate
+        /// error messages. If this property is set to <c>true</c> the module
+        /// will instead ignore the request, allowing other modules to handle
+        /// the request
+        /// </summary>
+        public bool PassThrough { get; set; } = false;
+
+        /// <summary>
+        /// The virtual filesystem used for all requests
+        /// </summary>
+        protected readonly IVirtualFileSystem m_vfs;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
         /// </summary>
         /// <param name="sourcefolder">The folder to server files from.</param>
@@ -107,8 +324,19 @@ namespace Ceen.Httpd.Handler
         /// <param name="sourcefolder">The folder to server files from.</param>
         /// <param name="mimetypelookup">A mapping function to return the mime type for a given path.</param>
         public FileHandler(string sourcefolder, Func<IHttpRequest, string, string> mimetypelookup = null)
+            : this(new FileSystem(), mimetypelookup)
         {
             SourceFolder = sourcefolder;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Handler.FileHandler"/> class.
+        /// </summary>
+        /// <param name="vfs">The virtual filesystem to use.</param>
+        /// <param name="mimetypelookup">Mimetypelookup.</param>
+        public FileHandler(IVirtualFileSystem vfs, Func<IHttpRequest, string, string> mimetypelookup = null)
+        {
+            m_vfs = vfs ?? throw new ArgumentNullException(nameof(vfs));
             m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
         }
 
@@ -211,13 +439,13 @@ namespace Ceen.Httpd.Handler
         /// <returns><c>true</c>, if redirect was issued, <c>false</c> otherwise.</returns>
         /// <param name="path">The local path to use.</param>
         /// <param name="context">The request context.</param>
-        protected virtual bool AutoRedirect(string path, IHttpContext context)
+        protected virtual async Task<bool> AutoRedirect(string path, IHttpContext context)
         {
-            if (!File.Exists(path))
+            if (!await m_vfs.FileExistsAsync(path))
             {
                 if (string.IsNullOrWhiteSpace(Path.GetExtension(path)) && !path.EndsWith("/", StringComparison.Ordinal) && !path.EndsWith(".", StringComparison.Ordinal))
                 {
-                    var ix = AutoProbeExtensions.FirstOrDefault(p => File.Exists(path + p));
+                    var ix = await FirstOrDefault(AutoProbeExtensions, p => m_vfs.FileExistsAsync(path + p));
                     if (!string.IsNullOrWhiteSpace(ix))
                     {
                         context.Response.InternalRedirect(context.Request.Path + ix);
@@ -225,18 +453,23 @@ namespace Ceen.Httpd.Handler
                     }
                 }
 
-                if (Directory.Exists(path))
+                if (await m_vfs.FolderExistsAsync(path))
                 {
                     if (!context.Request.Path.EndsWith("/", StringComparison.Ordinal))
                     {
-                        if (!IndexDocuments.Any(p => File.Exists(Path.Combine(path, p))))
+                        if (!await Any(IndexDocuments, p => m_vfs.FileExistsAsync(Path.Combine(path, p))))
+                        {
+                            if (PassThrough)
+                                return false;
+
                             throw new HttpException(HttpStatusCode.NotFound);
+                        }
 
                         context.Response.Redirect(context.Request.Path + "/");
                         return true;
                     }
 
-                    var ix = IndexDocuments.FirstOrDefault(p => File.Exists(Path.Combine(path, p)));
+                    var ix = await FirstOrDefault(IndexDocuments, p => m_vfs.FileExistsAsync(Path.Combine(path, p)));
                     if (!string.IsNullOrWhiteSpace(ix))
                     {
                         context.Response.InternalRedirect(context.Request.Path + ix);
@@ -261,7 +494,7 @@ namespace Ceen.Httpd.Handler
             try
             {
                 string etag = null;
-                string etagkey = ETagCacheSize < 0 ? null : File.GetLastWriteTimeUtc(path).Ticks + path;
+                string etagkey = ETagCacheSize < 0 ? null : (await m_vfs.GetLastFileWriteTimeUtcAsync(path)).Ticks + path;
                 string[] clientetags = new string[0];
 
                 if (etagkey != null)
@@ -285,7 +518,7 @@ namespace Ceen.Httpd.Handler
                     }
                 }
 
-                using (var fs = File.OpenRead(path))
+                using (var fs = await m_vfs.OpenReadAsync(path))
                 {
                     var startoffset = 0L;
                     var bytecount = fs.Length;
@@ -350,7 +583,7 @@ namespace Ceen.Httpd.Handler
                     if (etag != null && clientetags != null && clientetags.Any(x => string.Equals(x, etag, StringComparison.Ordinal)))
                         return SetNotModified(context, etag);
 
-                    var lastmodified = File.GetLastWriteTimeUtc(path);
+                    var lastmodified = await m_vfs.GetLastFileWriteTimeUtcAsync(path);
                     context.Response.ContentType = mimetype;
                     context.Response.StatusCode = HttpStatusCode.OK;
                     context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
@@ -421,30 +654,55 @@ namespace Ceen.Httpd.Handler
         /// </summary>
         /// <returns>The awaitable task.</returns>
         /// <param name="context">The http context.</param>
-        public virtual Task<bool> HandleAsync(IHttpContext context)
+        public virtual async Task<bool> HandleAsync(IHttpContext context)
         {
             if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+            {
+                if (PassThrough)
+                    return false;
                 throw new HttpException(HttpStatusCode.MethodNotAllowed);
+            }
 
-            var path = GetLocalPath(context);
-            if (string.IsNullOrWhiteSpace(path))
-                return Task.FromResult(false);
+            string path;
+            try
+            {
+                path = GetLocalPath(context);
+                if (string.IsNullOrWhiteSpace(path))
+                    return false;
+            }
+            catch
+            {
+                if (PassThrough)
+                    return false;
 
-            if (AutoRedirect(path, context))
-                return Task.FromResult(true);
+                throw;
+            }
 
-            if (!File.Exists(path))
+            if (await AutoRedirect(path, context))
+                return true;
+
+            if (!await m_vfs.FileExistsAsync(path))
+            {
+                if (PassThrough)
+                    return false;
+
                 throw new HttpException(HttpStatusCode.NotFound);
+            }
 
             // If this is just a rewrite handler, stop now as we did not handle it
             if (RedirectOnly)
-                return Task.FromResult(false);
+                return false;
 
             var mimetype = m_mimetypelookup(context.Request, path);
             if (mimetype == null)
-                throw new HttpException(HttpStatusCode.NotFound);
+            {
+                if (PassThrough)
+                    return false;
 
-            return ServeRequest(path, mimetype, context);
+                throw new HttpException(HttpStatusCode.NotFound);
+            }
+
+            return await ServeRequest(path, mimetype, context);
         }
         #endregion
 

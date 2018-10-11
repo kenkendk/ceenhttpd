@@ -115,20 +115,47 @@ namespace Ceen.Httpd.Handler
         public override async Task<bool> HandleAsync(IHttpContext context)
         {
             if (!string.Equals(context.Request.Method, "GET", StringComparison.Ordinal) && !string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+            {
+                if (PassThrough)
+                    return false;
+
                 throw new HttpException(HttpStatusCode.MethodNotAllowed);
+            }
 
             // Basic validation and sanitization of the request
-            var localpath = base.GetLocalPath(context);
-            if (string.IsNullOrWhiteSpace(localpath))
-                return false;
+            string localpath;
+
+            try
+            {
+                localpath = base.GetLocalPath(context);
+                if (string.IsNullOrWhiteSpace(localpath))
+                    return false;
+            }
+            catch
+            {
+                if (PassThrough)
+                    return false;
+
+                throw;
+            }
 
             var mimetype = m_mimetypelookup(context.Request, localpath);
             if (mimetype == null)
+            {
+                if (PassThrough)
+                    return false;
+
                 throw new HttpException(HttpStatusCode.NotFound);
+            }
 
             // Reject known 404 requests immediately
             if ((await m_404cache.TryGetUnless(localpath, (k, v) => Cache404Seconds > 0 && (DateTime.Now - v).TotalSeconds > Cache404Seconds)).Key)
+            {
+                if (PassThrough)
+                    return false;
+
                 throw new HttpException(Ceen.HttpStatusCode.NotFound);
+            }
 
             // Check if the file is already downloaded in full
             if (!(await m_filecache.TryGetUnless(localpath, (k, v) => !File.Exists(localpath) || (MirrorCacheSeconds > 0 && (DateTime.Now - v).TotalSeconds > MirrorCacheSeconds))).Key)
