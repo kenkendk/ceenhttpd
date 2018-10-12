@@ -3,7 +3,6 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Ceen.Security</AssemblyName>
-    <ReleaseVersion>0.9.4</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType />
@@ -11,6 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj" />
-    <ProjectReference Include="..\..\Ceen\Ceen.Database\Ceen.Database.csproj" />
+    <ProjectReference Include="..\Ceen.Database\Ceen.Database.csproj" />
   </ItemGroup>
 </Project>
