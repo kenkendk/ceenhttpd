@@ -11,8 +11,7 @@ namespace Ceen.Httpd.Cli
 	{
         public static void DebugConsoleOutput(string msg, params object[] args)
         {
-			System.IO.File.AppendAllLines("/Users/kenneth/crashlog.txt", new string[] { string.Format(msg, args) });
-            Console.WriteLine(msg, args);
+            //Console.WriteLine(msg, args);
         }
 
         public static void ConsoleOutput(string msg, params object[] args)
