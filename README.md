@@ -15,21 +15,28 @@ Key features:
   - No dependencies - embed where you need it
   - Built on TCP level - easy to debug
   - Basic modules included - W3C Log and static file serving
-  - REST aware - Implement custom REST logic
+  
+Optional modules:
+
+  - REST aware - Implement custom REST logic with Ceen.Mvc
   - Routing - Optional routing module with Ceen.Mvc
+  - Logins - Support for login, persistent tokens, secure passphrase storage in Ceen.Security
+  - Database ORM - Basic SQLite support including table creation with Ceen.Database
 
 Standalone version, Ceen.Httpd.Cli:
 
   - Listen to sockets
   - Configure through text file
-  - Load binaries through AppDomain
+  - Load binaries through AppDomain (Mono or .Net full/desktop)
+  - Run external handler binary for seamless restarts (Mono, .Net full/desktop and .Net core)
   - Re-load configuration by sending SIGHUP
   - Reload enables on-the-fly updates to application logic without missing a single request
 
 Missing features:
 
   - No template engine: use [T4](https://msdn.microsoft.com/en-us/library/bb126445.aspx) or your favorite
-  - No application-level logging support: [Use log4net](https://logging.apache.org/log4net/)
+  - No application-level logging support: use [log4net](https://logging.apache.org/log4net/)
+  - Advanced database queries: use [Dapper](https://github.com/StackExchange/Dapper)
 
 Installation
 ============
@@ -70,7 +77,7 @@ public static void Main(string[] args)
         new IPEndPoint(IPAddress.Any, 8080),
         false,
         config,
-        tcs
+        tcs.Token
     );
 
     Console.WriteLine("Serving files, press enter to stop ...");
@@ -116,7 +123,7 @@ public static void Main(string[] args)
         new IPEndPoint(IPAddress.Any, 8080),
         false,
         config,
-        tcs
+        tcs.Token
     );
 
     Console.WriteLine("Serving files, press enter to stop ...");
@@ -186,7 +193,7 @@ public static void Main(string[] args)
         new IPEndPoint(IPAddress.Any, 8080),
         false,
         config,
-        tcs
+        tcs.Token
     );
 
     // GET "/api/v1" => ApiExampleController.Index
