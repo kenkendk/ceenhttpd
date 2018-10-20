@@ -99,7 +99,8 @@ namespace Ceen.Httpd.Cli
 			{
 				if (!hasrequestedstop)
 				{
-					hasrequestedstop = true;
+                    ConsoleOutput("Sending stop request to server");
+                    hasrequestedstop = true;
 					stopevent.SetResult(true);
 					return true;
 				}
@@ -111,7 +112,8 @@ namespace Ceen.Httpd.Cli
 			{
 				if (!hasrequestedreload)
 				{
-					hasrequestedreload = true;
+                    ConsoleOutput("Sending reload request to server");
+                    hasrequestedreload = true;
 					reloadevent.SetResult(true);
 					return true;
 				}
@@ -148,14 +150,15 @@ namespace Ceen.Httpd.Cli
 			if (primarytask.IsFaulted)
 				throw primarytask.Exception;
 
-			var sigtask = SignalHandler(tcs.Token, () =>
-			{
-				reloadevent.TrySetResult(true);
-				return true;
-			}, () => {
-				stopevent.TrySetResult(true);
-				return true;
-			});
+            var sigtask = SignalHandler(tcs.Token, 
+                () => {
+    				reloadevent.TrySetResult(true);
+    				return true;
+    			}, () => {
+    				stopevent.TrySetResult(true);
+    				return true;
+    			}
+            );
 
 			var allitems = Task.WhenAll(tasks);
 			var t = Task.WhenAny(allitems, stopevent.Task, reloadevent.Task).Result;
@@ -217,15 +220,39 @@ namespace Ceen.Httpd.Cli
                 new Mono.Unix.UnixSignal(Mono.Unix.Native.Signum.SIGQUIT),
             };
 
+            var lastctrlc = DateTime.Now.AddHours(-1);
+
             return Task.Run(() => {
                 while (!token.IsCancellationRequested)
                 {
-                   var sig = Mono.Unix.UnixSignal.WaitAny(signals, TimeSpan.FromSeconds(5));
+                    var sig = Mono.Unix.UnixSignal.WaitAny(signals, TimeSpan.FromSeconds(5));
 
-                    if (sig == 0 || sig == 1)
+                    if (sig == 0)
+                    {
+                        ConsoleOutput("Got SIGHUP, sending reload request to server");
                         reload();
+                    }
+                    else if (sig == 1)
+                    {
+                        var timesincelast = (DateTime.Now - lastctrlc).TotalSeconds;
+                        lastctrlc = DateTime.Now;
+
+                        if (timesincelast > 5)
+                        {
+                            ConsoleOutput("Got CTRL+C, sending reload request, press CTRL+C again within 5 seconds to send stop signal");
+                            reload();
+                        }
+                        else
+                        {
+                            ConsoleOutput("Got CTRL+C twice, sending stop signal");
+                            stop();
+                        }
+                    }
                     else if (sig == 2)
+                    {
+                        ConsoleOutput("Got SIGQUIT, sending stop signal to server");
                         stop();
+                    }
                 }
             });
 
