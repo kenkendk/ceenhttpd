@@ -61,7 +61,7 @@ namespace Ceen
         /// <param name="sizelimit">The limit for the size of the cache.</param>
         /// <param name="countlimit">The limit for the number of items in the cache.</param>
         /// <param name="expirationHandler">A callback method invoked when items are expired from the cache.</param>
-        /// <param name="sizeHandler">A callback handler used to compute the size of elements add and removed from the queue.</param>
+        /// <param name="sizeHandler">A callback handler used to compute the size of elements added to and removed from the queue.</param>
         public LRUCache(long sizelimit = long.MaxValue, long countlimit = long.MaxValue, Func<string, T, bool, Task> expirationHandler = null, Func<string, T, Task<long>> sizeHandler = null)
         {
             if (sizelimit != long.MaxValue && sizeHandler == null)
@@ -88,7 +88,7 @@ namespace Ceen
                 {
                     m_size -= vt.Value;
                     m_mru.Remove(key);
-                    await m_expirehandler?.Invoke(key, vt.Key, false);
+                    await (m_expirehandler?.Invoke(key, vt.Key, false) ?? Task.FromResult(true));
                 }
 
                 var s = await m_sizecalculator(key, value);
@@ -115,7 +115,7 @@ namespace Ceen
                 var v = m_lookup[k];
                 m_size -= v.Value;
                 m_lookup.Remove(k);
-                await m_expirehandler?.Invoke(k, v.Key, true);
+                await (m_expirehandler?.Invoke(k, v.Key, true) ?? Task.FromResult(true));
             }
         }
 
@@ -146,7 +146,7 @@ namespace Ceen
                         m_size -= v.Value;
                         m_mru.RemoveAt(i);
                         m_lookup.Remove(k);
-                        await m_expirehandler?.Invoke(k, v.Key, true);
+                        await (m_expirehandler?.Invoke(k, v.Key, true) ?? Task.FromResult(true));
                     }
                 }
 
@@ -193,7 +193,7 @@ namespace Ceen
                     m_mru.Remove(key);
                     m_size -= n.Value;
                     m_lookup.Remove(key);
-                    await m_expirehandler?.Invoke(key, n.Key, true);
+                    await (m_expirehandler?.Invoke(key, n.Key, true) ?? Task.FromResult(true));
                 }
             }
 
@@ -218,7 +218,7 @@ namespace Ceen
                     m_mru.Remove(key);
                     m_size -= n.Value;
                     m_lookup.Remove(key);
-                    await m_expirehandler?.Invoke(key, n.Key, true);
+                    await (m_expirehandler?.Invoke(key, n.Key, true) ?? Task.FromResult(true));
                 }
             }
 
