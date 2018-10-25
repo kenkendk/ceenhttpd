@@ -976,7 +976,6 @@ namespace Ceen.Httpd
                     try { stream.Close(); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to close stream: {nex}", logtaskid, cur); }
 
-
                     try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to log request: {nex}", logtaskid, cur); }
 
