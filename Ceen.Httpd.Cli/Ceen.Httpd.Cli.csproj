@@ -16,7 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Mono.Posix.NETStandard" Version="1.0.0" />
-    <PackageReference Include="SockRock" Version="1.0.1" />
+    <PackageReference Include="SockRock" Version="1.0.2" />
     <PackageReference Include="LeanIPC" Version="0.9.1" />
   </ItemGroup>
 </Project>
