@@ -562,7 +562,11 @@ namespace Ceen.Httpd.Cli
 					if (module.Options != null)
 						SetProperties(handler, module.Options);
 
-					cfg.AddModule((IModule)handler);
+                    if (module is IModuleWithSetup mse)
+                        mse.AfterConfigure();
+
+
+                    cfg.AddModule((IModule)handler);
 				}
 			}
 

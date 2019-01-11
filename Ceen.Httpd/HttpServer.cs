@@ -837,6 +837,9 @@ namespace Ceen.Httpd
 							storage
 						);
 
+						// Setup up the callback for allowing handlers to report errors
+						context.LogHandlerDelegate = (ex) => LogMessageAsync(controller, context, ex, started, DateTime.Now - started);
+
                         var timeoutcontroltask = new TaskCompletionSource<bool>();
 						var idletime = TimeSpan.FromSeconds(config.RequestHeaderReadTimeoutSeconds);
 

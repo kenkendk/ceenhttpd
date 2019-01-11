@@ -13,7 +13,6 @@ namespace Ceen.Httpd.Handler
     /// </summary>
     public class FileHandler : IHttpModuleWithSetup
     {
-
         /// <summary>
         /// Helper method to allow syntax similar to the Linq Any() call with async methods
         /// </summary>
@@ -491,6 +490,8 @@ namespace Ceen.Httpd.Handler
         /// <param name="context">The request context.</param>
         protected virtual async Task<bool> ServeRequest(string path, string mimetype, IHttpContext context)
         {
+            var permissionissue = false;
+
             try
             {
                 string etag = null;
@@ -518,8 +519,10 @@ namespace Ceen.Httpd.Handler
                     }
                 }
 
+                permissionissue = true;
                 using (var fs = await m_vfs.OpenReadAsync(path))
                 {
+                    permissionissue = false;
                     var startoffset = 0L;
                     var bytecount = fs.Length;
                     var endoffset = bytecount - 1;
@@ -640,9 +643,17 @@ namespace Ceen.Httpd.Handler
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                throw new HttpException(HttpStatusCode.Forbidden);
+                // Log the error
+                await context.LogExceptionAsync(ex);
+
+                // If this happens when we try to open the file, report as permission problem
+                if (permissionissue)
+                    throw new HttpException(HttpStatusCode.Forbidden);
+
+                // Something else has happened
+                throw new HttpException(HttpStatusCode.InternalServerError);
             }
 
             return true;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Ceen.Httpd
 {
@@ -34,6 +35,11 @@ namespace Ceen.Httpd
 		public IDictionary<string, string> LogData { get; } = new Dictionary<string, string>();
 
 		/// <summary>
+		/// The delegate used to forward exceptions to the loggers 
+		/// </summary>
+		internal Func<Exception, Task> LogHandlerDelegate { get; set;}
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpContext"/> class.
 		/// </summary>
 		/// <param name="request">The HTTP request.</param>
@@ -45,5 +51,12 @@ namespace Ceen.Httpd
 			this.Response = response;
 			this.Storage = storage;
 		}
-	}
+
+        /// <summary>
+        /// Logs an exception
+        /// </summary>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public Task LogExceptionAsync(Exception ex) => LogHandlerDelegate?.Invoke(ex) ?? Task.FromResult(true);
+    }
 }

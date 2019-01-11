@@ -449,6 +449,13 @@ namespace Ceen
 		/// Additional data that can be used in a logging module to tag the request or response
 		/// </summary>
 		IDictionary<string, string> LogData { get; }
+
+		/// <summary>
+		/// Logs an exception
+		/// </summary>
+		/// <param name="ex">The exception to log</param>
+		/// <returns>An awaitable task</returns>
+		Task LogExceptionAsync(Exception ex);
 	}
 
 	/// <summary>
@@ -483,6 +490,9 @@ namespace Ceen
     /// </summary>
     public interface IHttpModuleWithSetup : IHttpModule
     {
+		/// <summary>
+		/// Method called after module is configured
+		/// </summary>
         void AfterConfigure();
     }
 
@@ -552,4 +562,15 @@ namespace Ceen
 	public interface IModule
 	{
 	}
+
+    /// <summary>
+    /// Marker interface for a generic module
+    /// </summary>
+    public interface IModuleWithSetup : IModule
+    {
+        /// <summary>
+        /// Method called after module is configured
+        /// </summary>
+        void AfterConfigure();
+    }
 }
