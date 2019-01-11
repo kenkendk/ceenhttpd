@@ -52,6 +52,23 @@ namespace Ceen.Mvc
 	}
 
 	/// <summary>
+	/// Defines the REST access methods
+	/// </summary>
+    public enum RestApiAccess
+    {
+		/// <summary>Lists all or some of the items</summary>
+        List,
+        /// <summary>Gets a single item by ID</summary>
+        Get,
+        /// <summary>Adds an item</summary>
+        Add,
+        /// <summary>Updates an existing item</summary>
+        Update,
+        /// <summary>Deletes an existing item</summary>
+        Delete
+    }
+
+	/// <summary>
 	/// A base class for providing standard REST access to a resource
 	/// </summary>
 	public abstract class RestApiHelper<TData, TKey> : Controller
@@ -66,7 +83,9 @@ namespace Ceen.Mvc
 		/// <param name="context">The http context.</param>
 		public virtual async Task<IResult> GetIndex(IHttpContext context, int page = 0, int results = 50, string query = null)
 		{
-			if (page < 0)
+            CheckAccess(RestApiAccess.List, context);
+
+            if (page < 0)
 				return Status(HttpStatusCode.BadRequest, "Page must be a positive integer");
 
 			if (results <= 0)
@@ -92,17 +111,27 @@ namespace Ceen.Mvc
 		/// <param name="query">An optional query expression</param>
 		protected abstract Task<PageInformation<TData>> ListItemsAsync(int page, int results, string query);
 
+		/// <summary>
+		/// Callback method to selectively grant or deny access to a given operation.
+		/// Defaults to allowing all operations unconditionally.
+		/// </summary>
+		/// <param name="access">The operation being performed</param>
+		/// <param name="context">The request context</param>
+		protected virtual void CheckAccess(RestApiAccess access, IHttpContext context)
+		{ }
 
 		[HttpPost]
 		[Name("index")]
 		/// <summary>
-		/// Handles a PUT request, using the &quot;index&quot; name,
+		/// Handles a POST request, using the &quot;index&quot; name,
 		/// because we want two different functions to handle
 		/// PUT, POST and GET, and they cannot all be called &quot;Index&quot;.
 		/// </summary>
 		/// <param name="context">The http context.</param>
 		public virtual async Task<IResult> Post(IHttpContext context)
 		{
+			CheckAccess(RestApiAccess.Add, context);
+
 			TData item;
 			// TODO: Accept non-utf8 ?
             // TODO: Get the Json Async version
@@ -112,17 +141,16 @@ namespace Ceen.Mvc
 				item = JsonConvert.DeserializeObject<TData>(str);
 			}
 
-			await AddItemAsync(item);
-
-			return OK;
+			var res = await AddItemAsync(item);
+			return res == null ? OK : Json(res);
 		}
 
 		/// <summary>
 		/// Adds an item to the store
 		/// </summary>
-		/// <returns>An awaitable task.</returns>
+		/// <returns>T.</returns>
 		/// <param name="item">The item to add.</param>
-		protected abstract Task AddItemAsync(TData item);
+		protected abstract Task<TData> AddItemAsync(TData item);
 
 		[HttpGet]
 		[Route("{id}")]
@@ -135,7 +163,9 @@ namespace Ceen.Mvc
 		/// <param name="id">The index of the item, we limit it to only allow this to be specified via the path.</param>
 		public virtual async Task<IResult> GetDetail(IHttpContext context, [Parameter(ParameterSource.Url)] TKey id)
 		{
-			if (!await ValidateIDAsync(id))
+            CheckAccess(RestApiAccess.Get, context);
+
+            if (!await ValidateIDAsync(id))
 				return Status(HttpStatusCode.BadRequest, "Invalid ID");
 			
 			return Json(await GetItemAsync(id));
@@ -162,14 +192,16 @@ namespace Ceen.Mvc
 		[Route("{id}")]
 		[Name("index")]
 		/// <summary>
-		/// Updates a todo item based on its index
+		/// Updates an item based on its index
 		/// </summary>
 		/// <returns>The HTTP results.</returns>
 		/// <param name="context">The http context.</param>
 		/// <param name="id">The index of the item, we limit it to only allow this to be specified via the path.</param>
 		public virtual async Task<IResult> PutDetail(IHttpContext context, TKey id)
 		{
-			if (!await ValidateIDAsync(id))
+            CheckAccess(RestApiAccess.Update, context);
+
+            if (!await ValidateIDAsync(id))
 				return Status(HttpStatusCode.BadRequest, "Invalid ID");
 
 			TData item;
@@ -180,9 +212,8 @@ namespace Ceen.Mvc
 
 			}
 
-			await UpdateItemAsync(id, item);
-
-			return OK;
+			var res = await UpdateItemAsync(id, item);
+			return res == null ? OK : Json(res);
 		}
 
 		/// <summary>
@@ -191,7 +222,7 @@ namespace Ceen.Mvc
 		/// <returns>An awaitable task.</returns>
 		/// <param name="id">The identifier of the item to update</param>
 		/// <param name="item">The item to update.</param>
-		protected abstract Task UpdateItemAsync(TKey id, TData item);
+		protected abstract Task<TData> UpdateItemAsync(TKey id, TData item);
 
 		[HttpDelete]
 		[Route("{id}")]
@@ -204,7 +235,9 @@ namespace Ceen.Mvc
 		/// <param name="id">The index of the item, we limit it to only allow this to be specified via the path.</param>
 		public async Task<IResult> DeleteDetail(IHttpContext context, TKey id)
 		{
-			if (!await ValidateIDAsync(id))
+            CheckAccess(RestApiAccess.Delete, context);
+
+            if (!await ValidateIDAsync(id))
 				return Status(HttpStatusCode.BadRequest, "Invalid ID");
 
 			await DeleteItemAsync(id);
