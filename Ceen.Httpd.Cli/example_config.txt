@@ -275,7 +275,7 @@
 #handler "/api/*" Ceen.Security.Login.XSRFTokenRequiredHandler
 
 # The login modules require a storage module to be present
-# For simple setups, a memory storage module can be use,
+# For simple setups, a memory storage module can be used,
 # and for more persistent storage, a database can be used
 
 # To use the memory module to store settings, simply load it:
