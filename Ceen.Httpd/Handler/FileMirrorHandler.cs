@@ -483,8 +483,12 @@ namespace Ceen.Httpd.Handler
 
                     var pg = 0L;
                     using (var remote = resp.Stream)
-                    using (var local = new FileStream(localpath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite))
+                    using (var local = new FileStream(localpath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                     {
+                        // Note: Since we write to the actual file,
+                        // we may interfere with active downloads of
+                        // the file...
+
                         int r;
                         var buffer = new byte[8 * 1024];
 
