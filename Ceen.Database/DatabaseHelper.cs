@@ -227,6 +227,37 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Executes a query and returns the scalar value
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The SQL statement to execute</param>
+        /// <param name="arguments">The arguments to the command</param>
+        /// <returns>The scalar item</returns>
+        public static object ExecuteScalar(this IDbConnection connection, string query, params object[] arguments)
+        {
+            var dialect = GetDialect(connection);
+            using (var cmd = connection.CreateCommandWithParameters(query))
+            {
+                cmd.SetParameterValues(arguments);
+                using(var rd = cmd.ExecuteReader())
+                {
+                    if (!rd.Read())
+                        return null;
+
+                    // Fix issue with long conversion
+                    if (rd.GetFieldType(0) == typeof(long) || rd.GetFieldType(0) == typeof(int))
+                        return rd.GetInt64(0);
+
+                    var res = rd.GetValue(0);                       
+                    if (res == DBNull.Value)
+                        return null;
+
+                    return res;
+                }
+            }
+        }
+
+        /// <summary>
         /// Performs a database query and returns the results.
         /// Note this function requires the entire SQL command to be given as the query
         /// </summary>

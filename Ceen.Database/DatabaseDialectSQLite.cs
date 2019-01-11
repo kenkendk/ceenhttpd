@@ -5,6 +5,9 @@ using System.Reflection;
 
 namespace Ceen.Database
 {
+    /// <summary>
+    /// The Implementation of the database dialect for SQLite
+    /// </summary>
     public class DatabaseDialectSQLite : IDatabaseDialect
     {
         /// <summary>
@@ -197,6 +200,20 @@ namespace Ceen.Database
             var mapping = GetTypeMap(type);
             return
                 $"INSERT INTO {QuoteName(mapping.Name)} ({string.Join(",", mapping.AllColumns.Select(x => QuoteName(x.Name)))}) VALUES ({string.Join(",", mapping.AllColumns.Select(x => "?"))})";
+        }
+
+        /// <summary>
+        /// Returns a where fragment that limits the query
+        /// </summary>
+        /// <param name="offset">The optional offset to use</param>
+        /// <param name="limit">The maximum number of items to use</param>
+        /// <returns>The limit fragment</returns>
+        public virtual string Limit(int limit, int? offset)
+        {
+            if (offset == null)
+                return $"LIMIT {limit}";
+
+            return $"LIMIT {limit} OFFSET {offset.Value}";
         }
     }
 }

@@ -88,5 +88,13 @@ namespace Ceen.Database
         /// <returns>The table exists command.</returns>
         /// <param name="type">The type to generate the command for.</param>
         string CreateTableExistsCommand(Type type);
+
+        /// <summary>
+        /// Returns a where fragment that limits the query
+        /// </summary>
+        /// <param name="offset">The optional offset to use</param>
+        /// <param name="limit">The maximum number of items to use</param>
+        /// <returns>The limit fragment</returns>
+        string Limit(int limit, int? offset = null);
     }
 }
