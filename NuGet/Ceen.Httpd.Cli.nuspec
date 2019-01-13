@@ -5,6 +5,7 @@
     <version>0.9.3</version>
     <authors>Kenneth Skovhede</authors>
     <owners>Kenneth Skovhede</owners>
+    <license type="expression">MIT</license>
     <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
