@@ -8,7 +8,7 @@
     <RootNamespace>ToDoList</RootNamespace>
     <AssemblyName>ToDoList</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <ReleaseVersion>0.9.4</ReleaseVersion>
+    <ReleaseVersion>0.9.5</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
