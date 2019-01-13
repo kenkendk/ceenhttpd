@@ -14,6 +14,7 @@
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
+        <dependency id="Ceen.Database" version="0.9.3" />
     </dependencies>
   </metadata>
   <files>
