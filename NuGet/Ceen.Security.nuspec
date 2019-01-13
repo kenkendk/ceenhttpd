@@ -9,8 +9,8 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Login and security package for Ceen.Httpd</description>
-    <releaseNotes>Bugfixes</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2018</copyright>
+    <releaseNotes>Changed to use Ceen.Database to implement persistent storage</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />

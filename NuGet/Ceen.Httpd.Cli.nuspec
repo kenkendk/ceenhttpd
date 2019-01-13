@@ -9,8 +9,8 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A commandline host for Ceen.Httpd</description>
-    <releaseNotes>Added many features and fixed a few problems</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2018</copyright>
+    <releaseNotes>Fixed a number of issues, including better CTRL+C handling</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
