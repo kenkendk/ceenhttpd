@@ -68,12 +68,14 @@ cp ../Ceen.Httpd.Cli/bin/Release/netstandard2.0/*.dll .
 SED_EXPR="s/.*\<version\>.*/    \<version\>${VERSION}\<\/version\>/"
 SED_EXPR2="s/.*\<dependency.*id\=\"Ceen.Httpd\".*/        \<dependency id\=\"Ceen.Httpd\" version\=\"${VERSION}\" \/\>/"
 SED_EXPR3="s/.*\<dependency.*id\=\"Ceen.Mvc\".*/        \<dependency id\=\"Ceen.Mvc\" version\=\"${VERSION}\" \/\>/"
+SED_EXPR4="s/.*\<dependency.*id\=\"Ceen.Database\".*/        \<dependency id\=\"Ceen.Database\" version\=\"${VERSION}\" \/\>/"
 for NUSPEC in $(find . -type f -name "*.nuspec"); do
 	sed "${SED_EXPR}" "${NUSPEC}" > "tmp01.tmp"
 	sed "${SED_EXPR2}" "tmp01.tmp" > "tmp02.tmp"
-	sed "${SED_EXPR3}" "tmp02.tmp" > "${NUSPEC}.tmp.nuspec"
+	sed "${SED_EXPR3}" "tmp02.tmp" > "tmp03.tmp"
+	sed "${SED_EXPR4}" "tmp03.tmp" > "${NUSPEC}.tmp.nuspec"
 	"${NUGET}" "pack" "${NUSPEC}.tmp.nuspec"
-	rm "tmp01.tmp" "tmp02.tmp" "${NUSPEC}.tmp.nuspec"
+	rm "tmp01.tmp" "tmp02.tmp" "tmp03.tmp" "${NUSPEC}.tmp.nuspec"
 done
 
 rm *.dll
