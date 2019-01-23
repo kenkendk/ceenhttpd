@@ -305,7 +305,7 @@ namespace Ceen.Httpd
 					throw new ArgumentNullException(nameof(config));
 
 				StopToken = stoptoken;
-				StopToken.Register(() => m_stoptask.TrySetCanceled());
+				StopToken.Register(() => Stop("_"));
 				Config = config;
 				m_maxactive = config.MaxActiveRequests;
 				m_throttletask.SetResult(true);
