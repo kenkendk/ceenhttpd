@@ -40,22 +40,47 @@ services:
       - NGINX_DOCKER_GEN_CONTAINER=nginx-gen
 
   # Ceenhttdp, based on standard Mono image
-  ceenrunner:
+  ceenrunner-mono:
     image: mono
-    container_name: ceenrunner
+    container_name: ceenrunnermono
     restart: unless-stopped
     
     # Use this line if you want to run the server as root
-    #command: mono /usr/share/ceen/Ceen.Httpd.Cli.exe /usr/share/ceen/config.txt
+    #command: mono /usr/share/ceen/NetFullRunner.exe /usr/share/ceen/config.txt
 
     # Otherwise, this runs ceen with a non-privileged user
-    command: start-non-root.sh mono /usr/share/ceen/Ceen.Httpd.Cli.exe /usr/share/ceen/config.txt
+    command: start-non-root.sh mono /usr/share/ceen/NetFullRunner.exe /usr/share/ceen/config.txt
 
     ports:
       - "8080:8080"
     volumes:
       - ./www.example.com:/usr/share/www.example.com
-      - ./ceen:/usr/share/ceen
+      - ./ceen-mono:/usr/share/ceen
+    environment:
+      - LISTEN_PORT=8080
+      - STORAGE_FOLDER=/usr/share/www.example.com
+      - HTTPS_METHOD=redirect
+      - VIRTUAL_HOST=www.example.com
+      - LETSENCRYPT_HOST=www.example.com
+      - LETSENCRYPT_EMAIL=email@example.com
+
+# Ceenhttdp, based on standard .Net core image
+  ceenrunner-netcore:
+    image: microsoft/dotnet
+    container_name: ceenrunnernetcore
+    restart: unless-stopped
+    
+    # Use this line if you want to run the server as root
+    #command: dotnet /usr/share/ceen/NetCoreRunner.dll /usr/share/ceen/config.txt
+
+    # Otherwise, this runs ceen with a non-privileged user
+    command: start-non-root.sh dotnet /usr/share/ceen/NetCoreRunner.dll /usr/share/ceen/config.txt
+
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./www.example.com:/usr/share/www.example.com
+      - ./ceen-netcore:/usr/share/ceen
     environment:
       - LISTEN_PORT=8080
       - STORAGE_FOLDER=/usr/share/www.example.com
