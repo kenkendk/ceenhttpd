@@ -10,12 +10,25 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/Ceen.Httpd.Cli-Core21/bin/Debug/netcoreapp2.1/Ceen.Httpd.Cli-Core21.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/Ceen.Httpd.Cli-Core21",
+            "program": "dotnet",
+            "args": ["${workspaceFolder}/NetCoreRunner/bin/Debug/netcoreapp2.1/NetCoreRunner.dll", "config.txt"],
+            "cwd": "${workspaceFolder}/NetCoreRunner",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
             "console": "internalConsole",
             "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Mono Launch ToDoList (console)",
+            "type": "mono",
+            "request": "launch",
+            "preLaunchTask": "build todolist",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/ToDoList/bin/Debug/ToDoList.exe",
+            "args": ["config.txt"],
+            "cwd": "${workspaceFolder}/ToDoList/bin/Debug",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
             "internalConsoleOptions": "openOnSessionStart"
         },
         {

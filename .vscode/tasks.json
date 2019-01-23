@@ -7,7 +7,16 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/Ceen.Httpd.Cli-Core21/Ceen.Httpd.Cli-Core21.csproj"
+                "${workspaceFolder}/NetCoreRunner/NetCoreRunner.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build todolist",
+            "command": "msbuild",
+            "type": "process",
+            "args": [
+                "${workspaceFolder}/ToDoList/ToDoList.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
