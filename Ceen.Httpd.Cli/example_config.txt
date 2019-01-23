@@ -27,7 +27,6 @@
 # Use isolated processes to load executing assemblies
 # this takes precedence over isolatedappdomains
 # Changes to this property has no effect on a running instance
-# NOTE: This is not yet supported
 #isolatedprocesses false
 
 # Watch the configuration file for changes,

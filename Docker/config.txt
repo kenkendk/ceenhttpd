@@ -1,6 +1,6 @@
 ﻿# This is an example config file to be used with the Docker setup
 
-isolatedappdomain true
+isolatedprocesses true
 watchconfigfile true
 
 httpport %LISTEN_PORT%
