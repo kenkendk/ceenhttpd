@@ -40,6 +40,16 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\packages\Newtonsoft.Json.11.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="Mono.Posix.NETStandard">
+      <HintPath>..\packages\Mono.Posix.NETStandard.1.0.0\lib\net40\Mono.Posix.NETStandard.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Posix" />
+    <Reference Include="SockRock">
+      <HintPath>..\packages\SockRock.1.0.2\lib\netstandard2.0\SockRock.dll</HintPath>
+    </Reference>
+    <Reference Include="LeanIPC">
+      <HintPath>..\packages\LeanIPC.0.9.1\lib\netstandard2.0\LeanIPC.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
