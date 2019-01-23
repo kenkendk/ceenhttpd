@@ -16,7 +16,7 @@
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
         <dependency id="Ceen.Mvc" version="0.9.3" />
-        <dependency id="SockRock" version="1.0.2" />
+        <dependency id="SockRock" version="1.0.3" />
         <dependency id="LeanIPC" version="0.9.1" />
         <!-- <dependency id="SyslogNet.Client" version="0.3.2" /> -->
       </dependencies>
