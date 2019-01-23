@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A commandline host for Ceen.Httpd</description>
-    <releaseNotes>Fixed a number of issues, including better CTRL+C handling</releaseNotes>
+    <releaseNotes>Fixed spawned processes runner on 32-bit kqueue implementations</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>

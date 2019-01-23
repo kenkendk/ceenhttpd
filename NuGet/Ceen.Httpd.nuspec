@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A lightweight HTTP compliant web server written in C# with full async/await implementation</description>
-    <releaseNotes>Fixed issues with logging and some crashes that happens when running in an isolated process</releaseNotes>
+    <releaseNotes>Fixed case where the server would not stop correctly when running as a spawned process</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies />
