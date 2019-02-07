@@ -129,6 +129,12 @@ namespace Ceen.Httpd.Cli
 		public bool IsolatedProcesses { get; set; } = false;
 
 		/// <summary>
+		/// Gets or sets the maximum life time of a spawned runner.
+		/// A zero or negative value will make the runner live until a configuration change causes a reload.
+		/// </summary>
+		public TimeSpan MaxRunnerLifeSeconds { get; set; } = new TimeSpan(0);
+
+		/// <summary>
 		/// Gets or sets the number of seconds between each storage expiration check.
 		/// </summary>
 		public TimeSpan StorageExpirationCheckIntervalSeconds { get; set; } = TimeSpan.FromMinutes(10);

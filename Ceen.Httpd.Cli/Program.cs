@@ -161,6 +161,18 @@ namespace Ceen.Httpd.Cli
             );
 
 			var allitems = Task.WhenAll(tasks);
+			
+			// Setup automatic child restart
+            if (CLIConfiguration.MaxRunnerLifeSeconds.Ticks > 0)
+                Task.Run(() =>
+                {
+                    // Capture this instance
+                    var r = reloadevent;
+                    Task
+                        .Delay(CLIConfiguration.MaxRunnerLifeSeconds)
+                        .ContinueWith(_ => r.TrySetResult(true));
+                });
+
 			var t = Task.WhenAny(allitems, stopevent.Task, reloadevent.Task).Result;
 
 			using(fsw)
@@ -177,6 +189,15 @@ namespace Ceen.Httpd.Cli
                     tr.Wait();
 					if (tr.IsFaulted)
 						throw tr.Exception;
+						if (CLIConfiguration.MaxRunnerLifeSeconds.Ticks > 0)
+							Task.Run(() => {
+								// Capture this instance
+								var r = reloadevent;
+								Task
+									.Delay(CLIConfiguration.MaxRunnerLifeSeconds)
+									.ContinueWith(_ => r.TrySetResult(true));
+							});
+							
                     ConsoleOutput("Configuration reloaded!");
 				}
 				catch(Exception ex)
