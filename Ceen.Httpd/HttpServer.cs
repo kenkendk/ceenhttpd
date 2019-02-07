@@ -100,6 +100,19 @@ namespace Ceen.Httpd
             }
 
             /// <summary>
+            /// Handles a request
+            /// </summary>
+            /// <param name="stream">The stream to use.</param>
+            /// <param name="remoteEndPoint">The remote endpoint.</param>
+            /// <param name="logtaskid">The task ID to use.</param>
+            /// <param name="isConnected">A method that checks if the socket is connected</param>
+            public Task HandleRequestAsync(Stream stream, EndPoint remoteEndPoint, string logtaskid, Func<bool> isConnected)
+            {
+                return RunClient(stream, remoteEndPoint, logtaskid, Controller, isConnected);
+            }
+
+
+            /// <summary>
             /// Requests that this instance stops serving requests
             /// </summary>
             public void Stop()
