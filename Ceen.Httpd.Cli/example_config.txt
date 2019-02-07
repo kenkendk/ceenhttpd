@@ -79,7 +79,8 @@
 #AutoParseMultipartFormData true
 
 # Maximum size of a post request, including header (100mb)
-#MaxPostSize 104857600
+# Can use either an absolute number in bytes, or a size with a suffix
+#MaxPostSize 100mb
 
 # Support the X-HTTP-Method header
 #AllowHttpMethodOverride "true"

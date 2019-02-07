@@ -292,7 +292,7 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// Gets or sets the number of seconds the browser is allowed to cache the response.
         /// </summary>
-        public int CacheSeconds { get; set; } = 60 * 60 * 24;
+        public TimeSpan CacheSeconds { get; set; } = TimeSpan.FromDays(1);
 
         /// <summary>
         /// By default, the file handler module with report 404 - Not Found,
@@ -395,7 +395,7 @@ namespace Ceen.Httpd.Handler
         {
             context.Response.StatusCode = HttpStatusCode.NotModified;
             context.Response.ContentLength = 0;
-            context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
+            context.Response.SetExpires(CacheSeconds);
             if (!string.IsNullOrWhiteSpace(etag))
                 context.Response.Headers["ETag"] = $"\"{etag}\"";
             return true;
@@ -591,7 +591,7 @@ namespace Ceen.Httpd.Handler
                     context.Response.StatusCode = HttpStatusCode.OK;
                     context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
                     context.Response.AddHeader("Accept-Ranges", "bytes");
-                    context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
+                    context.Response.SetExpires(CacheSeconds);
 
                     DateTime modifiedsincedate;
                     DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);

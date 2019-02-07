@@ -403,7 +403,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
             var config = ConfigParser.CreateServerConfig(cfg);
             config.Storage = m_storage;
 
-            ((MemoryStorageCreator)m_storage).ExpireCheckInterval = TimeSpan.FromSeconds(cfg.StorageExpirationCheckIntervalSeconds);
+            ((MemoryStorageCreator)m_storage).ExpireCheckInterval = cfg.StorageExpirationCheckIntervalSeconds;
 
             // Not a part of .Net Standard or .Net core, but we can call it if we run .Net Framework
             var createMethod =

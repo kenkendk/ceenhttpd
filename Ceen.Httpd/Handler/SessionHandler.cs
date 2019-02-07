@@ -18,7 +18,7 @@ namespace Ceen.Httpd.Handler
 		/// <summary>
 		/// Gets or sets the number of seconds a session is valid.
 		/// </summary>
-		public int ExpirationSeconds { get; set; } = 60 * 30;
+		public TimeSpan ExpirationSeconds { get; set; } = TimeSpan.FromMinutes(30);
 
 		/// <summary>
 		/// Gets or sets a value indicating if the session cookie gets the &quot;secure&quot; option set,
@@ -41,7 +41,7 @@ namespace Ceen.Httpd.Handler
 			if (!string.IsNullOrWhiteSpace(sessiontoken))
 			{
 				// If the session exists, hook it up
-				context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, ExpirationSeconds, false);
+				context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, (int)ExpirationSeconds.TotalSeconds, false);
 				if (context.Session != null)
 					return false;
 			}
@@ -49,7 +49,7 @@ namespace Ceen.Httpd.Handler
 			// Create new storage
 			sessiontoken = Guid.NewGuid().ToString();
 			context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true);
-			context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, ExpirationSeconds, true);
+			context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, (int)ExpirationSeconds.TotalSeconds, true);
 
 			return false;
 		}

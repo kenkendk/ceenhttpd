@@ -58,7 +58,7 @@ namespace Ceen.Httpd.Cli.Runner
             var config = ConfigParser.CreateServerConfig(cfg);
             config.Storage = m_storage;
 
-            ((MemoryStorageCreator)m_storage).ExpireCheckInterval = TimeSpan.FromSeconds(cfg.StorageExpirationCheckIntervalSeconds);
+            ((MemoryStorageCreator)m_storage).ExpireCheckInterval = cfg.StorageExpirationCheckIntervalSeconds;
 
             var prevhttp = m_http_runner?.Wrapper;
             var prevhttps = m_https_runner?.Wrapper;

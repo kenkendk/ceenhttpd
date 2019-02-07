@@ -32,14 +32,14 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// Gets or sets the number of seconds to cache mirrored items.
         /// </summary>
-        public long MirrorCacheSeconds { get; set; } = 60 * 60 * 24 * 7;
+        public TimeSpan MirrorCacheSeconds { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
         /// Gets or sets the age of cached mirrored items found on startup.
         /// A positive number of seconds will make the mirrored items expire
         /// faster.
         /// </summary>
-        public long StartupMirrorCacheAgeSeconds { get; set; } = 0;
+        public TimeSpan StartupMirrorCacheAgeSeconds { get; set; } = new TimeSpan(0);
 
         /// <summary>
         /// Gets or sets the maximum number of 404 paths to cache
@@ -50,7 +50,7 @@ namespace Ceen.Httpd.Handler
         /// <summary>
         /// Gets or sets the number of seconds to cache a 404 response
         /// </summary>
-        public int Cache404Seconds { get; set; } = 60 * 60 * 4;
+        public TimeSpan Cache404Seconds { get; set; } = TimeSpan.FromHours(4);
 
         /// <summary>
         /// The lock object guarding the active transfer tables
@@ -149,7 +149,7 @@ namespace Ceen.Httpd.Handler
             }
 
             // Reject known 404 requests immediately
-            if ((await m_404cache.TryGetUnless(localpath, (k, v) => Cache404Seconds > 0 && (DateTime.Now - v).TotalSeconds > Cache404Seconds)).Key)
+            if ((await m_404cache.TryGetUnless(localpath, (k, v) => Cache404Seconds.Ticks > 0 && (DateTime.Now - v) > Cache404Seconds)).Key)
             {
                 if (PassThrough)
                     return false;
@@ -158,7 +158,7 @@ namespace Ceen.Httpd.Handler
             }
 
             // Check if the file is already downloaded in full
-            if (!(await m_filecache.TryGetUnless(localpath, (k, v) => !File.Exists(localpath) || (MirrorCacheSeconds > 0 && (DateTime.Now - v).TotalSeconds > MirrorCacheSeconds))).Key)
+            if (!(await m_filecache.TryGetUnless(localpath, (k, v) => !File.Exists(localpath) || (MirrorCacheSeconds.Ticks > 0 && (DateTime.Now - v) > MirrorCacheSeconds))).Key)
             {
                 // Not complete, check if we need to start a transfer
                 TaskCompletionSource<long> tcs = null;
@@ -200,7 +200,7 @@ namespace Ceen.Httpd.Handler
         /// <param name="value">The time the item was injected into the cache.</param>
         private bool Expire404Predicate(string key, DateTime value)
         {
-            return Cache404Seconds > 0 && (DateTime.Now - value).TotalSeconds > Cache404Seconds;
+            return Cache404Seconds.Ticks > 0 && (DateTime.Now - value) > Cache404Seconds;
         }
 
         /// <summary>
@@ -222,7 +222,7 @@ namespace Ceen.Httpd.Handler
             // Write a minimal response with as much information as we have
             context.Response.ContentType = mimetype;
             context.Response.StatusCode = HttpStatusCode.OK;
-            context.Response.SetExpires(TimeSpan.FromSeconds(CacheSeconds));
+            context.Response.SetExpires(CacheSeconds);
             if (fullsize > 0)
                 context.Response.ContentLength = fullsize;
 
@@ -562,7 +562,7 @@ namespace Ceen.Httpd.Handler
             );
 
             foreach (var f in Directory.EnumerateFiles(SourceFolder, "*", SearchOption.AllDirectories))
-                m_filecache.AddOrReplaceAsync(f, DateTime.Now.AddSeconds(StartupMirrorCacheAgeSeconds)).Wait();
+                m_filecache.AddOrReplaceAsync(f, DateTime.Now + StartupMirrorCacheAgeSeconds).Wait();
 
             m_404cache = new LRUCache<DateTime>(countlimit: Max404CacheCount);
         }
