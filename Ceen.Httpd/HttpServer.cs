@@ -396,7 +396,7 @@ namespace Ceen.Httpd
 					if (m_activeClients == 0)
 					{
 						if (m_debuglogger != null) m_debuglogger("Stopping, no active workers", logtaskid, null);
-						m_finishedtask.SetResult(true);
+						m_finishedtask.TrySetResult(true);
 					}
 					else
 					{
