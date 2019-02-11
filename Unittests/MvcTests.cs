@@ -171,7 +171,7 @@ namespace Unittests
 	{
 		public Ceen.Httpd.ServerConfig Config;
 
-		public System.Threading.CancellationTokenSource StopToken;
+		public readonly System.Threading.CancellationTokenSource StopToken;
 		public Task ServerTask;
 		public readonly int Port;
 

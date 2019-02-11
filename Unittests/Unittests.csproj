@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="MvcTests.cs" />
     <Compile Include="CliTests.cs" />
+    <Compile Include="MultipartTests.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
