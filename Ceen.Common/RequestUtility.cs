@@ -85,7 +85,7 @@ namespace Ceen
             if (firstdelim < 0)
                 firstdelim = contenttype.Length - 1;
 
-            return string.Equals(contenttype.Substring(0, firstdelim + 1), test, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(contenttype.Substring(0, firstdelim), test, StringComparison.OrdinalIgnoreCase);
         }
 
 		/// <summary>
