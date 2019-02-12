@@ -323,6 +323,7 @@ namespace Ceen.Httpd
 				Array.Resize(ref m_buffer, m_buffer.Length + count);
 			Array.Copy(data, offset, m_buffer, m_bufferoffset, count);
 			m_buffercount += count;
+            m_remainingbytes += count;
 		}
 
 		/// <summary>
