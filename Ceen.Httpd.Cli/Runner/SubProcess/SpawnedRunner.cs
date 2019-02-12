@@ -186,8 +186,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             Program.DebugConsoleOutput("Got simple handling request for handle {0}", handle);
 
             var stream = m_pollhandler.MonitorWithStream(handle);
-            base.HandleRequest(stream, remoteEndPoint, logtaskid, () => stream.ReaderClosed);
-            return Task.FromResult(true);
+            return base.HandleRequestAsync(stream, remoteEndPoint, logtaskid, () => stream.ReaderClosed);
         }
 
         /// <summary>
