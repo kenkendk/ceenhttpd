@@ -293,7 +293,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <summary>
         /// Starts the remote process
         /// </summary>
-        /// <returns>The async.</returns>
+        /// <returns>The process that was started.</returns>
         private System.Diagnostics.Process StartRemoteProcess()
         {
             // If we fake spawn, we actually run in the same process,
@@ -325,7 +325,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             }
             else
             {
-                var exe = System.Reflection.Assembly.GetEntryAssembly().Location;
+                var entry = System.IO.Path.GetFileName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var exe = System.IO.Path.Combine(Program.CLIConfiguration.Assemblypath, entry);
+                if (!System.IO.File.Exists(exe))
+                    exe = System.Reflection.Assembly.GetEntryAssembly().Location;
+
                 var pi = new System.Diagnostics.ProcessStartInfo(exe)
                 {
                     RedirectStandardError = true,
