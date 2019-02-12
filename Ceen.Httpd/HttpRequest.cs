@@ -299,6 +299,7 @@ namespace Ceen.Httpd
                 if (this.ContentLength > config.MaxPostSize)
                     throw new HttpException(HttpStatusCode.PayloadTooLarge);
 
+                var startpos = reader.Position;
                 var trail = new byte[2];
                 var parts = this.ContentType.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
                 var bndpart = parts.FirstOrDefault(x => x.Trim().StartsWith("boundary", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
@@ -347,6 +348,9 @@ namespace Ceen.Httpd
 
                 await reader.RepeatReadAsync(trail, 0, 2, idletime, timeouttask, stoptask);
                 if (trail[0] != '\r' || trail[1] != '\n')
+                    throw new HttpException(HttpStatusCode.BadRequest);
+
+                if (this.ContentLength > 0 && this.ContentLength != (reader.Position - startpos))
                     throw new HttpException(HttpStatusCode.BadRequest);
             }
         }
