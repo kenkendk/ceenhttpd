@@ -7,8 +7,7 @@ using NUnit.Framework;
 
 namespace Unittests
 {
-
-    [Name("target")]
+    [Name("reporttarget")]
     public class ReportExample : Controller
     {
         [HttpPost]
@@ -53,7 +52,7 @@ namespace Unittests
                 {
                     var boundary = "--test-boundary-1234";
 
-                    var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/target");
+                    var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/reporttarget");
                     req.Method = "POST";
                     req.ContentType = "multipart/form-data; boundary=" + boundary;
 
@@ -113,7 +112,7 @@ namespace Unittests
                 {
                     var boundary = "--test-boundary-1234";
 
-                    var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/target");
+                    var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/reporttarget");
                     req.Method = "POST";
                     req.ContentType = "multipart/form-data; boundary=" + boundary;
 
@@ -149,6 +148,66 @@ namespace Unittests
                 }
 
                 Assert.AreEqual(payload1 + payload2, result);
+            }
+        }
+
+        [Test]
+        public void TestBadTrailingMultipart()
+        {
+            using (var server = new ServerRunner(
+                new Ceen.Httpd.ServerConfig()
+                {
+                    AutoParseMultipartFormData = true,
+                }
+                .AddLogger((context, exception, started, duration) => Task.Run(() => Console.WriteLine("Error: {0}", exception)))
+                .AddRoute(
+                    new[] { typeof(ReportExample) }
+                    .ToRoute(
+                        new ControllerRouterConfig()
+                        { Debug = true }
+                    ))
+                ))
+            {
+
+                var payload = " ... some text data ...";
+                string result = null;
+                try
+                {
+                    var boundary = "--test-boundary-1234";
+
+                    var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/reporttarget");
+                    req.Method = "POST";
+                    req.ContentType = "multipart/form-data; boundary=" + boundary;
+
+                    using (var p = req.GetRequestStream())
+                    {
+                        var data = System.Text.Encoding.UTF8.GetBytes(
+                            string.Join("\r\n",
+                                $"--{boundary}",
+                                "Content-Disposition: form-data; name=\"file\"; filename=\"test.txt\"",
+                                "Content-Type: text/plain",
+                                "",
+                                payload + $"--{boundary}--",
+                                "",
+                                "abc" // This should not be here...
+                            )
+                        );
+                        p.Write(data, 0, data.Length);
+                    }
+
+                    using (var res = (System.Net.HttpWebResponse)req.GetResponse())
+                    using (var sr = new System.IO.StreamReader(res.GetResponseStream()))
+                        result = sr.ReadToEnd();
+                }
+                catch (System.Net.WebException wex)
+                {
+                    if (wex.Response is System.Net.HttpWebResponse)
+                        result = ((System.Net.HttpWebResponse)wex.Response).StatusDescription;
+                    else
+                        throw;
+                }
+
+                Assert.AreEqual("Bad Request", result);
             }
         }
     }
