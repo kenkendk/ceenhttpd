@@ -243,12 +243,22 @@ namespace Ceen
         /// Gets the time the request processing started
         /// </summary>
         DateTime RequestProcessingStarted { get; }
-	}
 
-	/// <summary>
-	/// Interface for a http response.
-	/// </summary>
-	public interface IHttpResponse
+        /// <summary>
+        /// Resets the processing timeout.
+        /// </summary>
+        void ResetProcessingTimeout();
+
+        /// <summary>
+        /// Helper method that throws a timeout exception if the processing time has been exceeded
+        /// </summary>
+        void ThrowIfTimeout();
+    }
+
+    /// <summary>
+    /// Interface for a http response.
+    /// </summary>
+    public interface IHttpResponse
 	{
 		/// <summary>
 		/// Gets or sets the HTTP version to report.

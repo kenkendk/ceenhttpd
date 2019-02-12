@@ -122,9 +122,29 @@ namespace Ceen.Httpd
         public CancellationToken TimeoutCancellationToken { get { return m_cancelRequest.Token; } }
 
         /// <summary>
-        /// The method to call to obtain the remote client connected stated
+        /// Helper method that throws a timeout exception if the processing time has been exceeded
+        /// </summary>
+        public void ThrowIfTimeout()
+        {
+            if (TimeoutCancellationToken.IsCancellationRequested)
+                throw new HttpException(HttpStatusCode.RequestTimeout);
+        }
+
+
+        /// <summary>
+        /// The method to call to obtain the remote client connected state
         /// </summary>
         private readonly Func<bool> m_connectedMethod;
+
+        /// <summary>
+        /// The processing timeout duration
+        /// </summary>
+        private TimeSpan m_processingtimeout;
+
+        /// <summary>
+        /// The processing timeout ID
+        /// </summary>
+        private CancellationTokenSource m_processingtimeoutcancellation = new CancellationTokenSource();
 
         /// <summary>
         /// Gets a value indicating whether this <see cref="T:Ceen.IHttpRequest"/> is connected.
@@ -544,8 +564,31 @@ namespace Ceen.Httpd
         {
             RequestProcessingStarted = DateTime.Now;
 
-            if (maxtime.Ticks > 0)
-                m_cancelRequest.CancelAfter(maxtime);
+            m_processingtimeout = maxtime;
+            ResetProcessingTimeout();
+        }
+
+        /// <summary>
+        /// Resets the processing timeout.
+        /// </summary>
+        public void ResetProcessingTimeout()
+        {
+            // Stop any existing timeout
+            m_processingtimeoutcancellation.Cancel();
+
+            if (m_processingtimeout.Ticks > 0)
+            {
+                // Setup cancellation for the timeout
+                m_processingtimeoutcancellation = new CancellationTokenSource();
+
+                // Prepare a task to trigger the actual timeout
+                Task
+                    .Delay(m_processingtimeout, m_processingtimeoutcancellation.Token)
+                    .ContinueWith(
+                        _ => m_cancelRequest.Cancel(), 
+                        TaskContinuationOptions.OnlyOnRanToCompletion
+                    );
+            }
         }
     }
 }

@@ -46,6 +46,7 @@
     <Compile Include="MvcTests.cs" />
     <Compile Include="CliTests.cs" />
     <Compile Include="MultipartTests.cs" />
+    <Compile Include="TimeoutTests.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
