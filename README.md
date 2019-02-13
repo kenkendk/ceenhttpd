@@ -263,6 +263,6 @@ With the route compiled into `MyAssembly.dll` and placed in the same folder as `
 mono Ceen.Httpd.Cli.exe config.txt
 ```
 
-This will load the configuration file and set up the server lige configured.
+This will load the configuration file and set up the server like configured.
 To update the application, replace `MyAssembly.dll` and send `SIGHUP` to the process, which will reload the config file and all assemblies.
 Once the new assembly is loaded, it will unload the old assembly, such that no client requests are lost.
