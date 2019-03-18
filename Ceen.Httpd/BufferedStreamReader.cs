@@ -90,7 +90,6 @@ namespace Ceen.Httpd
 			var bufsize = 0;
 			var totalread = 0;
 			var lastlookoffset = 0;
-			var cs = new CancellationTokenSource();
 
 			// Repeat the parsing until we time out or get an empty line
 			while (true)
@@ -98,14 +97,18 @@ namespace Ceen.Httpd
 				if (totalread == maxheadersize)
 					throw new HttpException(HttpStatusCode.RequestHeaderFieldsTooLarge);
 
-				var rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else if (totalread == 0)
@@ -114,7 +117,7 @@ namespace Ceen.Httpd
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				totalread += r;
 				bufsize += r;
 
@@ -216,25 +219,27 @@ namespace Ceen.Httpd
 		/// <param name="stoptask">The task that signals stop for the server</param>
 		internal async Task RepeatReadAsync(byte[] buffer, int offset, int count, TimeSpan idletimeout, Task timeouttask, Task stoptask)
 		{
-			var cs = new CancellationTokenSource();
-
 			while (count > 0)
 			{
-				var rtask = ReadAsync(buffer, offset, count, cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buffer, offset, count, cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				offset += r;
 				count -= r;
 				if (r == 0)
@@ -255,28 +260,31 @@ namespace Ceen.Httpd
 		{
 			var buf = new byte[buffersize];
 			var offset = 0;
-			var cs = new CancellationTokenSource();
 
 			// Avoid the stream if it all fits in a single package
 			MemoryStream ms = null;
 
 			while (maxcount > 0)
 			{
-				var rtask = ReadAsync(buf, offset, Math.Min(buf.Length - offset, maxcount), cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buf, offset, Math.Min(buf.Length - offset, maxcount), cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				offset += r;
 				maxcount -= r;
 				if (r == 0)
