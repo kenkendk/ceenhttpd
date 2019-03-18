@@ -165,7 +165,6 @@ namespace Ceen.Httpd
 		}
 
 		#region implemented abstract members of Stream
-
 		public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).Result;
 
 		public override void Flush() => throw new NotImplementedException();
@@ -182,7 +181,6 @@ namespace Ceen.Httpd
 			get => m_read;
 			set => throw new NotImplementedException();
 		}
-
 		#endregion
 	}
 }
