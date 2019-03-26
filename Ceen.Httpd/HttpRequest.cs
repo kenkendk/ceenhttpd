@@ -12,7 +12,7 @@ namespace Ceen.Httpd
     /// <summary>
     /// Representation of the values in a HTTP request
     /// </summary>
-    internal class HttpRequest : IHttpRequest
+    internal class HttpRequest : IHttpRequest, IDisposable
     {
         /// <summary>
         /// Gets the HTTP Request line as sent by the client
@@ -366,8 +366,6 @@ namespace Ceen.Httpd
         /// <param name="stoptask">A task that signals server stop.</param>
         internal async Task ParseFormData(BufferedStreamReader reader, ServerConfig config, TimeSpan idletime, Task timeouttask, Task stoptask)
         {
-            var cs = new CancellationTokenSource();
-
             if (string.Equals("application/x-www-form-urlencoded", this.ContentType))
             {
                 if (this.ContentLength != 0)
@@ -406,17 +404,16 @@ namespace Ceen.Httpd
                             using (var sr = new StreamReader(stream, RequestUtility.GetEncodingForCharset(charset)))
                             {
                                 var rtask = sr.ReadToEndAsync();
-                                var rt = await Task.WhenAny(Task.Delay(idletime), timeouttask, stoptask, rtask);
+                                var rt = await Task.WhenAny(timeouttask, stoptask, rtask);
                                 if (rt != rtask)
                                 {
-                                    cs.Cancel();
                                     if (rt == stoptask)
                                         throw new TaskCanceledException();
                                     else
                                         throw new HttpException(HttpStatusCode.RequestTimeout);
                                 }
 
-                                this.Form[name] = await rtask;
+                                this.Form[name] = rtask.Result;
                             }
                         }
                         else
@@ -428,19 +425,24 @@ namespace Ceen.Httpd
                                 Data = new MemoryStream()
                             };
 
-                            var rtask = stream.CopyToAsync(me.Data, 8 * 1024, cs.Token);
+                            Task rtask;
+                            Task rt;
 
-                            var rt = await Task.WhenAny(Task.Delay(idletime), timeouttask, stoptask, rtask);
+                            using (var cs = new CancellationTokenSource(idletime))
+                            {
+                                rtask = stream.CopyToAsync(me.Data, 8 * 1024, cs.Token);
+                                rt = await Task.WhenAny(timeouttask, stoptask, rtask);
+                            }
+
                             if (rt != rtask)
                             {
-                                cs.Cancel();
                                 if (rt == stoptask)
                                     throw new TaskCanceledException();
                                 else
                                     throw new HttpException(HttpStatusCode.RequestTimeout);
                             }
 
-                            await rtask;
+                            rtask.GetAwaiter().GetResult();
                             me.Data.Position = 0;
 
                             this.Files.Add(me);
@@ -589,10 +591,15 @@ namespace Ceen.Httpd
                 Task
                     .Delay(m_processingtimeout, m_processingtimeoutcancellation.Token)
                     .ContinueWith(
-                        _ => m_cancelRequest.Cancel(), 
+                        _ => m_cancelRequest.Cancel(),
                         TaskContinuationOptions.OnlyOnRanToCompletion
                     );
             }
+        }
+
+        public void Dispose()
+        {
+            m_processingtimeoutcancellation.Dispose();
         }
     }
 }
