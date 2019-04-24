@@ -221,6 +221,29 @@
 
 
 #
+# CORS support
+#
+
+# The CORSHandler makes it easy to add Cross Origin Resource Sharing support to the API
+
+# Start by adding the handler early in the config file, and let let it handle the API calls
+#handler "/api/*" Ceen.Httpd.Handler.CORSHandler
+
+# Then set the allowed methods
+#set AllowedMethods "GET, PUT, DELETE, POST, PATCH"
+
+# For a production setup, limit the allowed origins
+# default is using "*", meaning allow all origins
+#set AllowedOrigins "example.com,www.example.com,*.example.com"
+
+# Optionally set the headers allowed for CORS requests
+#set AllowedHeaders "Content-Type,My-Custom-Header"
+
+# Optionally report some extra headers for CORS requests
+#set ExtraHeaders "X-Served-By: my-cool-server, Access-Control-Extra: 1234"
+
+
+#
 # Login and XSRF handling
 #
 
