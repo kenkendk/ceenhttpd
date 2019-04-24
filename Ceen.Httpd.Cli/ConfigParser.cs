@@ -117,11 +117,16 @@ namespace Ceen.Httpd.Cli
             if (targettype.IsArray)
             {
                 // TODO: Handle embedded comma values in strings?
-                return
+				var args = 
                     (value ?? "")
                         .Split(',')
-                        .Select(x => ArgumentFromString(ExpandEnvironmentVariables(x), targettype.GetElementType()))
+                        .Select(x => ArgumentFromString((x ?? string.Empty).Trim(), targettype.GetElementType()))
                         .ToArray();
+
+				// Manually convert to the right type
+				var res = Array.CreateInstance(targettype.GetElementType(), args.Length);
+				Array.Copy(args, res, args.Length);
+				return res;
             }
 
             if ((targettype.IsArray || targettype == typeof(string)) && string.Equals(value, "null", StringComparison.OrdinalIgnoreCase))
@@ -661,7 +666,7 @@ namespace Ceen.Httpd.Cli
 					if (module.Options != null)
 						SetProperties(handler, module.Options);
 
-                    if (module is IModuleWithSetup mse)
+                    if (handler is IModuleWithSetup mse)
                         mse.AfterConfigure();
 
 
