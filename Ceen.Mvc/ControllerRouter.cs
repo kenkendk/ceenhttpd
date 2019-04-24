@@ -600,7 +600,8 @@ namespace Ceen.Mvc
                 {
                     // We can have at most one body param
                     hasreadbody = true;
-                    ApplyArgument(method.Method, e, await RequestUtility.ReadAllAsStringAsync(context.Request.Body, RequestUtility.GetEncodingForContentType(context.Request.ContentType), context.Request.TimeoutCancellationToken), values);
+                    var str = await RequestUtility.ReadAllAsStringAsync(context.Request.Body, RequestUtility.GetEncodingForContentType(context.Request.ContentType), context.Request.TimeoutCancellationToken);
+                    ApplyArgument(method.Method, e, str, values);
                 }
 				else if (e.Required)
 					throw new HttpException(HttpStatusCode.BadRequest, $"Missing mandatory parameter {e.Name}");
@@ -641,7 +642,7 @@ namespace Ceen.Mvc
                 if (argtype.IsPrimitive || argtype.IsEnum || argtype == typeof(string))
                     values[entry.ArgumentIndex] = Convert.ChangeType(value, argtype);
                 else
-                    Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
+                    values[entry.ArgumentIndex] = Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
 			}
 			catch (Exception)
 			{
