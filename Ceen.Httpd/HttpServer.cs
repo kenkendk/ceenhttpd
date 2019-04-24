@@ -824,10 +824,11 @@ namespace Ceen.Httpd
 					{
                         config.DebugLogHandler?.Invoke("Failed setting up SSL", logtaskid, remoteEndPoint);
 
-                        // Log a message indicating that we failed setting up SSL
-                        await LogRequestCompletedMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
+                        // Log a message indicating that we failed setting up SSL                        
+                        using (var httpRequest = new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false))
+                            await LogRequestCompletedMessageAsync(controller, new HttpContext(httpRequest, null, storage), aex, DateTime.Now, new TimeSpan());
 
-						return;
+                        return;
 					}
 
                     config.DebugLogHandler?.Invoke("Run SSL", logtaskid, remoteEndPoint);
@@ -873,7 +874,9 @@ namespace Ceen.Httpd
 
 					do
 					{
-						var reqid = SetLoggingRequestID();
+                        cur?.Dispose();
+
+                        var reqid = SetLoggingRequestID();
 						bs.ResetReadLength(config.MaxPostSize);
 						started = DateTime.Now;
 						context = new HttpContext(
