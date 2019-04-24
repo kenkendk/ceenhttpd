@@ -84,9 +84,10 @@ namespace Ceen.Database
         /// <typeparam name="T">The type of the table to create.</typeparam>
         /// <param name="connection">The connection to use</param>
         /// <param name="ifNotExists">Only create the table if it does not exist</param>
-        public static void CreateTable<T>(this IDbConnection connection, bool ifNotExists = true)
+        /// <param name="autoAddColumns">Automatically add new columns to the database if they are not present</param>
+        public static void CreateTable<T>(this IDbConnection connection, bool ifNotExists = true, bool autoAddColumns = true)
         {
-            CreateTable(connection, typeof(T), ifNotExists);
+            CreateTable(connection, typeof(T), ifNotExists, autoAddColumns);
         }
 
         /// <summary>
@@ -95,12 +96,33 @@ namespace Ceen.Database
         /// <param name="type">The type of the table to create.</param>
         /// <param name="connection">The connection to use</param>
         /// <param name="ifNotExists">Only create the table if it does not exist</param>
-        public static void CreateTable(this IDbConnection connection, Type type, bool ifNotExists = true)
+        /// <param name="autoAddColumns">Automatically add new columns to the database if they are not present</param>
+        public static void CreateTable(this IDbConnection connection, Type type, bool ifNotExists = true, bool autoAddColumns = true)
         {
             var dialect = GetDialect(connection);
+            var mapping = dialect.GetTypeMap(type);
+
             var sql = dialect.CreateTableSql(type, ifNotExists);
             using (var cmd = connection.CreateCommand(sql))
                 cmd.ExecuteNonQuery();
+
+            sql = dialect.CreateSelectTableColumnsSql(type);
+            var columns = new List<string>();
+            using (var cmd = connection.CreateCommand(sql))
+            using(var rd = cmd.ExecuteReader())
+                while(rd.Read())
+                    columns.Add(rd.GetAsString(0));
+
+            var missingcolumns = mapping.AllColumns.Where(x => !columns.Contains(x.ColumnName)).ToArray();
+            if (missingcolumns.Length != 0)
+            {
+                if (!autoAddColumns)
+                    throw new DataException($"The table {mapping.Name} is missing the column(s): {string.Join(", ", missingcolumns.Select(x => x.ColumnName))}");
+
+                sql = dialect.CreateAddColumnSql(type, missingcolumns);
+                using (var cmd = connection.CreateCommand(sql))
+                    cmd.ExecuteNonQuery();
+            }
         }
 
 
@@ -143,13 +165,16 @@ namespace Ceen.Database
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
 
+            if (mapping.PrimaryKeys.Length == 0)
+                throw new ArgumentException("Cannot select by ID when there are no primary keys on the table");
+
             if (ids == null || ids.Length != mapping.PrimaryKeys.Length)
                 throw new ArgumentException($"Expected {mapping.PrimaryKeys.Length} keys but got {ids?.Length}");
 
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.Name)} = ?")) + " LIMIT 1"))
+            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?")) + " LIMIT 1"))
             using(var rd = cmd.ExecuteReader(ids))
             {
-                return rd.NextResult() 
+                return rd.Read() 
                     ? FillItem(rd, mapping, new T())
                     : default(T);
             }
@@ -171,6 +196,18 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Adds a space in from of the query string
+        /// </summary>
+        /// <param name="query">The query string</param>
+        /// <returns>A space prefixed query string</returns>
+        private static string SpacePrefixQuery(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return string.Empty;
+            return " " + query.Trim();
+        }
+
+        /// <summary>
         /// Gets some items for a given type
         /// </summary>
         /// <returns>The items that match.</returns>
@@ -182,7 +219,7 @@ namespace Ceen.Database
             where T : new()
         {
             var dialect = GetDialect(connection);
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + query))
+            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + SpacePrefixQuery(query)))
             {
                 cmd.SetParameterValues(arguments);
                 foreach (var n in FillItems<T>(cmd))
@@ -203,10 +240,10 @@ namespace Ceen.Database
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + query + " LIMIT 1"))
+            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + SpacePrefixQuery(query) + " LIMIT 1"))
             using(var rd = cmd.ExecuteReader(arguments))
             {
-                return rd.NextResult()
+                return rd.Read()
                     ? FillItem(rd, mapping, new T())
                     : default(T);
             }
@@ -291,7 +328,7 @@ namespace Ceen.Database
         {
             using (var cmd = connection.CreateCommandWithParameters(query))
             using (var rd = cmd.ExecuteReader(arguments))
-                if (rd.NextResult())
+                if (rd.Read())
                     return FillItem(rd, GetDialect(connection).GetTypeMap(typeof(T)), new T());
 
             return default(T);
@@ -310,7 +347,7 @@ namespace Ceen.Database
             var mapping = dialect.GetTypeMap(typeof(T));
 
             using(var reader = command.ExecuteReader())
-                while (reader.NextResult())
+                while (reader.Read())
                     yield return FillItem(reader, mapping, new T());
         }
 
@@ -333,10 +370,10 @@ namespace Ceen.Database
                     if (value == DBNull.Value)
                         value = null;
 
-                    if (value == null && prop.Property.PropertyType.IsValueType)
-                        value = Activator.CreateInstance(prop.Property.PropertyType);
+                    if (value == null && prop.MemberType.IsValueType)
+                        value = Activator.CreateInstance(prop.MemberType);
 
-                    prop.Property.SetValue(item, value);
+                    prop.SetValueFromDb(item, value);
                 }
             }
 
@@ -355,14 +392,24 @@ namespace Ceen.Database
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
 
+            if (mapping.PrimaryKeys.Length == 0)
+                throw new ArgumentException("Cannot perform update there are no primary keys on the table");
+
             var txt = 
                 $"UPDATE {dialect.QuoteName(mapping.Name)}"
-                + $" SET {string.Join(", ", mapping.ColumnsWithoutPrimaryKey.Select(x => $"{dialect.QuoteName(x.Name)} = ?" ))}"
-                + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.Name)} = ?"))
-                + " LIMIT 1";
+                + $" SET {string.Join(", ", mapping.UpdateColumns.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?" ))}"
+                + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?"));
 
             using (var cmd = connection.CreateCommandWithParameters(txt))
-                return cmd.ExecuteNonQuery(mapping.ColumnsWithoutPrimaryKey.Concat(mapping.PrimaryKeys).Select(x => x.Property.GetValue(item)).ToArray()) > 0;
+                return cmd.ExecuteNonQuery(mapping.UpdateColumns.Select(x => {
+                    switch (x.AutoGenerateAction)
+                    {
+                        case AutoGenerateAction.ClientChangeTimestamp:
+                            return DateTime.Now;
+                        default:
+                            return x.GetValueForDb(item);
+                    }                    
+                }).Concat(mapping.PrimaryKeys.Select(x => x.GetValueForDb(item)))) > 0;
         }
 
         /// <summary>
@@ -376,7 +423,7 @@ namespace Ceen.Database
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
-            return DeleteItemById(connection, typeof(T), mapping.PrimaryKeys.Select(x => x.Property.GetValue(item)).ToArray());
+            return DeleteItemById(connection, typeof(T), mapping.PrimaryKeys.Select(x => x.GetValueForDb(item)).ToArray());
         }
 
         /// <summary>
@@ -386,16 +433,50 @@ namespace Ceen.Database
         /// <param name="connection">The connection to use</param>
         /// <param name="ids">The primary key.</param>
         /// <param name="tdata">The data type</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
         public static bool DeleteItemById(this IDbConnection connection, Type tdata, params object[] ids)
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(tdata);
+            if (mapping.PrimaryKeys.Length == 0)
+                throw new ArgumentException("Cannot perform delete by ID when there are no primary keys on the table");
             if (ids == null || ids.Length != mapping.PrimaryKeys.Length)
                 throw new ArgumentException($"Expected {mapping.PrimaryKeys.Length} keys but got {ids?.Length}");
 
-            var txt = $"DELETE FROM {dialect.QuoteName(mapping.Name)} " + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.Name)} = ?")) + " LIMIT 1";
+
+            var txt = dialect.CreateDeleteByIdCommand(tdata);
             using (var cmd = connection.CreateCommandWithParameters(txt))
                 return cmd.ExecuteNonQuery(ids) > 0;
+        }
+
+        /// <summary>
+        /// Deletes items matching the where clause
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="whereclause">The where clause</param>
+        /// <param name="arguments">The arguments for the where clause</param>
+        /// <returns>The number of items</returns>
+        public static int Delete<T>(this IDbConnection connection, string whereclause, params object[] arguments)
+        {
+            return Delete(connection, typeof(T), whereclause, arguments);
+        }
+
+        /// <summary>
+        /// Deletes items matching the where clause
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="tdata">The data type to use</param>
+        /// <param name="whereclause">The where clause</param>
+        /// <param name="arguments">The arguments for the where clause</param>
+        /// <returns>The number of items</returns>
+        public static int Delete(this IDbConnection connection, Type tdata, string whereclause, params object[] arguments)
+        {
+            var dialect = GetDialect(connection);
+            var mapping = dialect.GetTypeMap(tdata);
+
+            var txt = dialect.CreateDeleteCommand(tdata);
+            using(var cmd = connection.CreateCommandWithParameters(txt + SpacePrefixQuery(whereclause)))
+                return cmd.ExecuteNonQuery(arguments);
         }
 
         /// <summary>
@@ -423,7 +504,43 @@ namespace Ceen.Database
             var mapping = dialect.GetTypeMap(typeof(T));
 
             using (var cmd = connection.CreateCommandWithParameters(dialect.CreateInsertCommand(typeof(T))))
-                return cmd.ExecuteNonQuery(mapping.AllColumns.Select(x => x.Property.GetValue(item))) > 0;
+            {
+                // TODO: We might want to read the value from the database
+                // instead of relying on the generated value as we might
+                // have precision loss for the timestamps when going to the DB and back,
+                // which would result in value returned from create and subsequent select
+                // operations to differ
+                var clientgenerated = new Dictionary<ColumnMapping, object>();
+
+                var arguments = mapping.InsertColumns.Select(x =>
+                {
+                    switch (x.AutoGenerateAction)
+                    {
+                        case AutoGenerateAction.ClientCreateTimestamp:
+                        case AutoGenerateAction.ClientChangeTimestamp:
+                            return clientgenerated[x] = DateTime.Now; 
+                        case AutoGenerateAction.ClientGenerateGuid:
+                            return clientgenerated[x] = Guid.NewGuid().ToString();
+                    }
+
+                    return x.GetValueForDb(item);
+                });
+
+                if (!mapping.IsPrimaryKeyAutogenerated) {
+                    var res = cmd.ExecuteNonQuery(arguments) > 0;
+                    foreach (var x in clientgenerated)
+                        x.Key.SetValue(item, x.Value);
+                    return res;
+                }
+
+                var id = cmd.ExecuteScalar(arguments);
+                var pk = mapping.PrimaryKeys.First();
+                pk.SetValueFromDb(item, id);
+                foreach (var x in clientgenerated)
+                    x.Key.SetValue(item, x.Value);
+
+                return true;
+            }
         }
     }
 }

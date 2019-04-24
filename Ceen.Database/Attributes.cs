@@ -82,4 +82,18 @@ namespace Ceen.Database
     public class IgnoreAttribute : Attribute
     {
     }
+
+    /// <summary>
+    /// Marker attribute for setting a property or field as a creation timestamp
+    /// </summary>
+    public class CreatedTimestampAttribute : Attribute
+    {
+    }
+
+    /// <summary>
+    /// Marker attribute for setting a property or field as a change timestamp
+    /// </summary>
+    public class ChangedTimestampAttribute : Attribute
+    {
+    }
 }

@@ -15,7 +15,6 @@ namespace Ceen.Database
         /// </summary>
         private static readonly Type[] INTTYPES = { typeof(int), typeof(uint), typeof(short), typeof(ushort), typeof(long), typeof(ulong) };
 
-
         /// <summary>
         /// The map of property types
         /// </summary>
@@ -31,23 +30,71 @@ namespace Ceen.Database
         /// </summary>
         /// <returns>The sql column type.</returns>
         /// <param name="property">The property being examined.</param>
-        public string GetSqlColumnType(PropertyInfo property)
+        public Tuple<string, AutoGenerateAction> GetSqlColumnType(MemberInfo member)
         {
-            var custom = property.GetCustomAttributes(true).OfType<DbTypeAttribute>().Select(x => x.Type).FirstOrDefault();
-            if (custom != null)
-                return custom;
-
-            if (INTTYPES.Contains(property.PropertyType))
+            var action = AutoGenerateAction.None;            
+            if (member.GetCustomAttributes(true).OfType<CreatedTimestampAttribute>().Any())
+                action = AutoGenerateAction.ClientCreateTimestamp;
+            if (member.GetCustomAttributes(true).OfType<ChangedTimestampAttribute>().Any())
             {
-                if (property.Name == "ID")
-                    return "INTEGER PRIMARY KEY AUTOINCREMENT";
-
-                return "INTEGER";
+                if (action != AutoGenerateAction.None)
+                    throw new ArgumentException($"The {nameof(CreatedTimestampAttribute)} and {nameof(ChangedTimestampAttribute)} attributes are mutually exclusive");
+                action = AutoGenerateAction.ClientChangeTimestamp;
             }
-            else if (property.PropertyType == typeof(DateTime))
-                return "DATETIME";
+
+            var custom = member.GetCustomAttributes(true).OfType<DbTypeAttribute>().Select(x => x.Type).FirstOrDefault();
+            if (custom != null)
+                return new Tuple<string, AutoGenerateAction>(custom, action);
+
+            Type elType;
+            if (member is PropertyInfo pi)
+                elType = pi.PropertyType;
+            else if (member is FieldInfo fi)
+                elType = fi.FieldType;
             else
-                return "STRING";
+                throw new Exception($"Unexpected member type: {member?.GetType()}");
+
+            var isPrimaryKey = member.GetCustomAttributes<PrimaryKeyAttribute>(true).Any();
+            var otherPrimaries = member.DeclaringType
+                .GetProperties()
+                .Select(x => x.GetCustomAttributes<PrimaryKeyAttribute>(true).Any())
+                .Concat(
+                    member.DeclaringType
+                        .GetFields()
+                        .Select(x => x.GetCustomAttributes<PrimaryKeyAttribute>(true).Any())
+                )
+                .Any(x => x);
+
+            if (INTTYPES.Contains(elType))
+            {
+                // If this member is decorated primary, or named ID with no other primary key members,
+                // we make this item the primary key
+                if (isPrimaryKey || (member.Name == "ID" && !otherPrimaries && action == AutoGenerateAction.None))
+                {
+                    if (action != AutoGenerateAction.None)
+                        throw new ArgumentException($"The primary key cannot also be a timestamp");
+
+                    return new Tuple<string, AutoGenerateAction>("INTEGER PRIMARY KEY AUTOINCREMENT", AutoGenerateAction.DatabaseAutoID);
+                }
+
+                return new Tuple<string, AutoGenerateAction>("INTEGER", action);
+            }
+            else if (elType == typeof(DateTime))
+                return new Tuple<string, AutoGenerateAction>("DATETIME", action);
+            else if (elType == typeof(bool))
+                return new Tuple<string, AutoGenerateAction>("BOOLEAN", action);
+            else
+            {
+                if (isPrimaryKey || ((member.Name == "ID" || member.Name == "GUID") && !otherPrimaries && action == AutoGenerateAction.None))
+                {
+                    if (action != AutoGenerateAction.None)
+                        throw new ArgumentException($"The primary key cannot also be a timestamp");
+
+                    return new Tuple<string, AutoGenerateAction>("STRING PRIMARY KEY", AutoGenerateAction.ClientGenerateGuid);
+                }
+
+                return new Tuple<string, AutoGenerateAction>("STRING", action);
+            }
         }
 
         /// <summary>
@@ -75,34 +122,32 @@ namespace Ceen.Database
                 );
         }
 
+        /// <summary>
+        /// Quotes a column or table name in a way that is SQL safe
+        /// </summary>
+        /// <param name="name">The name to quote</param>
+        /// <returns>The quoted name</returns>
         public virtual string QuoteName(string name)
         {
-            return $"'{name}'";
+            if ((name ?? throw new ArgumentNullException(nameof(name))).Contains("\""))
+                throw new ArgumentException("Cannot quote a name with a \" character in it");
+
+            return $"\"{name}\"";
         }
 
         /// <summary>
         /// Gets the name for a class
         /// </summary>
         /// <returns>The name.</returns>
-        /// <param name="property">The class to get the name from.</param>
-        public virtual string GetName(PropertyInfo property)
+        /// <param name="member">The member to get the name from.</param>
+        public virtual string GetName(MemberInfo member)
         {
             return
                 EscapeName(
-                    property.GetCustomAttributes(true).OfType<NameAttribute>().Select(x => x.Name).FirstOrDefault()
+                    member.GetCustomAttributes(true).OfType<NameAttribute>().Select(x => x.Name).FirstOrDefault()
                     ??
-                    property.Name
+                    member.Name
                 );
-        }
-
-        /// <summary>
-        /// Creates the type map with a custom table name.
-        /// </summary>
-        /// <param name="name">The custom table name to use.</param>
-        /// <typeparam name="type">The type to build the map for.</typeparam>
-        public void CreateTypeMap<T>(string name)
-        {
-            CreateTypeMap(name, typeof(T));
         }
 
         /// <summary>
@@ -143,22 +188,22 @@ namespace Ceen.Database
             var fields =
                 string.Join(", ", mapping
                             .AllColumns
-                            .Select(x => string.Format(@"""{0}"" {1}", x.Name, x.SqlType))
+                            .Select(x => string.Format(@"{0} {1}", QuoteName(x.ColumnName), x.SqlType))
                 );
 
             var constr =
                 (mapping.Uniques == null || mapping.Uniques.Length == 0)
                 ? string.Empty
-                : string.Join(", ",
+                : ", " + string.Join(", ",
                     mapping.Uniques.Select(x =>
-                       string.Format($@"CONSTRAINT {QuoteName(mapping.Name + (x.Group == null ? string.Empty : EscapeName(x.Group)) + "_unique")} UNIQUE({string.Join(", ", x.Columns.Select(y => QuoteName(y.Name)))})")
+                       string.Format($@"CONSTRAINT {QuoteName(mapping.Name + (x.Group == null ? string.Empty : EscapeName(x.Group)) + "_unique")} UNIQUE({string.Join(", ", x.Columns.Select(y => QuoteName(y.ColumnName)))})")
                     )
                 );
 
             var sql = string.Format(
-                @"CREATE TABLE{0} ""{1}"" ({2} {3}) ",
+                @"CREATE TABLE{0} {1} ({2} {3}) ",
                 ifNotExists ? " IF NOT EXISTS" : "",
-                mapping.Name,
+                QuoteName(mapping.Name),
                 fields,
                 constr
             );
@@ -175,7 +220,7 @@ namespace Ceen.Database
         {
             var mapping = GetTypeMap(type);
             return
-                $"SELECT {string.Join(",", mapping.AllColumns.Select(x => QuoteName(x.Name)))} FROM {QuoteName(mapping.Name)}";
+                $"SELECT {string.Join(",", mapping.AllColumns.Select(x => QuoteName(x.ColumnName)))} FROM {QuoteName(mapping.Name)}";
         }
 
         /// <summary>
@@ -198,9 +243,73 @@ namespace Ceen.Database
         public virtual string CreateInsertCommand(Type type)
         {
             var mapping = GetTypeMap(type);
-            return
-                $"INSERT INTO {QuoteName(mapping.Name)} ({string.Join(",", mapping.AllColumns.Select(x => QuoteName(x.Name)))}) VALUES ({string.Join(",", mapping.AllColumns.Select(x => "?"))})";
+            var statement =
+                $"INSERT INTO {QuoteName(mapping.Name)} ({string.Join(",", mapping.InsertColumns.Select(x => QuoteName(x.ColumnName)))}) VALUES ({string.Join(",", mapping.InsertColumns.Select(x => "?"))})";
+
+            if (mapping.IsPrimaryKeyAutogenerated)    
+                statement += "; SELECT last_insert_rowid();";
+
+            return statement;
         }
+
+        /// <summary>
+        /// Creates a command for deleting one or more items
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <returns>The delete command</returns>
+        public virtual string CreateDeleteCommand(Type type)
+        {
+            var mapping = GetTypeMap(type);
+            return $"DELETE FROM {QuoteName(mapping.Name)}";
+        }
+
+        /// <summary>
+        /// Creates a command for deleting an item by suppling the primary key
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <returns>The delete command</returns>
+        public virtual string CreateDeleteByIdCommand(Type type)
+        {
+            var mapping = GetTypeMap(type);
+            return
+                $"DELETE FROM {QuoteName(mapping.Name)} " + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{QuoteName(x.ColumnName)} = ?"));
+        }
+
+        /// <summary>
+        /// Creates a command that returns the names of the columns in a table
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <returns>The table column select command</returns>
+        public virtual string CreateSelectTableColumnsSql(Type type)
+        {
+            var mapping = GetTypeMap(type);
+            return 
+                $"SELECT \"name\",\"type\" FROM pragma_table_info('{mapping.Name}')";
+
+        }
+
+        /// <summary>
+        /// Creates a command that adds columns to a table
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <param name="columns">The columns to add</param>
+        /// <returns>The command that adds columns</returns>
+        public virtual string CreateAddColumnSql(Type type, IEnumerable<ColumnMapping> columns)
+        {
+            var mapping = GetTypeMap(type);
+            if (columns == null || !columns.Any())
+                throw new ArgumentException("Cannot create an SQL statement to add zero columns");
+
+            return
+                string.Join(";",
+                    columns.Select(
+                        x =>
+                            $"ALTER TABLE {QuoteName(mapping.Name)} ADD COLUMN {QuoteName(x.ColumnName)} {x.SqlType}"
+                    )
+                );
+        }
+
+
 
         /// <summary>
         /// Returns a where fragment that limits the query
