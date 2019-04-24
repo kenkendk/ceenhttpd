@@ -10,7 +10,7 @@ namespace Ceen.Httpd
 	/// Helper class that reads a stream,
 	/// but also provides a buffer to allow peek/read-ahead
 	/// It contains a special method to read data until the first 
-	/// CR LF CR LF entry (end o HTTP header), and leaves the rest of
+	/// CR LF CR LF entry (end of HTTP header), and leaves the rest of
 	/// the stream untouched.
 	/// </summary>
 	public class BufferedStreamReader : Stream
