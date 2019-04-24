@@ -274,7 +274,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		/// <param name="assemblies">The assemblies to scan for controllers.</param>
 		public ControllerRouter(ControllerRouterConfig config, IEnumerable<Assembly> assemblies)
-			: this(config, assemblies.SelectMany(x => x.GetTypes()).Where(x => x != null && typeof(Controller).IsAssignableFrom(x)))
+			: this(config, assemblies.SelectMany(x => x.GetTypes()).Where(x => x != null && typeof(Controller).IsAssignableFrom(x) && !x.IsAbstract && !x.IsGenericTypeDefinition))
 		{
 		}
 
@@ -314,11 +314,15 @@ namespace Ceen.Mvc
 			if (types.Count() == 0)
 				throw new ArgumentException($"No controller entries to load from \"{types}\"");
 
-			var wrong = types.Where(x => !typeof(Controller).IsAssignableFrom(x)).FirstOrDefault();
+			var wrong = types.FirstOrDefault(x => !typeof(Controller).IsAssignableFrom(x));
 			if (wrong != null)
 				throw new ArgumentException($"The type \"{wrong.FullName}\" does not derive from {typeof(Controller).FullName}");
 
-			m_routeparser = BuildParse(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
+            wrong = types.FirstOrDefault(x => x.IsAbstract || x.IsGenericTypeDefinition);
+            if (wrong != null)
+                throw new ArgumentException($"The type \"{wrong.FullName}\" cannot be instantiated");
+
+            m_routeparser = BuildParse(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
 		}
 
 		private static RouteParser BuildParse(IEnumerable<Controller> controllers, ControllerRouterConfig config)
