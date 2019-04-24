@@ -312,5 +312,97 @@ namespace Ceen
 				return encoding.GetString(ms.ToArray());
 			}
 		}
-	}
+
+		/// <summary>
+		/// Logs an exception error
+		/// </summary>
+		/// <param name="context">The context to log with</param>
+		/// <param name="ex">The exception to log</param>
+		/// <returns>An awaitable task</returns>
+        public static Task LogErrorAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Error, null, ex);
+        }
+
+        /// <summary>
+        /// Logs an error message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogErrorAsync(this IHttpContext context, string message, Exception ex = null)
+		{
+			return context.LogMessageAsync(LogLevel.Error, message, ex);
+		}
+
+        /// <summary>
+        /// Logs an exception warning
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogWarningAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Warning, null, ex);
+        }
+
+        /// <summary>
+        /// Logs a warning message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogWarningAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Warning, message, ex);
+        }
+
+        /// <summary>
+        /// Logs an exception for information use
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogInformationAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Information, null, ex);
+        }
+
+        /// <summary>
+        /// Logs an informaiton message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogInformationAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Information, message, ex);
+        }
+
+        /// <summary>
+        /// Logs an exception for debugging
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogDebugAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Debug, null, ex);
+        }
+
+        /// <summary>
+        /// Logs a debug message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogDebugAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Debug, message, ex);
+        }
+    }
 }

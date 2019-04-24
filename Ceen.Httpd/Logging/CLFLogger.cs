@@ -172,7 +172,7 @@ namespace Ceen.Httpd.Logging
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>
-		public virtual Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+		public virtual Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
 		{
 			return Task.Run(async () => {
 				if (m_stream == null)

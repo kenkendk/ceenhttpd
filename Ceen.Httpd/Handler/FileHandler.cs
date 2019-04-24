@@ -646,7 +646,7 @@ namespace Ceen.Httpd.Handler
             catch (Exception ex)
             {
                 // Log the error
-                await context.LogExceptionAsync(ex);
+                await context.LogMessageAsync(LogLevel.Error, $"Failed to process file: {path}", ex);
 
                 // If this happens when we try to open the file, report as permission problem
                 if (permissionissue)

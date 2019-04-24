@@ -460,12 +460,14 @@ namespace Ceen
 		/// </summary>
 		IDictionary<string, string> LogData { get; }
 
-		/// <summary>
-		/// Logs an exception
-		/// </summary>
-		/// <param name="ex">The exception to log</param>
-		/// <returns>An awaitable task</returns>
-		Task LogExceptionAsync(Exception ex);
+        /// <summary>
+        /// Logs a message
+        /// </summary>
+        /// <param name="level">The level to log</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        Task LogMessageAsync(LogLevel level, string message, Exception ex);
 	}
 
 	/// <summary>
@@ -538,20 +540,53 @@ namespace Ceen
 	}
 
 	/// <summary>
+	/// The log levels
+	/// </summary>
+	public enum LogLevel
+	{
+		/// <summary>The message is a debug message</summary>
+		Debug,
+		/// <summary>The message is an informational message</summary>
+		Information,
+		/// <summary>The message is a warning message</summary>
+		Warning,
+		/// <summary>The message is an error message</summary>
+		Error
+	}
+
+	/// <summary>
 	/// Interface for implementing a logging provider
 	/// </summary>
 	public interface ILogger
 	{
 		/// <summary>
-		/// Logs a request.
+		/// Logs a completed request.
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="context">The execution context.</param>
 		/// <param name="ex">The exception being logged, may be null.</param>
 		/// <param name="started">The time the request started.</param>
 		/// <param name="duration">The request duration.</param>
-		Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
+		Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration);
 	}
+
+	/// <summary>
+	/// Interface for a logger that also accepts messages during requests
+	/// </summary>
+	public interface IMessageLogger : ILogger
+	{
+        /// <summary>
+        /// Logs a message
+        /// </summary>
+        /// <param name="context">The execution context.</param>
+        /// <param name="ex">The exception being logged, may be null.</param>
+        /// <param name="loglevel">The log level</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="when">The time the log data was received</param>
+        /// <returns>An awaitable task</returns>
+        Task LogMessageAsync(IHttpContext context, Exception ex, LogLevel loglevel, string message, DateTime when);
+	}
+
 
 	/// <summary>
 	/// Interface for logging requests before they are processed
@@ -563,7 +598,7 @@ namespace Ceen
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
 		/// <param name="request">The request being started.</param>
-		Task LogRequestStarted(IHttpRequest request);
+		Task LogRequestStartedAsync(IHttpRequest request);
 	}
 
 	/// <summary>

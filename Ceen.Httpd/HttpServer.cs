@@ -687,15 +687,47 @@ namespace Ceen.Httpd
             config.DebugLogHandler?.Invoke("Stopped", taskid, null);
         }
 
+        /// <summary>
+        /// Logs a message to all attached loggers
+        /// </summary>
+        /// <param name="controller">The controller to get loggers from</param>
+        /// <param name="context">The request context.</param>
+        /// <param name="loglevel">The log level to use</param>
+		/// <param name="exception">The exception to log, if any</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="when">The time the message was logged</param>
+        /// <returns>An awaitable task</returns>
+        private static Task LogProcessingMessage(RunnerControl controller, HttpContext context, Exception ex, LogLevel loglevel, string message, DateTime when)
+		{
+            var config = controller.Config;
+            if (config.Loggers == null)
+                return Task.FromResult(true);
+
+            CopyLogData?.Invoke(context);
+
+            var count = config.Loggers.Count;
+            if (count == 0)
+                return Task.FromResult(true);
+            else if (count == 1)
+			{
+				if (!(config.Loggers[0] is IMessageLogger msl))
+					return Task.FromResult(true);
+                return msl.LogMessageAsync(context, ex, loglevel, message, when);
+			}
+            else
+                return Task.WhenAll(config.Loggers.OfType<IMessageLogger>().Select(x => x.LogMessageAsync(context, ex, loglevel, message, when)));
+		}
+
 		/// <summary>
-		/// Logs a message to all configured loggers
+		/// Logs a message signalling that a request has completed to all configured loggers
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
+		/// <param name="controller">The controller to get loggers from</param>
 		/// <param name="context">The request context.</param>
 		/// <param name="ex">Exception data, if any.</param>
 		/// <param name="start">The request start time.</param>
 		/// <param name="duration">The request duration.</param>
-		private static Task LogMessageAsync(RunnerControl controller, HttpContext context, Exception ex, DateTime start, TimeSpan duration)
+		private static Task LogRequestCompletedMessageAsync(RunnerControl controller, HttpContext context, Exception ex, DateTime start, TimeSpan duration)
 		{
 			var config = controller.Config;
 			if (config.Loggers == null)
@@ -707,9 +739,9 @@ namespace Ceen.Httpd
 			if (count == 0)
 				return Task.FromResult(true);
 			else if (count == 1)
-				return config.Loggers[0].LogRequest(context, ex, start, duration);
+				return config.Loggers[0].LogRequestCompletedAsync(context, ex, start, duration);
 			else
-				return Task.WhenAll(config.Loggers.Select(x => x.LogRequest(context, ex, start, duration)));
+				return Task.WhenAll(config.Loggers.Select(x => x.LogRequestCompletedAsync(context, ex, start, duration)));
 		}
 
 		/// <summary>
@@ -793,7 +825,7 @@ namespace Ceen.Httpd
                         config.DebugLogHandler?.Invoke("Failed setting up SSL", logtaskid, remoteEndPoint);
 
                         // Log a message indicating that we failed setting up SSL
-                        await LogMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
+                        await LogRequestCompletedMessageAsync(controller, new HttpContext(new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false), null, storage), aex, DateTime.Now, new TimeSpan());
 
 						return;
 					}
@@ -851,7 +883,8 @@ namespace Ceen.Httpd
 						);
 
 						// Setup up the callback for allowing handlers to report errors
-						context.LogHandlerDelegate = (ex) => LogMessageAsync(controller, context, ex, started, DateTime.Now - started);
+						context.LogHandlerDelegate = (level, message, ex) => LogProcessingMessage(controller, context, ex, level, message, DateTime.Now);
+
 						// Set up call context access to this instance
 						Context.SetCurrentContext(context);
 
@@ -909,10 +942,10 @@ namespace Ceen.Httpd
 							{
 								var sl = config.Loggers[0] as IStartLogger;
 								if (sl != null)
-									await sl.LogRequestStarted(cur);
+									await sl.LogRequestStartedAsync(cur);
 							}
 							else if (count != 0)
-								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStarted(cur)));
+								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStartedAsync(cur)));
 						}
 
                         config.DebugLogHandler?.Invoke("Running handler", logtaskid, cur);
@@ -968,7 +1001,7 @@ namespace Ceen.Httpd
 						keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength;
 						requests--;
 
-						await LogMessageAsync(controller, context, null, started, DateTime.Now - started);
+						await LogRequestCompletedMessageAsync(controller, context, null, started, DateTime.Now - started);
 
 					} while (keepingalive);
 				}
@@ -994,7 +1027,7 @@ namespace Ceen.Httpd
                     try { stream.Close(); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to close stream: {nex}", logtaskid, cur); }
 
-                    try { await LogMessageAsync(controller, context, ex, started, DateTime.Now - started); }
+                    try { await LogRequestCompletedMessageAsync(controller, context, ex, started, DateTime.Now - started); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to log request: {nex}", logtaskid, cur); }
 
                     config.DebugLogHandler?.Invoke("Failed handler", logtaskid, cur);
