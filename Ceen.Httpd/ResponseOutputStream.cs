@@ -98,7 +98,7 @@ namespace Ceen.Httpd
 		/// <param name="cancellationToken">The cancellation token.</param>
         public override async Task FlushAsync(CancellationToken cancellationToken)
 		{
-            await SetLengthAndFlushAsync(false);
+            await SetLengthAndFlushAsync(false, cancellationToken);
             await m_parent.FlushAsync(cancellationToken);
 		}
 
@@ -107,7 +107,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		public override void Flush()
 		{
-            FlushAsync(default(CancellationToken)).Wait();
+            FlushAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
 		}
 
 		/// <summary>
@@ -170,7 +170,7 @@ namespace Ceen.Httpd
 				}
 
                 // If we get here, we dump what we have
-                await SetLengthAndFlushAsync(false);
+                await SetLengthAndFlushAsync(false, cancellationToken);
             }
 
 			await m_parent.WriteAsync(buffer, offset, count, cancellationToken);
@@ -185,56 +185,32 @@ namespace Ceen.Httpd
 		/// <param name="count">The number of bytes to write.</param>
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-			WriteAsync(buffer, offset, count).Wait();
+			WriteAsync(buffer, offset, count).ConfigureAwait(false).GetAwaiter().GetResult();
 		}
 
 		/// <summary>
 		/// Gets a value indicating whether this instance can be read.
 		/// </summary>
 		/// <value><c>true</c> if this instance can read; otherwise, <c>false</c>.</value>
-		public override bool CanRead
-		{
-			get
-			{
-				return false;
-			}
-		}
+		public override bool CanRead => false;
 
-		/// <summary>
+        /// <summary>
 		/// Gets a value indicating whether this instance can seek.
 		/// </summary>
 		/// <value><c>true</c> if this instance can seek; otherwise, <c>false</c>.</value>
-		public override bool CanSeek
-		{
-			get
-			{
-				return false;
-			}
-		}
+		public override bool CanSeek => false;
 
-		/// <summary>
+        /// <summary>
 		/// Gets a value indicating whether this instance can be written.
 		/// </summary>
 		/// <value><c>true</c> if this instance can write; otherwise, <c>false</c>.</value>
-		public override bool CanWrite
-		{
-			get
-			{
-				return m_parent.CanWrite;
-			}
-		}
+		public override bool CanWrite => m_parent.CanWrite;
 
-		/// <summary>
+        /// <summary>
 		/// Gets the length of the stream.
 		/// </summary>
 		/// <value>The length.</value>
-		public override long Length
-		{
-			get
-			{
-				return m_written;
-			}
-		}
+		public override long Length => m_written;
 
         /// <summary>
         /// Gets or sets the position.
@@ -252,7 +228,7 @@ namespace Ceen.Httpd
         /// <param name="disposing">If set to <c>true</c> disposing.</param>
         protected override void Dispose(bool disposing)
 		{
-            FlushAsync(default(CancellationToken)).Wait();
+            FlushAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
 		}
 
 		#endregion
