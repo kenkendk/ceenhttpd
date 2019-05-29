@@ -158,6 +158,12 @@ namespace Ceen
 		/// </summary>
 		string UserID { get; set; }
 		/// <summary>
+		/// Gets or sets a session tracking ID.
+		/// This value can be logged and used to group requests from a single session
+		/// better than simply grouping by IP address
+		/// </summary>
+		string SessionID { get; set; }
+		/// <summary>
 		/// Gets a value indicating what connection security is used.
 		/// </summary>
 		SslProtocols SslProtocol { get; }
@@ -170,9 +176,13 @@ namespace Ceen
 		/// </summary>
 		X509Certificate ClientCertificate { get; }
 		/// <summary>
-		/// The taskid used for logging and tracing the request
+		/// The taskid used for logging and tracing the connection
 		/// </summary>
-		string LogTaskID { get; }
+		string LogConnectionID { get; }
+        /// <summary>
+        /// The taskid used for logging and tracing the request
+        /// </summary>
+        string LogRequestID { get; }
 
         /// <summary>
         /// The stream representing the body of the request

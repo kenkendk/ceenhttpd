@@ -68,12 +68,19 @@ namespace Ceen.Httpd
         /// Gets the http version string.
         /// </summary>
         public string HttpVersion { get; private set; }
-        /// <summary>
-        /// Gets or sets a user identifier attached to the request.
-        /// This can be set by handlers processing the request to simplify dealing with logged in users.
-        /// Handlers should only set this is the user is authenticated.
-        /// </summary>
+		/// <summary>
+		/// Gets or sets a user identifier attached to the request.
+		/// This can be set by handlers processing the request to simplify dealing with logged in users.
+		/// Handlers should only set this is the user is authenticated.
+		/// This value can be logged.
+		/// </summary>
         public string UserID { get; set; }
+        /// <summary>
+        /// Gets or sets a session tracking ID.
+        /// This value can be logged and used to group requests from a single session
+        /// better than simply grouping by IP address
+        /// </summary>
+        public string SessionID { get; set; }
         /// <summary>
         /// Gets a value indicating what connection security is used.
         /// </summary>
@@ -89,7 +96,7 @@ namespace Ceen.Httpd
         /// <summary>
         /// The taskid used for logging and tracing the request
         /// </summary>
-        public string LogTaskID { get; private set; }
+        public string LogConnectionID { get; private set; }
         /// <summary>
         /// The taskid used for logging and tracing the request
         /// </summary>
@@ -187,19 +194,19 @@ namespace Ceen.Httpd
         /// Initializes a new instance of the <see cref="Ceen.Httpd.HttpRequest"/> class.
         /// </summary>
         /// <param name="remoteEndpoint">The remote endpoint.</param>
-        /// <param name="logtaskid">The logging ID for the task</param>
+        /// <param name="logconnectionid">The logging ID for the task</param>
         /// <param name="clientCert">The client SSL certificate.</param>
         /// <param name="sslProtocol">The SSL protocol used</param>
         /// <param name="logrequestid">The ID of the request for logging purposes</param>
         /// <param name="connected">The method providing the remote client connected state</param>
-        public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol, Func<bool> connected)
+        public HttpRequest(System.Net.EndPoint remoteEndpoint, string logconnectionid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol, Func<bool> connected)
         {
             m_cancelRequest = new CancellationTokenSource();
             m_connectedMethod = connected;
             RemoteEndPoint = remoteEndpoint;
             ClientCertificate = clientCert;
             SslProtocol = sslProtocol;
-            LogTaskID = logtaskid;
+            LogConnectionID = logconnectionid;
             LogRequestID = logrequestid;
             Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
             QueryString = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
