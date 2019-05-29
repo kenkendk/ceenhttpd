@@ -39,11 +39,21 @@ namespace Ceen.Security.Login
 				var session = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
 				if (session != null)
 				{
+					// Kill the existing record
 					await ShortTermStorage.DropSessionAsync(session);
 					droppedxsrf = true;
+
+					// Register a new one on the same XSRF token,
+					// but without any user attached
+					await ShortTermStorage.AddSessionAsync(new SessionRecord() {
+						UserID = null,
+						Cookie = null,
+						XSRFToken = session.XSRFToken,
+						Expires = DateTime.Now.AddSeconds(ShortTermExpirationSeconds)
+					});
 				}
 
-				context.Response.AddCookie(XSRFCookieName, "", path: CookiePath, expires: new DateTime(1970, 1, 1), maxage: 0);
+				//context.Response.AddCookie(XSRFCookieName, "", path: CookiePath, expires: new DateTime(1970, 1, 1), maxage: 0);
 			}
 
 			if (!string.IsNullOrWhiteSpace(cookie))
