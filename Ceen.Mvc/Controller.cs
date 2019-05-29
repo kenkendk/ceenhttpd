@@ -101,27 +101,27 @@ namespace Ceen.Mvc
 		}
 
 		/// <summary>
-		/// Sends a &quot;400 - Bad request&quot;
+		/// Sends a &quot;400 - Bad request&quot; response
 		/// </summary>
 		protected static readonly IStatusCodeResult BadRequest = new StatusCodeResult(HttpStatusCode.BadRequest);
 
 		/// <summary>
-		/// Sends a &quot;404 - Not found&quot; response with an optional specific message
+		/// Sends a &quot;404 - Not found&quot; response
 		/// </summary>
 		protected static readonly IStatusCodeResult NotFound = new StatusCodeResult(HttpStatusCode.NotFound);
 
 		/// <summary>
-		/// Sends a &quot;200 - OK&quot; response with an optional specific message
+		/// Sends a &quot;200 - OK&quot; response
 		/// </summary>
 		protected static readonly IStatusCodeResult OK = new StatusCodeResult(HttpStatusCode.OK);
 
 		/// <summary>
-		/// Sends a &quot;403 - Forbidden&quot; response with an optional specific message
+		/// Sends a &quot;403 - Forbidden&quot; response
 		/// </summary>
 		protected static readonly IStatusCodeResult Forbidden = new StatusCodeResult(HttpStatusCode.Forbidden);
 
 		/// <summary>
-		/// Sends a &quot;204 - No Content&quot; response with an optional specific message
+		/// Sends a &quot;204 - No Content&quot; response
 		/// </summary>
 		protected static readonly IStatusCodeResult NoContent = new StatusCodeResult(HttpStatusCode.NoContent);
 
