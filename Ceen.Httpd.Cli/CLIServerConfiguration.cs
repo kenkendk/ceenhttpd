@@ -41,7 +41,7 @@ namespace Ceen.Httpd.Cli
 	}
 
 	/// <summary>
-	/// A logger of a logger to attach
+	/// A definition of a logger to attach
 	/// </summary>
 	[Serializable]
 	public class LoggerDefinition : ModuleDefinition
