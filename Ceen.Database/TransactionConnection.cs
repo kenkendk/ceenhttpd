@@ -65,7 +65,7 @@ namespace Ceen.Database
         /// <inheritdoc />
         public ConnectionState State => m_connection.State;
         /// <inheritdoc />
-        public void Dispose() => m_connection.Dispose();
+        public void Dispose() => m_transaction.Dispose();
 
         /// <inheritdoc />
         public IsolationLevel IsolationLevel => m_transaction.IsolationLevel;
