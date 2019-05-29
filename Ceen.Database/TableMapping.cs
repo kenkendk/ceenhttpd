@@ -36,6 +36,10 @@ namespace Ceen.Database
         /// </summary>
         public readonly string Name;
         /// <summary>
+        /// The name of the table in quotes for SQL
+        /// </summary>
+        public readonly string QuotedTableName;
+        /// <summary>
         /// The type being mapped
         /// </summary>
         public readonly Type Type;
@@ -102,6 +106,7 @@ namespace Ceen.Database
             Dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
             Type = type;
             Name = nameoverride ?? dialect.GetName(type);
+            QuotedTableName = dialect.QuoteName(Name);
             AllColumns = type
                 .GetProperties()
                 .Where(x => !x.GetCustomAttributes<IgnoreAttribute>(true).Any())
@@ -155,7 +160,7 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="propertyname">The name of the property to get the column name for</param>
         /// <returns>The quoted column name</returns>
-        public string QuotedColumName(string propertyname)
+        public string QuotedColumnName(string propertyname)
         {
             return Dialect.QuoteName(AllColumnsByMemberName[propertyname].ColumnName);
         }
@@ -175,9 +180,13 @@ namespace Ceen.Database
         /// </summary>
         public readonly AutoGenerateAction AutoGenerateAction;
         /// <summary>
-        /// The name of the column
+        /// The name of the column in SQL format
         /// </summary>
         public readonly string ColumnName;
+        /// <summary>
+        /// The name of the column, quoted for SQL
+        /// </summary>
+        public readonly string QuotedColumnName;
         /// <summary>
         /// The name of the member item
         /// </summary>
@@ -227,6 +236,7 @@ namespace Ceen.Database
             Member = member ?? throw new ArgumentNullException(nameof(member));
             MemberType = memberType;
             ColumnName = dialect.GetName(member);
+            QuotedColumnName = dialect.QuoteName(ColumnName);
             IsPrimaryKey = member.GetCustomAttributes<PrimaryKeyAttribute>(true).Any();
             var sqlType = dialect.GetSqlColumnType(member);
             SqlType = sqlType.Item1;
@@ -316,7 +326,7 @@ namespace Ceen.Database
         {
             var v = GetValue(instance);
             if (MemberType.IsEnum)
-                return v = (v ?? string.Empty).ToString();
+                return (v ?? string.Empty).ToString();
             return v;
         }
     }
