@@ -16,12 +16,12 @@ namespace Ceen.Security.Login
 		/// </summary>
 		static LoginSettingsModule()
 		{
-			_basesettings[nameof(XSRFErrorStatusMessage)] = 403;
-			_basesettings[nameof(XSRFErrorStatusCode)] = "XSRF token invalid or missing";
+			_basesettings[nameof(XSRFErrorStatusCode)] = 403;
+			_basesettings[nameof(XSRFErrorStatusMessage)] = "XSRF token invalid or missing";
 			_basesettings[nameof(XSRFErrorRedirectUrl)] = null;
 
-			_basesettings[nameof(HijackErrorStatusMessage)] = 403;
-			_basesettings[nameof(HijackErrorStatusCode)] = "Login token hijacking detected, someone else has used your identity";
+			_basesettings[nameof(HijackErrorStatusCode)] = 403;
+			_basesettings[nameof(HijackErrorStatusMessage)] = "Login token hijacking detected, someone else has used your identity";
 			_basesettings[nameof(HijackErrorRedirectUrl)] = null;
 
 			_basesettings[nameof(LoginErrorStatusCode)] = 403;
@@ -314,8 +314,14 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(xsrf))
 				{
 					var prev = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-					if (!Utility.IsNullOrExpired(prev) && prev.UserID == userid && !string.IsNullOrWhiteSpace(userid))
-						session = prev;
+					if (prev != null)
+					{
+                        // Remove the previous entry to avoid conflicts
+                        await ShortTermStorage.DropSessionAsync(prev);
+						
+						// Re-use the XSRF token
+						session.XSRFToken = prev.XSRFToken;
+                    }
 				}
 			}
 
@@ -352,6 +358,8 @@ namespace Ceen.Security.Login
 			session.Cookie = PRNG.GetRandomString(32);
 			context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
 
+			if (ShortTermStorage == null)
+				Console.WriteLine("Missing short term storage module, make sure you load Ceen.Security.Login.DatabaseStorageModule or manually set a storage module");
 			await ShortTermStorage.AddSessionAsync(session);
 
 			SetLoginSuccess(context);
