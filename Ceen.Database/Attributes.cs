@@ -70,7 +70,7 @@ namespace Ceen.Database
     }
 
     /// <summary>
-    /// Marker class to make item primary key
+    /// Attribute to mark item as primary key
     /// </summary>
     public class PrimaryKeyAttribute : Attribute
     {
