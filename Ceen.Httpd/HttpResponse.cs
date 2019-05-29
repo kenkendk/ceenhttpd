@@ -186,6 +186,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		private ResponseOutputStream m_outstream;
 		/// <summary>
+		/// The wrapped output stream
+		/// </summary>
+		private Stream m_wrappedoutstream;
+		/// <summary>
 		/// The internal storage for the response headers
 		/// </summary>
 		private Dictionary<string, string> m_headers;
@@ -239,6 +243,7 @@ namespace Ceen.Httpd
 
 			m_headers = new Dictionary<string, string>();
 			m_outstream = new ResponseOutputStream(m_stream, this);
+			m_wrappedoutstream = m_outstream;
 			m_hasSentHeaders = false;
 
 			AddDefaultHeaders();
@@ -411,9 +416,13 @@ namespace Ceen.Httpd
 		/// Flushes all headers and sets the length to the amount of data currently buffered in the output
 		/// </summary>
 		/// <returns>The and set length async.</returns>
-		internal Task FlushAndSetLengthAsync()
+		internal async Task FlushAndSetLengthAsync()
 		{
-			return m_outstream.SetLengthAndFlushAsync(true);
+			// Make sure any 
+			if (m_wrappedoutstream != m_outstream)
+				await m_wrappedoutstream.FlushAsync();
+
+			await m_outstream.SetLengthAndFlushAsync(true);
 		}
 
 		/// <summary>
@@ -439,7 +448,7 @@ namespace Ceen.Httpd
 				ContentType = contenttype;
 			if (!HasSentHeaders)
 				ContentLength = data.Length - data.Position;
-			return data.CopyToAsync(m_outstream);
+			return data.CopyToAsync(m_wrappedoutstream);
 		}
 
 		/// <summary>
@@ -454,7 +463,7 @@ namespace Ceen.Httpd
 				ContentType = contenttype;
 			if (!HasSentHeaders)
 				ContentLength = data.Length;
-			return m_outstream.WriteAsync(data, 0, data.Length);
+			return m_wrappedoutstream.WriteAsync(data, 0, data.Length);
 		}
 
 		/// <summary>
@@ -542,7 +551,28 @@ namespace Ceen.Httpd
 		/// <returns>The response stream.</returns>
 		public Stream GetResponseStream()
 		{
-			return m_outstream;
+			return m_wrappedoutstream;
+		}
+
+		/// <summary>
+		/// Changes the output stream to a wrapped stream
+		/// </summary>
+		/// <param name="stream">The stream that wraps the current output</param>
+		public void SetOutputWrapperStream(Stream stream)
+		{
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
+            
+			if (m_hasSentHeaders)
+				throw new InvalidOperationException("Cannot wrap the output stream after the headers have been sent");
+			
+			if (m_wrappedoutstream != m_outstream)
+				throw new InvalidOperationException("Cannot re-wrap a wrapped output stream");
+
+			// Copy any currently buffered content into the new wrapper
+			m_outstream.Unbuffer(stream);
+			m_wrappedoutstream = stream;
+
 		}
 
 		/// <summary>

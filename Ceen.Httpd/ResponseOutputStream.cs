@@ -231,6 +231,29 @@ namespace Ceen.Httpd
             FlushAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
 		}
 
+		/// <summary>
+		/// Unbuffers the contents of this stream and puts it into the target stream
+		/// </summary>
+		/// <param name="target">The stream to unbuffer to</param>
+		public void Unbuffer(Stream target) 
+		{
+			if (target == null)
+				throw new ArgumentNullException(nameof(target));
+
+			if (m_passThrough)
+				throw new InvalidOperationException("Cannot unbuffer when the stream is no longer buffering");
+			
+			// Copy the current buffer reference
+			var buf = m_buffer;
+
+			// Mark this instance as not buffering
+			Clear();
+
+			// Copy to the target, which may start a new buffer on this instance
+			if (buf != null)
+				buf.CopyTo(target);
+		}
+
 		#endregion
 	}
 }
