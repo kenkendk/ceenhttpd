@@ -96,10 +96,14 @@ namespace Ceen.Httpd
 		/// The loaded module instance
 		/// </summary>
 		public IList<IModule> Modules { get; set; }
-		/// <summary>
-		/// A callback method for injecting headers into the responses
-		/// </summary>
-		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
+        /// <summary>
+        /// The loaded post-processor instances
+        /// </summary>
+        public IList<IPostProcessor> PostProcessors { get; set; }
+        /// <summary>
+        /// A callback method for injecting headers into the responses
+        /// </summary>
+        public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
 
 		/// <summary>
 		/// Gets or sets the default name of the server reported in response headers.
@@ -280,6 +284,22 @@ namespace Ceen.Httpd
 			Modules.Add(module);
 			return this;
 		}
+
+        /// <summary>
+        /// Adds a post-processor instance to the server
+        /// </summary>
+        /// <returns>The server configuration.</returns>
+        /// <param name="postprocessor">The post-processor to add.</param>
+        public ServerConfig AddPostProcessor(IPostProcessor postprocessor)
+        {
+            if (postprocessor == null)
+                throw new ArgumentNullException(nameof(postprocessor));
+            if (PostProcessors == null)
+                PostProcessors = new List<IPostProcessor>();
+
+            PostProcessors.Add(postprocessor);
+            return this;
+        }		
 	}
 }
 

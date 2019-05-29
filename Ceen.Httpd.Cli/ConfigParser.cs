@@ -419,7 +419,22 @@ namespace Ceen.Httpd.Cli
 						cfg.Modules.Add(module);
 						lastitemprops = module.Options;
 					}
-					else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
+                    else if (string.Equals(cmd, "postprocessor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (args.Length < 2)
+                            throw new Exception($"Too few arguments in line {lineindex}: {line}");
+
+                        var postprocessor = new PostProcessorDefinition()
+                        {
+                            Classname = args.Skip(1).First(),
+                            ConstructorArguments = args.Skip(2).ToList()
+                        };
+
+                        cfg.PostProcessors.Add(postprocessor);
+                        lastitemprops = postprocessor.Options;
+                    }
+
+                    else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
 					{
 						if (args.Length < 2)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
@@ -678,7 +693,23 @@ namespace Ceen.Httpd.Cli
 				}
 			}
 
-			if (config.Routes != null)
+            if (config.PostProcessors != null)
+            {
+                foreach (var postProcessor in config.PostProcessors)
+                {
+                    var inst = CreateInstance(postProcessor.Classname, postProcessor.ConstructorArguments, typeof(IPostProcessor));
+                    if (postProcessor.Options != null)
+                        SetProperties(inst, postProcessor.Options);
+
+                    if (inst is IPostProcessorWithSetup mse)
+                        mse.AfterConfigure();
+
+                    cfg.AddPostProcessor((IPostProcessor)inst);
+                }
+            }
+
+
+            if (config.Routes != null)
 			{
 				foreach (var route in config.Routes)
 				{

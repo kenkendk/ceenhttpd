@@ -630,12 +630,24 @@ namespace Ceen
     {
     }
 
+    /// <summary>
+    /// Basic interface for a post-processing handler
     /// </summary>
-    public interface IModuleWithSetup : IModule
+    public interface IPostProcessor
     {
         /// <summary>
-        /// Method called after module is configured
+        /// Process the request for the specified context.
         /// </summary>
-        void AfterConfigure();
+        /// <param name="context">The context to use.</param>
+        /// <returns>An awaitable task</returns>
+        Task HandleAsync(IHttpContext context);
     }
+
+    /// <summary>
+    /// Extension for a post-processing handler that requires configuration
+    /// </summary>
+    public interface IPostProcessorWithSetup : IPostProcessor, IWithSetup
+	{
+	}
+
 }

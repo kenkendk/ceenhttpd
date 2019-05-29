@@ -350,6 +350,11 @@ namespace Ceen.Httpd
 		{
 			if (!m_hasSentHeaders)
 			{
+				// Allow post-processor hook-ins
+				if (m_serverconfig.PostProcessors != null)
+					foreach(var p in m_serverconfig.PostProcessors)
+						await p.HandleAsync(this.Context);
+
 				if (string.IsNullOrWhiteSpace(this.StatusMessage))
 					this.StatusMessage = HttpStatusMessages.DefaultMessage(this.StatusCode);
 
