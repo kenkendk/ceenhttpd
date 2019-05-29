@@ -146,7 +146,7 @@ namespace Ceen.Httpd
 
 							// If we have more data, "unread it"
 							if (bufsize - bufoffset != 0)
-								AddToBuffer(buf, bufoffset, bufsize - bufoffset);
+								UnreadBytesIntoBuffer(buf, bufoffset, bufsize - bufoffset);
 
 							return;
 						}
@@ -320,18 +320,52 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Adds bytes to the internal buffer.
+		/// Appends bytes to the internal buffer.
 		/// </summary>
 		/// <param name="data">The data to add.</param>
 		/// <param name="offset">The data offset.</param>
 		/// <param name="count">The number of bytes.</param>
-		internal void AddToBuffer(byte[] data, int offset, int count)
+		internal void UnreadBytesIntoBuffer(byte[] data, int offset, int count)
 		{
-			if (m_buffer.Length - m_buffercount < count)
-				Array.Resize(ref m_buffer, m_buffer.Length + count);
-			Array.Copy(data, offset, m_buffer, m_bufferoffset, count);
-			m_buffercount += count;
-            m_remainingbytes += count;
+			// If we have no buffered data, just add the new data to the buffer
+			if (m_buffercount == 0)
+			{
+				// Make sure there is space
+                if (m_buffer.Length < count)
+                    Array.Resize(ref m_buffer, count);
+				// Copy in the data
+                Array.Copy(data, offset, m_buffer, 0, count);
+				// Adjust the counters
+				m_buffercount = count;
+				m_bufferoffset = 0;
+				m_remainingbytes += count;
+            }
+            // We need to pre-pend the data
+            else
+			{
+				// If we can add the data before the current cursor, we do it
+				if (m_bufferoffset < count)
+				{
+					Array.Copy(data, offset, m_buffer, m_bufferoffset - count, count);
+					m_bufferoffset -= count;
+					m_buffercount += count;
+					m_remainingbytes += count;
+				}
+				else
+				{
+					// Make sure we have space for it
+					if (m_buffer.Length < count + m_buffercount)
+                        Array.Resize(ref m_buffer, m_buffer.Length + count);
+
+					// Move the current data so the new data fits before it
+					Array.Copy(m_buffer, m_bufferoffset, m_buffer, count, count);
+					// Then copy the new data behind it
+					Array.Copy(data, offset, m_buffer, 0, count);
+					m_bufferoffset = 0;
+					m_buffercount += count;
+                    m_remainingbytes += count;
+                }				
+			}
 		}
 
 		/// <summary>

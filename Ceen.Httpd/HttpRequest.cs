@@ -307,9 +307,11 @@ namespace Ceen.Httpd
                 if (string.IsNullOrWhiteSpace(boundary))
                     throw new HttpException(HttpStatusCode.BadRequest);
 
-                var itemboundary = System.Text.Encoding.ASCII.GetBytes("--" + boundary);
-                var tmp = await reader.RepeatReadAsync(itemboundary.Length, idletime, timeouttask, stoptask);
-                if (!Enumerable.SequenceEqual(itemboundary, tmp))
+                // Since we have read the headers, we have consumed the initial CRLF
+                // so we adjust the initial boundary reading to skip the CRLF
+                var itemboundary = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary);
+                var tmp = await reader.RepeatReadAsync(itemboundary.Length - 2, idletime, timeouttask, stoptask);
+                if (!Enumerable.SequenceEqual(itemboundary.Skip(2), tmp))
                     throw new HttpException(HttpStatusCode.BadRequest);
 
                 await reader.RepeatReadAsync(trail, 0, 2, idletime, timeouttask, stoptask);
