@@ -367,10 +367,10 @@ namespace Ceen.Httpd
 					var sb = new StringBuilder();
 					sb.Append("Set-Cookie: ");
 					sb.Append(cookie.Name);
-					if (!string.IsNullOrWhiteSpace(cookie.Value))
+                    sb.Append("=");
+					
+                    if (!string.IsNullOrWhiteSpace(cookie.Value))
 					{
-						sb.Append("=");
-
 						// URL encoding not required, but common practice
 						sb.Append(Uri.EscapeDataString(cookie.Value));
 					}
