@@ -651,7 +651,11 @@ namespace Ceen.Httpd.Cli
 					var inst = CreateInstance(logger.Classname, logger.ConstructorArguments, typeof(ILogger));
 					if (logger.Options != null)
 						SetProperties(inst, logger.Options);
-					cfg.AddLogger((ILogger)inst);
+
+                    if (inst is ILoggerWithSetup mse)
+                        mse.AfterConfigure();
+
+                    cfg.AddLogger((ILogger)inst);
 				}
 			}
 
