@@ -108,62 +108,53 @@ namespace Ceen
 		/// <summary>
 		/// The HTTP method or Verb
 		/// </summary>
-		/// <value>The method.</value>
 		string Method { get; }
 		/// <summary>
 		/// The path of the query, not including the query string
 		/// </summary>
-		/// <value>The path.</value>
 		string Path { get; }
 		/// <summary>
 		/// Gets the original path before internal rewrite.
 		/// </summary>
-		/// <value>The original path.</value>
 		string OriginalPath { get; }
 		/// <summary>
 		/// The query string
 		/// </summary>
-		/// <value>The query string, including the leading question mark.</value>
 		string RawQueryString { get; }
 		/// <summary>
 		/// Gets a parsed representation of the query string.
 		/// Duplicate values are not represented, instead only the latest is stored
 		/// </summary>
-		/// <value>The parsed query string.</value>
 		IDictionary<string, string> QueryString { get; }
 		/// <summary>
 		/// Gets the headers found in the request.
 		/// Duplicate values are not represented, instead only the latest is stored
 		/// </summary>
-		/// <value>The headers.</value>
 		IDictionary<string, string> Headers { get; }
 		/// <summary>
 		/// Gets the form data, if any.
 		/// Duplicate values are not represented, instead only the latest is stored
 		/// </summary>
-		/// <value>The form values.</value>
 		IDictionary<string, string> Form { get; }
 		/// <summary>
 		/// Gets the cookies supplied, if any.
 		/// Duplicate values are not represented, instead only the latest is stored
 		/// </summary>
-		/// <value>The cookie values.</value>
 		IDictionary<string, string> Cookies { get; }
 		/// <summary>
 		/// Gets the posted files, if any.
 		/// Duplicate values are not represented, instead only the latest is stored
 		/// </summary>
-		/// <value>The files.</value>
 		IList<IMultipartItem> Files { get; }
 		/// <summary>
 		/// Gets the http version string.
 		/// </summary>
-		/// <value>The http version.</value>
 		string HttpVersion { get; }
 		/// <summary>
 		/// Gets or sets a user identifier attached to the request.
 		/// This can be set by handlers processing the request to simplify dealing with logged in users.
 		/// Handlers should only set this is the user is authenticated.
+		/// This value can be logged.
 		/// </summary>
 		string UserID { get; set; }
 		/// <summary>
@@ -183,10 +174,10 @@ namespace Ceen
 		/// </summary>
 		string LogTaskID { get; }
 
-		/// <summary>
-		/// The stream representing the body of the request
-		/// </summary>
-		Stream Body { get; }
+        /// <summary>
+        /// The stream representing the body of the request
+        /// </summary>
+        Stream Body { get; }
 
 		/// <summary>
 		/// Gets the HTTP Content-Type header value
@@ -342,11 +333,11 @@ namespace Ceen
 		/// <value>The length of the content.</value>
 		long ContentLength { get; set; }
 
-		/// <summary>
-		/// Gets or sets the Keep-Alive header
-		/// </summary>
-		/// <value><c>true</c> if keep alive; otherwise, <c>false</c>.</value>
-		bool KeepAlive { get; set; }
+        /// <summary>
+        /// Gets or sets the Keep-Alive header
+        /// </summary>
+        /// <value><c>true</c> if keep alive; otherwise, <c>false</c>.</value>
+        bool KeepAlive { get; set; }
 
 		/// <summary>
 		/// Flush all headers async.
