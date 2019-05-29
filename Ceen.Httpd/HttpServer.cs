@@ -846,7 +846,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		/// <param name="stream">The underlying stream.</param>
 		/// <param name="endpoint">The remote endpoint.</param>
-		/// <param name="logtaskid">The task id for logging and tracing</param>
+		/// <param name="logtaskid">The task id for logging and tracing the connection</param>
 		/// <param name="clientcert">The client certificate if any.</param>
 		/// <param name="controller">The runner controller.</param>
         /// <param name="sslProtocol">The SSL protocol being used</param>
@@ -884,6 +884,9 @@ namespace Ceen.Httpd
 							resp = new HttpResponse(stream, config),
 							storage
 						);
+
+						// Make sure the response knows the context
+						resp.Context = context;
 
 						// Setup up the callback for allowing handlers to report errors
 						context.LogHandlerDelegate = (level, message, ex) => LogProcessingMessage(controller, context, ex, level, message, DateTime.Now);

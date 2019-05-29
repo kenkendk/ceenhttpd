@@ -574,10 +574,15 @@ namespace Ceen.Httpd
 		public bool IsRedirectingInternally { get { return !string.IsNullOrWhiteSpace(m_internalredirectpath); } }
 
 		/// <summary>
-		/// Performs an internal redirect
+		/// The context this response belongs to
 		/// </summary>
-		/// <param name="path">The new path to use.</param>
-		public void InternalRedirect(string path)
+        internal HttpContext Context { get; set; }
+
+        /// <summary>
+        /// Performs an internal redirect
+        /// </summary>
+        /// <param name="path">The new path to use.</param>
+        public void InternalRedirect(string path)
 		{
 			if (HasSentHeaders)
 				throw new Exception("Cannot redirect after headers have been sent");
