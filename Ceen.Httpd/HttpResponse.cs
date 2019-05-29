@@ -278,9 +278,7 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Content-Type", out v);
-
+				m_headers.TryGetValue("Content-Type", out var v);
 				return v;
 			}
 			set
@@ -297,11 +295,9 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Content-Length", out v);
+				m_headers.TryGetValue("Content-Length", out var v);
 
-				long vv;
-				if (!long.TryParse(v, out vv))
+				if (!long.TryParse(v, out var vv))
 					return -1;
 				
 				return vv;
@@ -320,9 +316,7 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Connection", out v);
-
+				m_headers.TryGetValue("Connection", out var v);
 				return string.Equals("keep-alive", v, StringComparison.OrdinalIgnoreCase);
 			}
 			set
