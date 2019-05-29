@@ -351,7 +351,7 @@ namespace Ceen.Mvc
 					
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
-					routes = new[] { string.Empty };
+						routes = new[] { string.Empty };
 
 					return routes.Distinct().Select(y => new
 					{
@@ -388,7 +388,14 @@ namespace Ceen.Mvc
 					return
 						x.Controller.GetType()
 							.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-							.Where(y => y.ReturnType == typeof(void) || typeof(IResult).IsAssignableFrom(y.ReturnType) || typeof(Task).IsAssignableFrom(y.ReturnType))
+							// Only target the methods that return something useful
+							.Where(y => 
+								y.ReturnType == typeof(void) 
+								|| typeof(IResult).IsAssignableFrom(y.ReturnType) 
+								|| typeof(Task).IsAssignableFrom(y.ReturnType)
+							)
+							// Remove properties and others
+							.Where(y => !y.IsSpecialName)
 							.Select(y => new
 							{
 								Controller = x.Controller,
