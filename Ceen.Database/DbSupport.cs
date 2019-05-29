@@ -80,12 +80,7 @@ namespace Ceen.Database
         /// <param name="index">The index to read the string from.</param>
         public static string GetAsString(this IDataReader rd, int index)
         {
-            var val = rd.GetValue(index);
-
-            if (val == null || val == DBNull.Value)
-                return null;
-            else
-                return (string)val;
+            return (string)rd.GetNormalizedValue(index);
         }
 
         /// <summary>

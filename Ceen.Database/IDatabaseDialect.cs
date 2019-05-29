@@ -74,7 +74,8 @@ namespace Ceen.Database
         /// </summary>
         /// <returns>The insert command.</returns>
         /// <param name="type">The type to generate the command for.</param>
-        string CreateInsertCommand(Type type);
+        /// <param name="useInsertOrIgnore">Use &quote;INSERT OR IGNORE&quote; instead of the usual &quote;INSERT&quote; command </param>
+        string CreateInsertCommand(Type type, bool useInsertOrIgnore);
 
         /// <summary>
         /// Creates a command for deleting one or more items
@@ -119,5 +120,13 @@ namespace Ceen.Database
         /// <param name="limit">The maximum number of items to use</param>
         /// <returns>The limit fragment</returns>
         string Limit(int limit, int? offset = null);
+
+        /// <summary>
+        /// Renders an SQL where clause from a query element
+        /// </summary>
+        /// <param name="type">The type to generate the clause for.</param>
+        /// <param name="element">The element to use</param>
+        /// <returns>The SQL where clause</returns>
+        KeyValuePair<string, object[]> RenderClause(Type type, QueryElement element);
     }
 }

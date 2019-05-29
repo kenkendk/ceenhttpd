@@ -49,7 +49,14 @@ namespace Ceen.Database
         /// </summary>
         /// <returns>The insert command.</returns>
         /// <typeparam name="T">The type to generate the command for.</typeparam>
-        public static string CreateInsertCommand<T>(this IDatabaseDialect self) => self.CreateInsertCommand(typeof(T));
+        public static string CreateInsertCommand<T>(this IDatabaseDialect self) => self.CreateInsertCommand(typeof(T), false);
+
+        /// <summary>
+        /// Creates a command for inserting a record
+        /// </summary>
+        /// <returns>The insert command.</returns>
+        /// <typeparam name="T">The type to generate the command for.</typeparam>
+        public static string CreateInsertOrIgnoreCommand<T>(this IDatabaseDialect self) => self.CreateInsertCommand(typeof(T), true);
 
         /// <summary>
         /// Creates a command that checks if a table exists
