@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Ceen
 {
@@ -30,21 +31,26 @@ namespace Ceen
         /// <summary>
         /// Gets the current active request
         /// </summary>
-        public static IHttpRequest CurrentRequest => m_activeContext.Value?.Request;
+        public static IHttpRequest Request => m_activeContext.Value?.Request;
         /// <summary>
         /// Gets the current active response
         /// </summary>
-        public static IHttpResponse CurrentResponse => m_activeContext.Value?.Response;
+        public static IHttpResponse Response => m_activeContext.Value?.Response;
+
+        /// <summary>
+        /// Gets the current user ID
+        /// </summary>
+        public static string UserID => m_activeContext.Value?.Request.UserID;
 
         /// <summary>
         /// Gets the current active session, can be null if no session module is loaded
         /// </summary>
-        public static IDictionary<string, string> CurrentSession => m_activeContext.Value?.Session;
+        public static IDictionary<string, string> Session => m_activeContext.Value?.Session;
 
         /// <summary>
         /// Gets the current request's log data
         /// </summary>
-        public static IDictionary<string, string> CurrentLogData => m_activeContext.Value?.LogData;
+        public static IDictionary<string, string> LogData => m_activeContext.Value?.LogData;
 
     }
 }
