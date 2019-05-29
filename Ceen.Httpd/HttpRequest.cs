@@ -21,63 +21,52 @@ namespace Ceen.Httpd
         /// <summary>
         /// The HTTP method or Verb
         /// </summary>
-        /// <value>The method.</value>
         public string Method { get; private set; }
         /// <summary>
         /// The path of the query, not including the query string
         /// </summary>
-        /// <value>The path.</value>
         public string Path { get; internal set; }
         /// <summary>
         /// The original path of the request, before internal path rewriting
         /// </summary>
-        /// <value>The path.</value>
         public string OriginalPath { get; internal set; }
         /// <summary>
         /// The query string
         /// </summary>
-        /// <value>The query string, including the leading question mark.</value>
         public string RawQueryString { get; private set; }
         /// <summary>
         /// Gets a parsed representation of the query string.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The parsed query string.</value>
         public IDictionary<string, string> QueryString { get; private set; }
         /// <summary>
         /// Gets the headers found in the request.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The headers.</value>
         public IDictionary<string, string> Headers { get; private set; }
         /// <summary>
         /// Gets the form data, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The form values.</value>
         public IDictionary<string, string> Form { get; private set; }
         /// <summary>
         /// Gets the cookies supplied, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The cookie values.</value>
         public IDictionary<string, string> Cookies { get; private set; }
         /// <summary>
         /// Gets the posted files, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The files.</value>
         public IList<IMultipartItem> Files { get; private set; }
         /// <summary>
         /// Gets the headers found in the request.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The headers.</value>
         public IDictionary<string, object> RequestState { get; private set; }
         /// <summary>
         /// Gets the http version string.
         /// </summary>
-        /// <value>The http version.</value>
         public string HttpVersion { get; private set; }
         /// <summary>
         /// Gets or sets a user identifier attached to the request.
