@@ -10,7 +10,7 @@ namespace Ceen.Security.Login
 	/// <summary>
 	/// Implementation of a database-based storage module
 	/// </summary>
-	public class DatabaseStorageModule : IModule, IShortTermStorageModule, ILongTermStorageModule, ILoginEntryModule, IDisposable
+	public class DatabaseStorageModule : IModuleWithSetup, IShortTermStorageModule, ILongTermStorageModule, ILoginEntryModule, IDisposable
 	{
 		/// <summary>
 		/// Gets or sets the connection string use to connect to the database.
@@ -75,74 +75,6 @@ namespace Ceen.Security.Login
 		/// </summary>
 		protected System.Data.IDbConnection m_connection;
 
-		/// <summary>
-		/// The command used to add a session record
-		/// </summary>
-		protected System.Data.IDbCommand m_addSessionCommand;
-		/// <summary>
-		/// The command used to drop a session record
-		/// </summary>
-		protected System.Data.IDbCommand m_dropSessionCommand;
-		/// <summary>
-		/// The command used to update the session records expiration valued
-		/// </summary>
-		protected System.Data.IDbCommand m_updateSessionCommand;
-		/// <summary>
-		/// The command used to get a session record from a cookie identifier
-		/// </summary>
-		protected System.Data.IDbCommand m_getSessionFromCookieCommand;
-		/// <summary>
-		/// The command used to get a session record from an XSRF token
-		/// </summary>
-		protected System.Data.IDbCommand m_getSessionFromXSRFCommand;
-
-		/// <summary>
-		/// The command used to get the long term login record
-		/// </summary>
-		protected System.Data.IDbCommand m_getLongTermLoginCommand;
-		/// <summary>
-		/// The comand used to drop a long term login record
-		/// </summary>
-		protected System.Data.IDbCommand m_dropLongTermLoginCommand;
-		/// <summary>
-		/// The command used to drop all long term login records
-		/// </summary>
-		protected System.Data.IDbCommand m_dropAllLongTermLoginCommand;
-		/// <summary>
-		/// The command used to add a long term login record
-		/// </summary>
-		protected System.Data.IDbCommand m_addLongTermLoginCommand;
-
-		/// <summary>
-		/// The command used to drop expired sessions
-		/// </summary>
-		protected System.Data.IDbCommand m_dropExpiredSessionsCommand;
-		/// <summary>
-		/// The command used to drop expired long term logins
-		/// </summary>
-		protected System.Data.IDbCommand m_dropExpiredLongTermCommand;
-
-		/// <summary>
-		/// The command used to add a user login entry
-		/// </summary>
-		protected System.Data.IDbCommand m_addLoginEntryCommand;
-		/// <summary>
-		/// The command used to get the user login entries
-		/// </summary>
-		protected System.Data.IDbCommand m_getLoginEntriesCommand;
-		/// <summary>
-		/// The command used to drop a login entry
-		/// </summary>
-		protected System.Data.IDbCommand m_dropLoginEntryCommand;
-		/// <summary>
-		/// The command used to drop all login entries
-		/// </summary>
-		protected System.Data.IDbCommand m_dropAllLoginEntryCommand;
-		/// <summary>
-		/// The command used to update login entries
-		/// </summary>
-		protected System.Data.IDbCommand m_updateLoginEntryCommand;
-
         /// <summary>
         /// Establishes a connection to the database, must hold the lock before this method is called.
         /// </summary>
@@ -167,53 +99,20 @@ namespace Ceen.Security.Login
             m_connection = DatabaseHelper.CreateConnection(ConnectionString, ConnectionClass);
         }
 
-
-        /// <summary>
-        /// Sets up all the required commands, must hold the lock before this method is called.
-        /// </summary>
-        protected virtual void SetupCommands()
+		/// <summary>
+		/// Creates the required tables
+		/// </summary>
+		protected virtual void CreateTables()
 		{
             var dialect = m_connection.GetDialect();
             dialect.CreateTypeMap<SessionRecord>(SessionRecordTablename);
             dialect.CreateTypeMap<LongTermToken>(LongTermLoginTablename);
             dialect.CreateTypeMap<LoginEntry>(LoginEntryTablename);
 
-			m_addSessionCommand = m_connection.SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"") VALUES (?, ?, ?, ?)", SessionRecordTablename));
-			m_dropSessionCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Cookie"" = ? AND ""XSRFToken"" = ?", SessionRecordTablename));
-			m_updateSessionCommand = m_connection.SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Expires"" = ? WHERE ""UserID"" = ? AND ""Cookie"" = ?  AND ""XSRFToken"" = ?", SessionRecordTablename));
-			m_getSessionFromCookieCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""Cookie"" = ?", SessionRecordTablename));
-			m_getSessionFromXSRFCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Cookie"", ""XSRFToken"", ""Expires"" FROM ""{0}"" WHERE ""XSRFToken"" = ?", SessionRecordTablename));
-
-			m_addLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Series"" = ?; INSERT INTO ""{0}"" (""UserID"", ""Series"", ""Token"", ""Expires"") VALUES (?, ?, ?, ?)", LongTermLoginTablename));
-			m_dropLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Series"" = ? AND ""Token"" = ?", LongTermLoginTablename));
-			m_dropAllLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? OR ""Series"" = ?", LongTermLoginTablename));
-			m_getLongTermLoginCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Series"", ""Token"", ""Expires"" FROM ""{0}"" WHERE ""Series"" = ?", LongTermLoginTablename));
-
-			m_dropExpiredSessionsCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", SessionRecordTablename));
-			m_dropExpiredLongTermCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""Expires"" <= ?", LongTermLoginTablename));
-
-			m_addLoginEntryCommand = m_connection.SetupCommand(string.Format(@"INSERT INTO ""{0}"" (""UserID"", ""Username"", ""Token"") VALUES (?, ?, ?)", LoginEntryTablename));
-			m_getLoginEntriesCommand = m_connection.SetupCommand(string.Format(@"SELECT ""UserID"", ""Username"", ""Token"" FROM ""{0}"" WHERE ""Username"" = ?", LoginEntryTablename));
-			m_dropLoginEntryCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ? AND ""Token"" = ?", LoginEntryTablename));
-			m_dropAllLoginEntryCommand = m_connection.SetupCommand(string.Format(@"DELETE FROM ""{0}"" WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
-			m_updateLoginEntryCommand = m_connection.SetupCommand(string.Format(@"UPDATE ""{0}"" SET ""Token"" = ? WHERE ""UserID"" = ? AND ""Username"" = ?", LoginEntryTablename));
-		}
-
-        /// <summary>
-        /// Executes a command while being locked
-        /// </summary>
-        /// <returns>The command async.</returns>
-        /// <param name="command">Command.</param>
-        /// <param name="values">Values.</param>
-        public virtual Task ExecuteCommandAsync(IDbCommand command, params object[] values)
-        {
-            return m_lock.LockedAsync(() => {
-
-                EnsureConnected();
-                command.ExecuteNonQuery(values);
-            });
+            m_connection.CreateTable(typeof(SessionRecord));
+            m_connection.CreateTable(typeof(LongTermToken));
+            m_connection.CreateTable(typeof(LoginEntry));
         }
-
 
 		/// <summary>
 		/// Adds a new session record
@@ -222,13 +121,7 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to add.</param>
 		public virtual Task AddSessionAsync(SessionRecord record)
 		{
-            return ExecuteCommandAsync(
-                m_addSessionCommand,
-				record.UserID,
-				record.Cookie,
-				record.XSRFToken,
-				record.Expires
-			);
+			return m_lock.LockedAsync(() => m_connection.InsertItem(record));
 		}
 
 		/// <summary>
@@ -238,11 +131,12 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to drop.</param>
 		public virtual Task DropSessionAsync(SessionRecord record)
 		{
-            return ExecuteCommandAsync(
-				m_dropSessionCommand,
-				record.UserID,
-				record.Cookie,
-				record.XSRFToken
+			return m_lock.LockedAsync(() => 
+				m_connection.Delete<SessionRecord>(x => 
+					x.UserID == record.UserID
+					&& x.Cookie == record.Cookie
+					&& x.XSRFToken == record.XSRFToken
+				)
 			);
 		}
 
@@ -251,26 +145,14 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>The session record.</returns>
 		/// <param name="cookie">The cookie identifier.</param>
-		public virtual async Task<SessionRecord> GetSessionFromCookieAsync(string cookie)
+		public virtual Task<SessionRecord> GetSessionFromCookieAsync(string cookie)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-                m_getSessionFromCookieCommand.SetParameterValues(cookie);
-				using (var rd = m_getSessionFromCookieCommand.ExecuteReader())
-				{
-					if (!rd.Read())
-						return null;
-					else
-						return new SessionRecord()
-						{
-							UserID = rd.GetAsString(0),
-							Cookie = rd.GetAsString(1),
-							XSRFToken = rd.GetAsString(2),
-							Expires = rd.GetDateTime(3)
-						};
-				}
-			}
+            return m_lock.LockedAsync(() =>
+				m_connection.SelectSingle<SessionRecord>(
+					x => x.Cookie == cookie
+				)
+			);
+
 		}
 
 		/// <summary>
@@ -278,26 +160,13 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>The session record.</returns>
 		/// <param name="xsrf">The XSRF token.</param>
-		public virtual async Task<SessionRecord> GetSessionFromXSRFAsync(string xsrf)
+		public virtual Task<SessionRecord> GetSessionFromXSRFAsync(string xsrf)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-                m_getSessionFromXSRFCommand.SetParameterValues(xsrf);
-				using (var rd = m_getSessionFromXSRFCommand.ExecuteReader())
-				{
-					if (!rd.Read())
-						return null;
-					else
-						return new SessionRecord()
-						{
-							UserID = rd.GetAsString(0),
-							Cookie = rd.GetAsString(1),
-							XSRFToken = rd.GetAsString(2),
-							Expires = rd.GetDateTime(3)
-						};
-				}
-			}
+			return m_lock.LockedAsync(() =>
+				m_connection.SelectSingle<SessionRecord>(
+					x => x.XSRFToken == xsrf
+				)
+			);
 		}
 
 		/// <summary>
@@ -307,12 +176,13 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to update.</param>
 		public virtual Task UpdateSessionExpirationAsync(SessionRecord record)
 		{
-            return ExecuteCommandAsync(
-				m_updateSessionCommand,
-				record.Expires,
-				record.UserID,
-				record.Cookie,
-				record.XSRFToken
+			return m_lock.LockedAsync(() =>
+				m_connection.Update<SessionRecord>(
+					new { record.Expires },
+					x => x.UserID == record.UserID
+						&& x.Cookie == record.Cookie
+						&& x.XSRFToken == record.XSRFToken
+                )
 			);
 		}
 
@@ -323,14 +193,14 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to add.</param>
 		public virtual Task AddOrUpdateLongTermLoginAsync(LongTermToken record)
 		{
-            return ExecuteCommandAsync(
-				m_addLongTermLoginCommand,
-				record.Series,
-				record.UserID,
-				record.Series,
-				record.Token,
-				record.Expires
-			);
+			return m_lock.LockedAsync(() => {
+				using(var con = new TransactionConnection(m_connection, m_connection.BeginTransaction()))
+				{
+					con.Delete<LongTermToken>(x => x.Series == record.Series);
+					con.InsertItem(record);
+					con.Commit();
+				}
+			});
 		}
 
 		/// <summary>
@@ -341,26 +211,25 @@ namespace Ceen.Security.Login
 		/// <param name="series">The series identifier for the login token that caused the issuance.</param>
 		public virtual Task DropAllLongTermLoginsAsync(string userid, string series)
 		{
-            return ExecuteCommandAsync(
-				m_dropAllLongTermLoginCommand,
-				userid,
-				series
-			);
+			return m_lock.LockedAsync(() =>
+				m_connection.Delete<LongTermToken>(x => 
+					x.UserID == userid || x.Series == series
+			));
 		}
 
 		/// <summary>
 		/// Drops the given long term login entry.
 		/// </summary>
 		/// <returns>An awaitable task.</returns>
-		/// <param name="record">Record.</param>
-		public virtual  Task DropLongTermLoginAsync(LongTermToken record)
+		/// <param name="record">The record indentifying the login to drop.</param>
+		public virtual Task DropLongTermLoginAsync(LongTermToken record)
 		{
-            return ExecuteCommandAsync(
-				m_dropLongTermLoginCommand,
-				record.UserID,
-				record.Series,
-				record.Token
-			);
+			return m_lock.LockedAsync(() =>
+				m_connection.Delete<LongTermToken>(x => 
+					x.UserID == record.UserID
+					&& x.Series == record.Series
+					&& x.Token == record.Token
+			));
 		}
 
 		/// <summary>
@@ -368,26 +237,11 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>The long term login entry.</returns>
 		/// <param name="series">The series identifier to use for lookup.</param>
-		public virtual async Task<LongTermToken> GetLongTermLoginAsync(string series)
+		public virtual Task<LongTermToken> GetLongTermLoginAsync(string series)
 		{
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-                m_getLongTermLoginCommand.SetParameterValues(series);
-				using (var rd = m_getLongTermLoginCommand.ExecuteReader())
-				{
-					if (!rd.Read())
-						return null;
-					else
-						return new LongTermToken()
-						{
-							UserID = rd.GetAsString(0),
-							Series = rd.GetAsString(1),
-							Token = rd.GetAsString(2),
-							Expires = rd.GetDateTime(3)
-						};
-				}
-			}
+			return m_lock.LockedAsync(() =>
+				m_connection.SelectSingle<LongTermToken>(x => x.Series == series)
+			);
 		}
 
 		/// <summary>
@@ -398,10 +252,9 @@ namespace Ceen.Security.Login
 		{
             return m_lock.LockedAsync(() =>
             {
-                m_dropExpiredSessionsCommand.SetParameterValues(DateTime.Now);
-                m_dropExpiredSessionsCommand.ExecuteNonQuery();
-                m_dropExpiredLongTermCommand.SetParameterValues(DateTime.Now);
-                m_dropExpiredLongTermCommand.ExecuteNonQuery();
+				var time = DateTime.Now;
+				m_connection.Delete<SessionRecord>(x => x.Expires <= time);
+                m_connection.Delete<LongTermToken>(x => x.Expires <= time);
             });
 		}
 
@@ -433,27 +286,18 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>The login entries.</returns>
 		/// <param name="username">The username to get the login tokens for.</param>
-		public virtual async Task<IEnumerable<LoginEntry>> GetLoginEntriesAsync(string username)
+		public virtual Task<IEnumerable<LoginEntry>> GetLoginEntriesAsync(string username)
 		{
-			var lst = new List<LoginEntry>();
-			using (await m_lock.LockAsync())
-			{
-				EnsureConnected();
-                m_getLoginEntriesCommand.SetParameterValues(username);
-				using (var rd = m_getLoginEntriesCommand.ExecuteReader())
-				{
-					while (rd.Read())
-						lst.Add(new LoginEntry()
-						{
-							UserID = rd.GetAsString(0),
-							Username = rd.GetAsString(1),
-							Token = rd.GetAsString(2)
-						});
-				}
-			}
-
-			// Not using enumerable, because it messes with the lock if the caller does not exhaust the enumerable
-			return lst;
+			return m_lock.LockedAsync(() =>
+				m_connection
+				.Select<LoginEntry>(x => x.Username == username)
+				
+				// Force allocation while having the lock
+				.ToList()
+				
+				// And return as enumerable
+				.AsEnumerable()
+			);
 		}
 
 		/// <summary>
@@ -463,11 +307,8 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to add.</param>
 		public virtual Task AddLoginEntryAsync(LoginEntry record)
 		{
-            return ExecuteCommandAsync(
-				m_addLoginEntryCommand,
-				record.UserID,
-				record.Username,
-				record.Token
+			return m_lock.LockedAsync(() =>
+				m_connection.InsertItem(record)
 			);
 		}
 
@@ -478,11 +319,12 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to drop.</param>
 		public virtual Task DropLoginEntryAsync(LoginEntry record)
 		{
-            return ExecuteCommandAsync(
-				m_dropLoginEntryCommand,
-				record.UserID,
-				record.Username,
-				record.Token
+			return m_lock.LockedAsync(() =>
+				m_connection.Delete<LoginEntry>(x =>
+					x.UserID == record.UserID
+					&& x.Username == record.Username
+					&& x.Token == record.Token
+				)
 			);
 		}
 
@@ -494,10 +336,11 @@ namespace Ceen.Security.Login
 		/// <param name="username">The user name.</param>
 		public virtual Task DropAllLoginEntriesAsync(string userid, string username)
 		{
-            return ExecuteCommandAsync(
-				m_dropAllLoginEntryCommand,
-				userid,
-				username
+			return m_lock.LockedAsync(() =>
+				m_connection.Delete<LoginEntry>(x =>
+					x.UserID == userid
+					&& x.Username == username
+                )
 			);
 		}
 
@@ -508,12 +351,22 @@ namespace Ceen.Security.Login
 		/// <param name="record">The record to update.</param>
 		public virtual Task UpdateLoginTokenAsync(LoginEntry record)
 		{
-            return ExecuteCommandAsync(
-				m_updateLoginEntryCommand,
-				record.Token,
-				record.UserID,
-				record.Username
+			return m_lock.LockedAsync(() =>
+				m_connection.Update<LoginEntry>(
+					new { record.Token },
+					x => x.UserID == record.UserID
+                    && x.Username == record.Username
+				)
 			);
 		}
-	}
+
+		/// <summary>
+		/// Configuration method to set up everything
+		/// </summary>
+        public void AfterConfigure()
+        {
+            EnsureConnected();
+            CreateTables();
+        }
+    }
 }
