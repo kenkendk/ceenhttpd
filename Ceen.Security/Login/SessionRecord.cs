@@ -3,10 +3,10 @@ using Ceen.Database;
 
 namespace Ceen.Security.Login
 {
-	/// <summary>
-	/// Helper class to
-	/// </summary>
-	public static partial class Utility
+    /// <summary>
+    /// Helper class for static methods on records
+    /// </summary>
+    public static partial class Utility
 	{
 		/// <summary>
 		/// Gets a value indicating if the session is valid
@@ -33,10 +33,11 @@ namespace Ceen.Security.Login
 		/// </summary>
         [Unique]
 		public string Cookie { get; set; }
-		/// <summary>
-		/// Gets or sets the XSRF Token.
-		/// </summary>
-		public string XSRFToken { get; set; }
+        /// <summary>
+        /// Gets or sets the XSRF Token.
+        /// </summary>
+        [Unique]
+        public string XSRFToken { get; set; }
 		/// <summary>
 		/// Gets or sets the expiration time.
 		/// </summary>
