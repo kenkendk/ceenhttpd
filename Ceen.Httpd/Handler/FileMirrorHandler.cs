@@ -149,7 +149,7 @@ namespace Ceen.Httpd.Handler
             }
 
             // Reject known 404 requests immediately
-            if ((await m_404cache.TryGetUnless(localpath, (k, v) => Cache404Seconds.Ticks > 0 && (DateTime.Now - v) > Cache404Seconds)).Key)
+            if ((await m_404cache.TryGetUnlessAsync(localpath, (k, v) => Cache404Seconds.Ticks > 0 && (DateTime.Now - v) > Cache404Seconds)).Key)
             {
                 if (PassThrough)
                     return false;
@@ -158,7 +158,7 @@ namespace Ceen.Httpd.Handler
             }
 
             // Check if the file is already downloaded in full
-            if (!(await m_filecache.TryGetUnless(localpath, (k, v) => !File.Exists(localpath) || (MirrorCacheSeconds.Ticks > 0 && (DateTime.Now - v) > MirrorCacheSeconds))).Key)
+            if (!(await m_filecache.TryGetUnlessAsync(localpath, (k, v) => !File.Exists(localpath) || (MirrorCacheSeconds.Ticks > 0 && (DateTime.Now - v) > MirrorCacheSeconds))).Key)
             {
                 // Not complete, check if we need to start a transfer
                 TaskCompletionSource<long> tcs = null;
