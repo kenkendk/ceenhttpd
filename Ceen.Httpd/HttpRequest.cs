@@ -342,7 +342,7 @@ namespace Ceen.Httpd
 
 
                 if (trail[0] != '-' || trail[1] != '-')
-                    throw new HttpException(HttpStatusCode.BadRequest);
+                     throw new HttpException(HttpStatusCode.BadRequest);
 
                 await reader.RepeatReadAsync(trail, 0, 2, idletime, timeouttask, stoptask);
                 if (trail[0] != '\r' || trail[1] != '\n')
