@@ -475,6 +475,17 @@ namespace Ceen
 	}
 
 	/// <summary>
+	/// Shared interface for marking a module or logger as needing setup
+	/// </summary>
+	public interface IWithSetup
+	{
+        /// <summary>
+        /// Method called after module is configured
+        /// </summary>
+        void AfterConfigure();
+    }
+
+	/// <summary>
 	/// Basic interface for a request handler
 	/// </summary>
 	public interface IHttpModule
@@ -491,12 +502,8 @@ namespace Ceen
     /// A module based on <see cref="IHttpModule"/> which is notified after being configured.
     /// Items that use this interface can do one-time setups in this call.
     /// </summary>
-    public interface IHttpModuleWithSetup : IHttpModule
+    public interface IHttpModuleWithSetup : IHttpModule, IWithSetup
     {
-		/// <summary>
-		/// Method called after module is configured
-		/// </summary>
-        void AfterConfigure();
     }
 
 	/// <summary>
@@ -593,6 +600,13 @@ namespace Ceen
 	}
 
 	/// <summary>
+	/// Extensions to a logger module that requires configuration
+	/// </summary>
+	public interface ILoggerWithSetup : ILogger, IWithSetup
+	{
+    }
+
+	/// <summary>
 	/// Marker interface for a generic module
 	/// </summary>
 	public interface IModule
@@ -600,7 +614,12 @@ namespace Ceen
 	}
 
     /// <summary>
-    /// Marker interface for a generic module
+    /// Extension to a generic module that requires configuration
+    /// </summary>
+    public interface IModuleWithSetup : IModule, IWithSetup
+    {
+    }
+
     /// </summary>
     public interface IModuleWithSetup : IModule
     {
