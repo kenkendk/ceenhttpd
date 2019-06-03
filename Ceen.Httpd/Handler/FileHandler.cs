@@ -591,7 +591,10 @@ namespace Ceen.Httpd.Handler
                     context.Response.StatusCode = HttpStatusCode.OK;
                     context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
                     context.Response.AddHeader("Accept-Ranges", "bytes");
-                    context.Response.SetExpires(CacheSeconds);
+                    
+                    // If the VFS or something else handles cache headers, do not overwrite them here
+                    if (!context.Response.Headers.ContainsKey("Cache-Control") && !context.Response.Headers.ContainsKey("Expires"))
+                        context.Response.SetExpires(CacheSeconds);
 
                     DateTime modifiedsincedate;
                     DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
