@@ -800,9 +800,10 @@ namespace Ceen.Database
         /// <param name="connection">The connection to use</param>
         /// <param name="item">The item to insert.</param>
         /// <typeparam name="T">The data type parameter.</typeparam>
-        public static void InsertOrIgnoreItem<T>(this IDbConnection connection, T item)
+        /// <returns>The inserted item</returns>
+        public static T InsertOrIgnoreItem<T>(this IDbConnection connection, T item)
         {
-            InsertItem(connection, item, true);
+            return InsertItem(connection, item, true);
         }
 
         /// <summary>
@@ -811,9 +812,10 @@ namespace Ceen.Database
         /// <param name="connection">The connection to use</param>
         /// <param name="item">The item to insert.</param>
         /// <typeparam name="T">The data type parameter.</typeparam>
-        public static void InsertItem<T>(this IDbConnection connection, T item)
+        /// <returns>The inserted item</returns>
+        public static T InsertItem<T>(this IDbConnection connection, T item)
         {
-            InsertItem(connection, item, false);
+            return InsertItem(connection, item, false);
         }
 
         /// <summary>
@@ -823,7 +825,8 @@ namespace Ceen.Database
         /// <param name="item">The item to insert.</param>
         /// <param name="useInsertOrIgnore">Use &quote;INSERT OR IGNORE&quote; instead of the usual &quote;INSERT&quote; command </param>
         /// <typeparam name="T">The data type parameter.</typeparam>
-        private static void InsertItem<T>(IDbConnection connection, T item, bool useInsertOrIgnore)
+        /// <returns>The inserted item</returns>
+        private static T InsertItem<T>(IDbConnection connection, T item, bool useInsertOrIgnore)
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
@@ -858,7 +861,7 @@ namespace Ceen.Database
                     var res = cmd.ExecuteNonQuery(arguments) > 0;
                     foreach (var x in clientgenerated)
                         x.Key.SetValue(item, x.Value);
-                    return;
+                    return item;
                 }
 
                 var id = cmd.ExecuteScalar(arguments);
@@ -866,6 +869,8 @@ namespace Ceen.Database
                 pk.SetValueFromDb(item, id);
                 foreach (var x in clientgenerated)
                     x.Key.SetValue(item, x.Value);
+
+                return item;
             }
         }
 
