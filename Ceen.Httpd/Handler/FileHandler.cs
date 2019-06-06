@@ -352,6 +352,16 @@ namespace Ceen.Httpd.Handler
         }
 
         /// <summary>
+        /// Workaround for <see name="System.Security.Cryptography.HashAlgorithm.Create" /> not being correctly supported in .Net core
+        /// </summary>
+        /// <param name="id">The algorithm name</param>
+        /// <returns>The hash algorithm instance</returns>
+        private static System.Security.Cryptography.HashAlgorithm CreateFromId(string id)
+        {
+            return System.Security.Cryptography.CryptoConfig.CreateFromName(id) as System.Security.Cryptography.HashAlgorithm;
+        }
+
+        /// <summary>
         /// Computes the ETag value for a given resources
         /// </summary>
         /// <returns>The ETag value.</returns>
@@ -359,7 +369,7 @@ namespace Ceen.Httpd.Handler
         public virtual async Task<string> ComputeETag(Stream sourcedata)
         {
             var buffer = new byte[8 * 1024];
-            using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : System.Security.Cryptography.HashAlgorithm.Create(EtagAlgorithm))
+            using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : CreateFromId(EtagAlgorithm))
             {
                 if (m_etagsalt != null)
                     hasher.TransformBlock(m_etagsalt, 0, m_etagsalt.Length, m_etagsalt, 0);
