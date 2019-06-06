@@ -106,11 +106,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
     public class SpawnedServer : Ceen.Httpd.HttpServer.InterProcessBridge, ISpawnedServer
     {
         /// <summary>
-        /// The method used to create a socket from the handle
-        /// </summary>
-        //private readonly Func<long, Socket> m_createSocket;
-
-        /// <summary>
         /// The epoll handler instance
         /// </summary>
         private readonly SockRock.ISocketHandler m_pollhandler;
@@ -123,23 +118,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="storage">Storage.</param>
         public SpawnedServer(bool usessl, string configfile, IStorageCreator storage)
         {
-            //// Mono version
-            //var safeSocketHandleType = Type.GetType("System.Net.Sockets.SafeSocketHandle");
-            //var safeSocketHandleConstructor = safeSocketHandleType?.GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(IntPtr), typeof(bool) }, null);
-            //var socketConstructorSafeSocketHandle = safeSocketHandleType == null ? null : typeof(System.Net.Sockets.Socket).GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(AddressFamily), typeof(SocketType), typeof(ProtocolType), safeSocketHandleType }, null);
-
-            //// .Net Core version
-            //var safeCloseSocketType = Type.GetType("System.Net.Sockets.SafeCloseSocket");
-            //var safeCloseSocketConstructor = safeCloseSocketType?.GetMethod("CreateSocket", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static, null, new Type[] { typeof(IntPtr) }, null);
-            //var socketConstructorSafeCloseSocket = safeCloseSocketType == null ? null : typeof(System.Net.Sockets.Socket).GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { safeCloseSocketType }, null);
-
-            //if (safeSocketHandleConstructor != null && socketConstructorSafeSocketHandle != null)
-            //    m_createSocket = (handle) => (Socket)Activator.CreateInstance(typeof(Socket), AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp, Activator.CreateInstance(safeSocketHandleType, new IntPtr(handle), false));
-            //else if (safeCloseSocketConstructor != null && socketConstructorSafeCloseSocket != null)
-            //    m_createSocket = (handle) => (Socket)Activator.CreateInstance(typeof(Socket), safeCloseSocketConstructor.Invoke(null, new object[] { new IntPtr(handle) }));
-            //else
-                //throw new Exception("Unable to find a method to create sockets from handles ....");
-
             var config = ConfigParser.ValidateConfig(ConfigParser.ParseTextFile(configfile));
             config.Storage = storage ?? new MemoryStorageCreator();
 
