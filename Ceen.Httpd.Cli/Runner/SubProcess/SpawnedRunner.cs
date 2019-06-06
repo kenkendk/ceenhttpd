@@ -137,6 +137,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                 }
             }
 
+            m_pollhandler.WaitForShutdownAsync.ContinueWith(x => { 
+                Program.ConsoleOutput("The poll handler crashed, stopping this instance");
+                this.Stop(TimeSpan.FromSeconds(-5));                
+            }, TaskContinuationOptions.NotOnRanToCompletion);
+
             base.Setup(usessl, config);
         }
 
@@ -173,8 +178,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="waittime">The grace period before the active connections are killed</param>
         public void Stop(TimeSpan waittime)
         {
+            Program.DebugConsoleOutput("Base stop");
             base.Stop();
+            Program.DebugConsoleOutput("Poll handler stop");
             m_pollhandler.Stop(waittime);
+            Program.DebugConsoleOutput("Stop complete");
         }
     }
 
