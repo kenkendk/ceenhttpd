@@ -363,7 +363,7 @@ namespace Ceen.Security.Login
 		/// <summary>
 		/// Configuration method to set up everything
 		/// </summary>
-        public void AfterConfigure()
+        public virtual void AfterConfigure()
         {
             EnsureConnected();
             CreateTables();
