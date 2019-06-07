@@ -33,7 +33,12 @@ namespace Unittests
 			return Task.FromResult(true);
 		}
 
-		public bool TestProp { get; set; }
+        public Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+        {
+            return Task.FromResult(true);   
+        }
+
+        public bool TestProp { get; set; }
 	}
 
 
