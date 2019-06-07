@@ -10,6 +10,140 @@ using LeanIPC;
 namespace Ceen.Httpd.Cli.Runner.SubProcess
 {
     /// <summary>
+    /// An indirection helper for restarting the listener process
+    /// without restarting the handler framework
+    /// </summary>
+    internal class IndirectRunner : IWrappedRunner, ISelfListen
+    {
+        /// <summary>
+        /// The instance we are serving
+        /// </summary>
+        public SpawnRemoteInstance Instance;
+
+        /// <summary>
+        /// The path to use
+        /// </summary>
+        private string m_path;
+        /// <summary>
+        /// The ssl flag
+        /// </summary>
+        private bool m_useSSL;
+        /// <summary>
+        /// The storage creator
+        /// </summary>
+        private IStorageCreator m_storage;
+        /// <summary>
+        /// The cancellation token
+        /// </summary>
+        private CancellationToken m_token;
+        /// <summary>
+        /// The ready task
+        /// </summary>
+        private readonly Task m_task;
+
+        /// <summary>
+        /// The socket used to listen for new connections
+        /// </summary>
+        private SockRock.ListenSocket m_listenSocket;
+
+
+        /// <summary>
+        /// Gets a value indicating whether this <see cref="T:Ceen.Httpd.Cli.Runner.SubProcess.SpawnRemoteInstance"/>
+        /// uses managed listen.
+        /// </summary>
+        /// <value><c>true</c> if using managed listen; otherwise, <c>false</c>.</value>
+        public bool UseManagedListen => !SystemHelper.IsCurrentOSPosix;
+
+        /// <summary>
+        /// Creates a new indirect runner
+        /// </summary>
+        /// <param name="path">The path to the config file.</param>
+        /// <param name="useSSL">If set to <c>true</c> use ssl.</param>
+        /// <param name="storage">The storage interface to use.</param>
+        /// <param name="token">A cancellation token to use.</param>
+        public IndirectRunner(string path, bool useSSL, IStorageCreator storage, CancellationToken token)
+        {
+            m_path = path;
+            m_useSSL = useSSL;
+            m_storage = storage;
+            m_token = token;
+
+            m_task = MonitorForRestartAsync();
+        }
+
+        /// <summary>
+        /// Restarts the remote process if it crashes
+        /// </summary>
+        /// <returns>An awaitable task</returns>
+        private async Task MonitorForRestartAsync()
+        {
+            while(!m_token.IsCancellationRequested)
+            {
+                Instance = new SpawnRemoteInstance(m_path, m_useSSL, m_storage, m_token);
+
+                try { await Instance.Stopped; } 
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Handles a request on the wrapped instance
+        /// </summary>
+        /// <param name="client">The socket to transfer.</param>
+        /// <param name="endPoint">The remote endpoint</param>
+        /// <param name="logtaskid">The log task ID</param>
+        public Task HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
+        {
+            return Instance.HandleRequest(client, remoteEndPoint, logtaskid);
+        }
+
+        /// <summary>
+        /// Kills the remote process
+        /// </summary>
+        public void Kill()
+        {
+            Instance.Kill();
+        }
+
+        /// <summary>
+        /// Stops the remote process
+        /// </summary>
+        /// <returns>An awaitable task.</returns>
+        public Task StopAsync()
+        {
+            return Instance.StopAsync();
+        }
+
+        /// <summary>
+        /// Listens for a new connection
+        /// </summary>
+        /// <returns>The async.</returns>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public Task<KeyValuePair<long, EndPoint>> ListenAsync(CancellationToken cancellationToken)
+        {
+            return m_listenSocket.AcceptAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Binds this instance to the given endpoint
+        /// </summary>
+        /// <param name="endPoint">The endpoint to use.</param>
+        /// <param name="backlog">The connection backlog.</param>
+        public void Bind(EndPoint endPoint, int backlog)
+        {
+            m_listenSocket?.Dispose();
+
+            m_listenSocket = new SockRock.ListenSocket();
+            m_listenSocket.Bind(endPoint, backlog);
+        }
+
+        public Task HandleRequest(long client, EndPoint remoteEndPoint, string logtaskid)
+        {
+            return Instance.HandleRequest(client, remoteEndPoint, logtaskid);
+        }
+    }
+
+    /// <summary>
     /// Handler for spawning a remote process and interfacing with it
     /// </summary>
     public class Runner : RunHandlerBase
@@ -33,14 +167,14 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="token">A cancellation token to use.</param>
         protected override IWrappedRunner CreateRunner(string path, bool useSSL, IStorageCreator storage, CancellationToken token)
         {
-            return new SpawnRemoteInstance(path, useSSL, storage, token);
+            return new IndirectRunner(path, useSSL, storage, token);
         }
     }
 
     /// <summary>
     /// Class to keep the connection with the spawned process
     /// </summary>
-    internal class SpawnRemoteInstance : IWrappedRunner, ISelfListen
+    internal class SpawnRemoteInstance : IWrappedRunner
     {
         /// <summary>
         /// The RPC peer
@@ -112,20 +246,9 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         private readonly IStorageCreator m_storage;
 
         /// <summary>
-        /// Gets the runner task that can be used to check if the process is running
+        /// Task used to monitor if this instance has completed
         /// </summary>
-        public Task RunnerTask => m_main;
-
-        /// <summary>
-        /// Gets a value indicating whether this <see cref="T:Ceen.Httpd.Cli.SubProcess.SpawnRemoteInstance"/> should stop.
-        /// </summary>
-        /// <value><c>true</c> if should stop; otherwise, <c>false</c>.</value>
-        public bool ShouldStop { get; private set; } = false;
-
-        /// <summary>
-        /// The socket used to listen for new connections
-        /// </summary>
-        private SockRock.ListenSocket m_listenSocket;
+        public Task Stopped { get => m_main; }
 
         /// <summary>
         /// Helper class to delete files after use
@@ -417,7 +540,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Stop()
         {
-            ShouldStop = true;
             m_peer.Dispose();
         }
 
@@ -436,7 +558,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// </summary>
         public void Kill()
         {
-            ShouldStop = true;
             m_proc.Kill();
         }
 
@@ -448,16 +569,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         {
             Kill();
             return m_main;
-        }
-
-        /// <summary>
-        /// Listens for a new connection
-        /// </summary>
-        /// <returns>The async.</returns>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public Task<KeyValuePair<long, EndPoint>> ListenAsync(CancellationToken cancellationToken)
-        {
-            return m_listenSocket.AcceptAsync(cancellationToken);
         }
 
         /// <summary>
@@ -513,26 +624,5 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                 throw new PlatformNotSupportedException($"Unable to transmit the socket on the current platform: {SystemHelper.CurrentOS}");
             }
         }
-
-        /// <summary>
-        /// Binds this instance to the given endpoint
-        /// </summary>
-        /// <param name="endPoint">The endpoint to use.</param>
-        /// <param name="backlog">The connection backlog.</param>
-        public void Bind(EndPoint endPoint, int backlog)
-        {
-            m_listenSocket?.Dispose();
-
-            m_listenSocket = new SockRock.ListenSocket();
-            m_listenSocket.Bind(endPoint, backlog);
-        }
-
-
-        /// <summary>
-        /// Gets a value indicating whether this <see cref="T:Ceen.Httpd.Cli.Runner.SubProcess.SpawnRemoteInstance"/>
-        /// uses managed listen.
-        /// </summary>
-        /// <value><c>true</c> if using managed listen; otherwise, <c>false</c>.</value>
-        public bool UseManagedListen => !SystemHelper.IsCurrentOSPosix;
     }
 }
