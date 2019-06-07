@@ -161,6 +161,8 @@ namespace PerfTester
             {
             }
 
+            if (durations.LongCount() == 0)
+                return new ResultStats();
             DebugWriteLine($"All requests performed, computing stats");
             var mean = durations.Sum() / durations.LongCount();
             var sqdev = durations.Select(x => Math.Pow(x - mean, 2)).Sum();
