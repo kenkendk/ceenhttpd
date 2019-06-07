@@ -281,6 +281,14 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
 
             // Prepare the handle
             var rchandle = socket.Handle.ToInt32();
+            // Signal to stop processing
+            var serverShutdown = new TaskCompletionSource<bool>();
+
+            // If the server stops for some reason, make sure we do not hang on the socket
+            server.StopTask.ContinueWith(async _ => {
+                await Task.Delay(500);
+                serverShutdown.TrySetResult(true);
+            });
             
             try
             {
@@ -295,7 +303,18 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         {
                             // Get the next request from the socket
                             Program.DebugConsoleOutput("{0} Getting file handle", System.Diagnostics.Process.GetCurrentProcess().Id);
-                            var req = SockRock.ScmRightsImplementation.recv_fds(rchandle);
+                            var treq =  await Task.WhenAny(                            
+                                Task.Run(() => SockRock.ScmRightsImplementation.recv_fds(rchandle)),
+                                serverShutdown.Task
+                            );
+
+                            if (treq == serverShutdown.Task)
+                            {
+                                Program.DebugConsoleOutput("{0} Server stopped", System.Diagnostics.Process.GetCurrentProcess().Id);
+                                break;
+                            }
+
+                            var req = await (Task<Tuple<int[], byte[]>>)treq;
                             if (req == null)
                             {
                                 Program.DebugConsoleOutput("{0} Socket closed", System.Diagnostics.Process.GetCurrentProcess().Id);
