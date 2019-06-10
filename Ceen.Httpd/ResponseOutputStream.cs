@@ -189,7 +189,7 @@ namespace Ceen.Httpd
 		/// <param name="count">The number of bytes to write.</param>
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-            //TODO: prevent async deadlock in case of Synchronized execution. Better should be refactored for sync Write
+            //TODO: Better should be refactored for sync Write
             SyncAwaiter.WaitSync(() => WriteAsync(buffer, offset, count));
 		}
 
@@ -235,8 +235,7 @@ namespace Ceen.Httpd
 		{
             if (disposing)
 			{
-                // prevent async deadlock in case of Synchronized execution
-                SyncAwaiter.WaitSync(() => FlushAsync(CancellationToken.None));
+                Flush();
                 m_isDisposed = true;
             }
 		}
