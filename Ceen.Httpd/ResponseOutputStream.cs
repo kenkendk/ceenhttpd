@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
+using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -110,7 +111,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		public override void Flush()
 		{
-			FlushAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+			SyncAwaiter.WaitSync(() => FlushAsync(CancellationToken.None));
 		}
 
 		/// <summary>
@@ -188,8 +189,8 @@ namespace Ceen.Httpd
 		/// <param name="count">The number of bytes to write.</param>
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-			//TODO: prevent async deadlock in case of Synchronized execution. Better should be refactored for sync Write
-			Task.Run(() => WriteAsync(buffer, offset, count)).Wait();
+            //TODO: prevent async deadlock in case of Synchronized execution. Better should be refactored for sync Write
+            SyncAwaiter.WaitSync(() => WriteAsync(buffer, offset, count));
 		}
 
 		/// <summary>
@@ -232,12 +233,12 @@ namespace Ceen.Httpd
 		/// <param name="disposing">If set to <c>true</c> disposing.</param>
 		protected override void Dispose(bool disposing)
 		{
-			if (disposing)
+            if (disposing)
 			{
-				// prevent async deadlock in case of Synchronized execution
-				Task.Run(() => FlushAsync(CancellationToken.None)).Wait();
-				m_isDisposed = true;
-			}
+                // prevent async deadlock in case of Synchronized execution
+                SyncAwaiter.WaitSync(() => FlushAsync(CancellationToken.None));
+                m_isDisposed = true;
+            }
 		}
 
 		#endregion
