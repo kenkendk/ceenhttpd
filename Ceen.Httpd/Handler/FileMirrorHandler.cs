@@ -148,6 +148,10 @@ namespace Ceen.Httpd.Handler
                 throw new HttpException(HttpStatusCode.NotFound);
             }
 
+            // Reject any directory access
+            if (localpath.EndsWith("/"))
+                throw new HttpException(Directory.Exists(localpath) ? HttpStatusCode.Forbidden : HttpStatusCode.NotFound);
+
             // Reject known 404 requests immediately
             if ((await m_404cache.TryGetUnlessAsync(localpath, (k, v) => Cache404Seconds.Ticks > 0 && (DateTime.Now - v) > Cache404Seconds)).Key)
             {
