@@ -24,7 +24,7 @@ namespace Ceen.Security.Login
 		/// </summary>
 		/// <returns>The awaitable task.</returns>
 		/// <param name="context">The requests context.</param>
-		public async Task<bool> HandleAsync(IHttpContext context)
+		public virtual async Task<bool> HandleAsync(IHttpContext context)
 		{
 			if (!ForceCheck && !string.IsNullOrWhiteSpace(context.Request.UserID))
 				return false;
