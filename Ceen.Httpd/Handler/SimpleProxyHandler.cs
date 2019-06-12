@@ -59,6 +59,7 @@ namespace Ceen.Httpd.Handler
             foreach (var item in context.Request.Headers)
                 wr.Headers.Add(item.Key, item.Value);
 
+            wr.Method = context.Request.Method;
             if (context.Request.ContentLength > 0)
                 using(var rs = await wr.GetRequestStreamAsync())
                     await context.Request.Body.CopyToAsync(rs);
