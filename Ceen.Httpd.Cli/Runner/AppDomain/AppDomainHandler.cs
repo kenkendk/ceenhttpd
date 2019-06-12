@@ -344,7 +344,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                 ShouldStop = false;
 
                 RunnerTask = HttpServer.ListenToSocketAsync(
-                    new IPEndPoint(ConfigParser.ParseIPAddress(address), port),
+                    new IPEndPoint(ParseUtil.ParseIPAddress(address), port),
                     usessl,
                     m_token.Token,
                     config,
@@ -483,7 +483,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
         {
             var enabled = !string.IsNullOrWhiteSpace(address);
             // Ensure it parses
-            ConfigParser.ParseIPAddress(address);
+            ParseUtil.ParseIPAddress(address);
 
             var prev = m_handlers.Where(x => x.UseSSL == usessl).FirstOrDefault();
             if (enabled)
