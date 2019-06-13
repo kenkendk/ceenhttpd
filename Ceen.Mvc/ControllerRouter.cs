@@ -646,7 +646,9 @@ namespace Ceen.Mvc
 			var argtype = method.GetParameters()[entry.ArgumentIndex].ParameterType;
 			try
 			{
-                if (argtype.IsPrimitive || argtype.IsEnum || argtype == typeof(string))
+				if (argtype.IsEnum)
+					values[entry.ArgumentIndex] = Enum.Parse(argtype, value, true);
+                else if (argtype.IsPrimitive || argtype == typeof(string))
                     values[entry.ArgumentIndex] = Convert.ChangeType(value, argtype);
                 else
                     values[entry.ArgumentIndex] = Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
