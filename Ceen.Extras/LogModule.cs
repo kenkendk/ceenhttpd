@@ -144,6 +144,17 @@ namespace Ceen.Extras
         private List<HttpLogEntryLine> m_lines = new List<HttpLogEntryLine>();
 
         /// <summary>
+        /// The list of currently loaded log modules.
+        /// TODO: Should be possible to get this from the execution context
+        /// </summary>
+        private static List<LogModule> _loadedModules = new List<LogModule>();
+
+        /// <summary>
+        /// Gets the loaded log modules
+        /// </summary>
+        public static IEnumerable<LogModule> LoadedModules { get => _loadedModules.AsReadOnly(); }
+
+        /// <summary>
         /// The runner task
         /// </summary>
         private Task m_runner = null;
@@ -160,6 +171,7 @@ namespace Ceen.Extras
             : base()
         {
             ConnectionString = "logdata.sqlite";
+            _loadedModules.Add(this);
         }
 
         /// <summary>
