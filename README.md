@@ -158,7 +158,7 @@ public class ApiExampleController : Controller, IApiV1
     [HttpGet]
     public IResult Index(IHttpContext context)
     {
-        return OK();
+        return OK;
     }
 
     public IResult Index(int id)
@@ -169,7 +169,7 @@ public class ApiExampleController : Controller, IApiV1
     [Route("{id}/detail")]
     public IResult Detail(int id)
     {
-        return Status(HttpStatusCode.NoContent);
+        return Status(NoContent, "I have no content :(");
     }
 }
 
@@ -227,7 +227,7 @@ public class ApiExampleController : Controller, IApiV1
     [HttpGet]
     public IResult Index(IHttpContext context)
     {
-        return OK();
+        return OK;
     }
 
     public IResult Index(int id)
@@ -238,7 +238,7 @@ public class ApiExampleController : Controller, IApiV1
     [Route("{id}/detail")]
     public IResult Detail(int id)
     {
-        return Status(HttpStatusCode.NoContent);
+        return Status(NoContent, "I have no content :(");
     }
 }
 ```
