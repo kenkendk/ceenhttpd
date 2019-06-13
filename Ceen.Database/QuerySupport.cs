@@ -419,7 +419,7 @@ namespace Ceen.Database
                     case ExpressionType.LessThanOrEqual:
                         return UnwrapCompare(bexpr, "<=", methodtarget);
                     case ExpressionType.GreaterThanOrEqual:
-                        return UnwrapCompare(bexpr, "<=", methodtarget);
+                        return UnwrapCompare(bexpr, ">=", methodtarget);
                     case ExpressionType.AndAlso:
                     case ExpressionType.And:
                         return And(FromLambda(bexpr.Left, methodtarget), FromLambda(bexpr.Right, methodtarget));
