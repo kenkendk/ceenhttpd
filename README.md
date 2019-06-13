@@ -35,7 +35,7 @@ Standalone version, Ceen.Httpd.Cli:
 Missing features:
 
   - No template engine: use [T4](https://msdn.microsoft.com/en-us/library/bb126445.aspx) or your favorite
-  - No application-level logging support: use [log4net](https://logging.apache.org/log4net/)
+  - Full application-level logging support: use [log4net](https://logging.apache.org/log4net/)
   - Advanced database queries: use [Dapper](https://github.com/StackExchange/Dapper)
 
 Installation
