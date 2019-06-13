@@ -189,7 +189,6 @@ namespace Ceen.Httpd
 		/// <param name="count">The number of bytes to write.</param>
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-            //TODO: Better should be refactored for sync Write
             SyncAwaiter.WaitSync(() => WriteAsync(buffer, offset, count));
 		}
 
