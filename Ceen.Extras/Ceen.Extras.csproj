@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj" />
     <ProjectReference Include="..\Ceen.Database\Ceen.Database.csproj" />
+    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
   </ItemGroup>
 
   <ItemGroup>

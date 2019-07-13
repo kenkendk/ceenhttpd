@@ -183,7 +183,7 @@ namespace Ceen.Httpd.Cli.Runner
                     await runner.RestartAsync(newaddr, newport, usessl, config);
                 }
                 else
-                {
+                {                    
                     // If any of these change, we need to restart the listen socket
                     if (runner.Address != newaddr || runner.Port != newport)
                     {
