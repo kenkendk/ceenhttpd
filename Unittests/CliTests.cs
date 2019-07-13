@@ -74,7 +74,7 @@ namespace Unittests
 			Assert.AreEqual(c2.MaxActiveRequests, 999);
 			Assert.AreEqual(c2.AllowHttpMethodOverride, true);
 
-			Assert.AreEqual(c2.Loggers.Count, 4);
+			Assert.AreEqual(c2.Loggers.Count, 3);
 		}
 	}
 }

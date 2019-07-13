@@ -1,81 +1,31 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\NUnit.3.11.0\build\NUnit.props" Condition="Exists('..\packages\NUnit.3.11.0\build\NUnit.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{77A69C2A-6FCA-479A-8B8C-B79B869230E8}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>Unittests</RootNamespace>
-    <AssemblyName>Unittests</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <ReleaseVersion>0.9.7</ReleaseVersion>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug</OutputPath>
-    <DefineConstants>DEBUG;</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <ConsolePause>false</ConsolePause>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>full</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release</OutputPath>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <ConsolePause>false</ConsolePause>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="SyslogNet.Client">
-      <HintPath>..\packages\SyslogNet.Client.0.3.3\lib\net40\SyslogNet.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.3.11.0\lib\net45\nunit.framework.dll</HintPath>
-    </Reference>
-    <Reference Include="netstandard, Version=2.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51" />
+    <PackageReference Include="coverlet.msbuild" Version="2.6.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.1.1" />
+    <PackageReference Include="NUnit" Version="3.12.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="3.13.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="MvcTests.cs" />
-    <Compile Include="CliTests.cs" />
-    <Compile Include="MultipartTests.cs" />
-    <Compile Include="TimeoutTests.cs" />
+    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj" />
+    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj" />
+    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
+    <ProjectReference Include="..\Ceen.Httpd.Cli\Ceen.Httpd.Cli.csproj" />
   </ItemGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+
   <ItemGroup>
-    <ProjectReference Include="..\Ceen.Common\Ceen.Common.csproj">
-      <Project>{8AD45A7D-9123-4250-BE9F-444B8F913113}</Project>
-      <Name>Ceen.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj">
-      <Project>{030E03E0-C7E1-4316-B7D5-44582840DEA1}</Project>
-      <Name>Ceen.Httpd</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj">
-      <Project>{2BA2A179-0D71-464D-BF2E-18AF6937085C}</Project>
-      <Name>Ceen.Mvc</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Ceen.Httpd.Cli\Ceen.Httpd.Cli.csproj">
-      <Project>{AF13A77D-FD50-4ED1-943B-266E577CB28B}</Project>
-      <Name>Ceen.Httpd.Cli</Name>
-    </ProjectReference>
+    <None Update="*.txt" CopyToOutputDirectory="Always" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-    <None Include="test1.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="test2.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+
 </Project>
+
