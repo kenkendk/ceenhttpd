@@ -4,8 +4,17 @@ using System.Collections.Generic;
 
 namespace Ceen.Database
 {
+    /// <summary>
+    /// Abstraction of methods used to make vendor agnostic type-safe queries to a database
+    /// </summary>
     public interface IDatabaseDialect
     {
+        /// <summary>
+        /// Flag indicating if the database connection supports multithreaded access
+        /// </summary>
+        /// <value></value>
+        bool IsMultiThreadSafe { get; }
+
         /// <summary>
         /// Gets the SQL type for a given property
         /// </summary>
@@ -28,7 +37,7 @@ namespace Ceen.Database
         string GetName(Type type);
 
         /// <summary>
-        /// Gets the name for a class
+        /// Gets the name for a class member
         /// </summary>
         /// <returns>The name.</returns>
         /// <param name="member">The item to get the name from.</param>
@@ -61,35 +70,6 @@ namespace Ceen.Database
         /// <param name="recordtype">The datatype to store in the table.</param>
         /// <param name="ifNotExists">Only create table if it does not exist</param>
         string CreateTableSql(Type recordtype, bool ifNotExists = true);
-
-        /// <summary>
-        /// Creates the select command for the given type.
-        /// </summary>
-        /// <returns>The select command.</returns>
-        /// <param name="type">The type to generate the command for.</param>
-        string CreateSelectCommand(Type type);
-
-        /// <summary>
-        /// Creates a command for inserting a record
-        /// </summary>
-        /// <returns>The insert command.</returns>
-        /// <param name="type">The type to generate the command for.</param>
-        /// <param name="useInsertOrIgnore">Use &quote;INSERT OR IGNORE&quote; instead of the usual &quote;INSERT&quote; command </param>
-        string CreateInsertCommand(Type type, bool useInsertOrIgnore);
-
-        /// <summary>
-        /// Creates a command for deleting one or more items
-        /// </summary>
-        /// <param name="type">The type to generate the command for.</param>
-        /// <returns>The delete command</returns>
-        string CreateDeleteCommand(Type type);
-
-        /// <summary>
-        /// Creates a command for deleting an item by suppling the primary key
-        /// </summary>
-        /// <param name="type">The type to generate the command for.</param>
-        /// <returns>The delete command</returns>
-        string CreateDeleteByIdCommand(Type type);
 
         /// <summary>
         /// Creates a command that checks if a table exists
@@ -126,7 +106,24 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="type">The type to generate the clause for.</param>
         /// <param name="element">The element to use</param>
+        /// <param name="order">The query order</param>
         /// <returns>The SQL where clause</returns>
-        KeyValuePair<string, object[]> RenderClause(Type type, QueryElement element);
+        KeyValuePair<string, object[]> RenderWhereClause(Type type, QueryElement element);
+
+        /// <summary>
+        /// Returns an OrderBy fragment
+        /// </summary>
+        /// <param name="type">The type to generate the clause for.</param>
+        /// <param name="order">The order to render</param>
+        /// <returns>The SQL order-by fragment</returns>
+        string OrderBy(Type type, QueryOrder order);
+
+        /// <summary>
+        /// Renders a full query clause
+        /// </summary>
+        /// <param name="query">The query to render</param>
+        /// <param name="finalize">Flag indicating if the complete method should be called on the query</param>
+        /// <returns>The sql statement</returns>
+        KeyValuePair<string, object[]> RenderStatement(Query query, bool finalize = true);
     }
 }

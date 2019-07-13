@@ -80,15 +80,15 @@ namespace Ceen.Database
         }
 
         /// <summary>
-        /// Renders query using the current dialect
+        /// Parses a filterstring
         /// </summary>
         /// <param name="connection">The connection to get the dialect from</param>
-        /// <param name="query">The query to render</param>
+        /// <param name="filter">The filter to parse</param>
         /// <typeparam name="T">The type the query is for</typeparam>
-        /// <returns>The query and arguments</returns>
-        public static KeyValuePair<string, object[]> RenderClause<T>(this IDbConnection connection, QueryElement query)
+        /// <returns>The filter query</returns>
+        public static QueryElement ParseFilter<T>(this IDbConnection connection, string filter)
         {
-            return GetDialect(connection).RenderClause(typeof(T), query);
+            return GetDialect(connection).ParseFilter<T>(filter);
         }
 
         /// <summary>
@@ -98,9 +98,21 @@ namespace Ceen.Database
         /// <param name="query">The query to render</param>
         /// <typeparam name="T">The type the query is for</typeparam>
         /// <returns>The query and arguments</returns>
-        public static KeyValuePair<string, object[]> RenderClause<T>(this IDbConnection connection, Expression<Func<T, bool>> query)
+        public static KeyValuePair<string, object[]> RenderWhereClause<T>(this IDbConnection connection, QueryElement query)
         {
-            return GetDialect(connection).RenderClause(typeof(T), QueryUtil.FromLambda(query));
+            return GetDialect(connection).RenderWhereClause(typeof(T), query);
+        }
+
+        /// <summary>
+        /// Renders query using the current dialect
+        /// </summary>
+        /// <param name="connection">The connection to get the dialect from</param>
+        /// <param name="query">The query to render</param>
+        /// <typeparam name="T">The type the query is for</typeparam>
+        /// <returns>The query and arguments</returns>
+        public static KeyValuePair<string, object[]> RenderWhereClause<T>(this IDbConnection connection, Expression<Func<T, bool>> query)
+        {
+            return GetDialect(connection).RenderWhereClause(typeof(T), QueryUtil.FromLambda(query));
         }
 
         /// <summary>
@@ -110,9 +122,9 @@ namespace Ceen.Database
         /// <param name="query">The query to render</param>
         /// <typeparam name="T">The type the query is for</typeparam>
         /// <returns>The query and arguments</returns>
-        public static KeyValuePair<string, object[]> RenderClause<T>(this IDatabaseDialect dialect, Expression<Func<T, bool>> query)
+        public static KeyValuePair<string, object[]> RenderWhereClause<T>(this IDatabaseDialect dialect, Expression<Func<T, bool>> query)
         {
-            return dialect.RenderClause(typeof(T), QueryUtil.FromLambda(query));
+            return dialect.RenderWhereClause(typeof(T), QueryUtil.FromLambda(query));
         }
 
         /// <summary>
@@ -199,20 +211,68 @@ namespace Ceen.Database
         public static T SelectItemById<T>(this IDbConnection connection, params object[] ids)
             where T : new()
         {
+            return SelectSingle<T>(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .MatchPrimaryKeys(ids)
+                    .Limit(1)
+            );
+        }
+
+        /// <summary>
+        /// Selects a single item
+        /// </summary>
+        /// <returns>The first item matching the query.</returns>
+        /// <param name="query">The query to use.</param>
+        /// <param name="connection">The connection to use</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static T SelectSingle<T>(this IDbConnection connection, Query query)
+            where T : new()
+        {
+            return SelectSingle<T>(connection, query, () => new T());
+        }
+        /// <summary>
+        /// Selects a single item
+        /// </summary>
+        /// <returns>The first item matching the query.</returns>
+        /// <param name="query">The query to use.</param>
+        /// <param name="connection">The connection to use</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static T SelectSingle<T>(this IDbConnection connection, Query<T> query)
+            where T : new()
+        {
+            return SelectSingle<T>(connection, query, () => new T());
+        }
+
+        /// <summary>
+        /// Selects a single item
+        /// </summary>
+        /// <returns>The first item matching the query.</returns>
+        /// <param name="query">The query to use.</param>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="create">The method creating the instance of <typeref name="T" /> to update</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static T SelectSingle<T>(this IDbConnection connection, Query query, Func<T> create)
+        {
             var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(typeof(T));
+            var mapping = dialect.GetTypeMap<T>();
 
-            if (mapping.PrimaryKeys.Length == 0)
-                throw new ArgumentException("Cannot select by ID when there are no primary keys on the table");
+            if (query.Parsed.Type != QueryType.Select)
+                throw new ArgumentException($"Cannot select with a query of type {query.Parsed.Type}");
 
-            if (ids == null || ids.Length != mapping.PrimaryKeys.Length)
-                throw new ArgumentException($"Expected {mapping.PrimaryKeys.Length} keys but got {ids?.Length}");
+            // Force a limit of one result
+            if (query.Parsed.LimitParams == null || query.Parsed.LimitParams.Item1 < 0)
+                query.Parsed.Limit(1);
+            else if (query.Parsed.LimitParams.Item1 != 1)
+                throw new ArgumentException("The limit cannot be set when selecting a single item");
 
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?")) + " LIMIT 1"))
-            using(var rd = cmd.ExecuteReader(ids))
+            var q = dialect.RenderStatement(query);
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
+            using(var rd = cmd.ExecuteReader(q.Value))
             {
                 return rd.Read() 
-                    ? FillItem(rd, mapping, new T())
+                    ? FillItem(rd, mapping, create())
                     : default(T);
             }
         }
@@ -226,10 +286,11 @@ namespace Ceen.Database
         public static IEnumerable<T> SelectAll<T>(this IDbConnection connection)
             where T : new()
         {
-            var dialect = GetDialect(connection);
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T))))
-                foreach (var n in FillItems<T>(cmd))
-                    yield return n;
+            return Select(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+            );
         }
 
         /// <summary>
@@ -254,8 +315,12 @@ namespace Ceen.Database
         public static IEnumerable<T> Select<T>(this IDbConnection connection, Expression<Func<T, bool>> query)
             where T : new()
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), QueryUtil.FromLambda(query));
-            return Select<T>(connection, q.Key, q.Value);
+            return Select(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -268,8 +333,12 @@ namespace Ceen.Database
         public static IEnumerable<T> Select<T>(this IDbConnection connection, QueryElement query)
             where T : new()
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), query);
-            return Select<T>(connection, q.Key, q.Value);
+            return Select(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -283,14 +352,48 @@ namespace Ceen.Database
         public static IEnumerable<T> Select<T>(this IDbConnection connection, string query, params object[] arguments)
             where T : new()
         {
+            return Select(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(new CustomQuery(query, arguments))
+            );
+        }
+
+        /// <summary>
+        /// Gets some items for a given type
+        /// </summary>
+        /// <returns>The items that match.</returns>
+        /// <param name="query">The query to use</param>
+        /// <param name="arguments">The query arguments</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static IEnumerable<T> Select<T>(this IDbConnection connection, Query<T> query)
+            where T : new()
+        {
+            return Select<T>(connection, (Query)query);
+        }
+
+        /// <summary>
+        /// Gets some items for a given type
+        /// </summary>
+        /// <returns>The items that match.</returns>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The where part of the query to use</param>
+        /// <param name="arguments">The query arguments</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static IEnumerable<T> Select<T>(this IDbConnection connection, Query query)
+            where T : new()
+        {
             var dialect = GetDialect(connection);
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + SpacePrefixQuery(query)))
+            var q = dialect.RenderStatement(query);
+
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
             {
-                cmd.SetParameterValues(arguments);
+                cmd.SetParameterValues(q.Value);
                 foreach (var n in FillItems<T>(cmd))
                     yield return n;
             }
-        }
+        }        
 
         /// <summary>
         /// Gets a single item of a given type
@@ -302,8 +405,13 @@ namespace Ceen.Database
         public static T SelectSingle<T>(this IDbConnection connection, Expression<Func<T, bool>> query)
             where T : new()
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), QueryUtil.FromLambda(query));
-            return SelectSingle<T>(connection, q.Key, q.Value);
+            return SelectSingle<T>(
+                connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -316,8 +424,13 @@ namespace Ceen.Database
         public static T SelectSingle<T>(this IDbConnection connection, QueryElement query)
             where T : new()
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), query);
-            return SelectSingle<T>(connection, q.Key, q.Value);
+            return SelectSingle<T>(
+                connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -331,15 +444,13 @@ namespace Ceen.Database
         public static T SelectSingle<T>(this IDbConnection connection, string query, params object[] arguments)
             where T : new()
         {
-            var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(typeof(T));
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateSelectCommand(typeof(T)) + SpacePrefixQuery(query) + " LIMIT 1"))
-            using(var rd = cmd.ExecuteReader(arguments))
-            {
-                return rd.Read()
-                    ? FillItem(rd, mapping, new T())
-                    : default(T);
-            }
+            return SelectSingle<T>(
+                connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Select()
+                    .Where(new CustomQuery(query, arguments))
+            );
         }
 
         /// <summary>
@@ -374,46 +485,6 @@ namespace Ceen.Database
         }
 
         /// <summary>
-        /// Executes a query and returns the values
-        /// </summary>
-        /// <param name="connection">The connection to use</param>
-        /// <param name="query">The SQL statement to execute</param>
-        /// <param name="arguments">The arguments to the command</param>
-        /// <typeparam name="T">The data elements to return</typeparam>
-        /// <returns>The items</returns>
-        public static IEnumerable<T> ExecuteAndFill<T>(this IDbConnection connection, string query, params object[] arguments)
-            where T : new()
-        {
-            var dialect = GetDialect(connection);
-            var map = dialect.GetTypeMap<T>();
-
-            using (var cmd = connection.CreateCommandWithParameters(query))
-            {
-                cmd.SetParameterValues(arguments);
-                using (var rd = cmd.ExecuteReader())
-                while(rd.Read())
-                {
-                    var el = new T();
-
-                    // Try to assign all fields returned
-                    for(var i = 0; i < rd.FieldCount; i++)
-                    {                        
-                        if (map.AllColumnsBySqlName.TryGetValue(rd.GetName(i), out var col))
-                            col.SetValueFromDb(el, rd.GetNormalizedValue(i));
-                        else if (map.AllColumnsByMemberName.TryGetValue(rd.GetName(i), out col))
-                            col.SetValueFromDb(el, rd.GetNormalizedValue(i));
-                        else
-                        { 
-                            // Log this?
-                        }
-                    }
-
-                    yield return el;
-                }
-            }            
-        }
-
-        /// <summary>
         /// Returns the number of records that match the query
         /// </summary>
         /// <param name="connection">The connection to use</param>
@@ -426,6 +497,20 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Returns the number of records that match the query.
+        /// Note that this method works on all query types (select, insert, update, delete)
+        /// and ignores any limits set on the query
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The query to extract the where clause from</param>
+        /// <typeparam name="T">The table type</typeparam>
+        /// <returns>The count</returns>
+        public static long SelectCount<T>(this IDbConnection connection, Query<T> query)
+        {
+            return SelectCount<T>(connection, query.Parsed.WhereQuery);
+        }
+
+        /// <summary>
         /// Returns the number of records that match the query
         /// </summary>
         /// <param name="connection">The connection to use</param>
@@ -434,7 +519,7 @@ namespace Ceen.Database
         /// <returns>The count</returns>
         public static long SelectCount<T>(this IDbConnection connection, QueryElement query)
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), query);
+            var q = connection.GetDialect().RenderWhereClause(typeof(T), query);
             return SelectCount<T>(connection, q.Key, q.Value);
         }
 
@@ -491,11 +576,23 @@ namespace Ceen.Database
         /// Note this function requires the entire SQL command to be given as the query
         /// </summary>
         /// <param name="connection">The connection to use</param>
+        /// <returns>A blank new query.</returns>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static Query<T> Query<T>(this IDbConnection connection)
+        {
+            return GetDialect(connection).Query<T>();
+        }
+        
+        /// <summary>
+        /// Performs a database query and returns the results.
+        /// Note this function requires the entire SQL command to be given as the query
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
         /// <param name="query">The SQL statement to execute</param>
         /// <param name="arguments">The arguments to the command</param>
         /// <returns>The items that match.</returns>
         /// <typeparam name="T">The data type parameter.</typeparam>
-        public static IEnumerable<T> Query<T>(this IDbConnection connection, string query, params object[] arguments)
+        public static IEnumerable<T> CustomQuery<T>(this IDbConnection connection, string query, params object[] arguments)
             where T : new()
         {
             using (var cmd = connection.CreateCommandWithParameters(query))
@@ -515,7 +612,7 @@ namespace Ceen.Database
         /// <param name="arguments">The arguments to the command</param>
         /// <returns>The items that match.</returns>
         /// <typeparam name="T">The data type parameter.</typeparam>
-        public static T QuerySingle<T>(this IDbConnection connection, string query, params object[] arguments)
+        public static T CustomQuerySingle<T>(this IDbConnection connection, string query, params object[] arguments)
             where T : new()
         {
             using (var cmd = connection.CreateCommandWithParameters(query))
@@ -579,8 +676,12 @@ namespace Ceen.Database
         /// <typeparam name="T">The data type parameter.</typeparam>
         public static int Update<T>(this IDbConnection connection, object item, Expression<Func<T, bool>> query)
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), QueryUtil.FromLambda(query));
-            return Update<T>(connection, item, q.Key, q.Value);
+            return Update(connection,
+                GetDialect(connection).
+                    Query<T>()
+                    .Update(item)
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -593,8 +694,12 @@ namespace Ceen.Database
         /// <typeparam name="T">The data type parameter.</typeparam>
         public static int Update<T>(this IDbConnection connection, object item, QueryElement query)
         {
-            var q = connection.GetDialect().RenderClause(typeof(T), query);
-            return Update<T>(connection, item, q.Key, q.Value);
+            return Update(connection,
+                GetDialect(connection).
+                    Query<T>()
+                    .Update(item)
+                    .Where(query)
+            );
         }
 
         /// <summary>
@@ -608,44 +713,47 @@ namespace Ceen.Database
         /// <typeparam name="T">The data type parameter.</typeparam>
         public static int Update<T>(this IDbConnection connection, object item, string query, params object[] arguments)
         {
-            var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(typeof(T));
-            var cols = mapping.UpdateColumns.Where(x => item.GetType().GetProperty(x.MemberName) != null).ToList();
-            if (cols.Count == 0 || cols.Count != item.GetType().GetProperties().Length)
-                throw new Exception("Incorrect update item given, not all properties match the target type");
-
-            // Throw in the update timestamp column here, if not already included
-            cols.AddRange(
-                mapping.UpdateColumns
-                .Where(x => 
-                    x.AutoGenerateAction == AutoGenerateAction.ClientChangeTimestamp 
-                    && !cols.Contains(x)
-                )
+            return Update(connection,
+                GetDialect(connection).
+                    Query<T>()
+                    .Update(item)
+                    .Where(new CustomQuery(query, arguments))
             );
-
-            var txt =
-                $"UPDATE {dialect.QuoteName(mapping.Name)}"
-                + $" SET {string.Join(", ", cols.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?"))}"
-                + SpacePrefixQuery(query);
-
-            using (var cmd = connection.CreateCommandWithParameters(txt))
-                return cmd.ExecuteNonQuery(cols.Select(x =>
-                {
-                    switch (x.AutoGenerateAction)
-                    {
-                        case AutoGenerateAction.ClientChangeTimestamp:
-                            return DateTime.Now;
-                        default:
-                        {
-                            var v = item.GetType().GetProperty(x.MemberName).GetValue(item);
-                            if (x.MemberType.IsEnum)
-                                return (v ?? string.Empty).ToString();
-
-                            return v;
-                        }
-                    }
-                }).Concat(arguments));
         }
+
+        /// <summary>
+        /// Updates one or more items with the given values.
+        /// </summary>
+        /// <returns>The number of rows updated.</returns>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="values">Thev values to update.</param>
+        /// <param name="query">The SQL where clause to execute</param>
+        /// <param name="arguments">The arguments to the command</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        public static int Update<T>(this IDbConnection connection, Dictionary<string, object> values, string query, params object[] arguments)
+        {
+            return Update(connection,
+                GetDialect(connection).
+                    Query<T>()
+                    .Update(values)
+                    .Where(new CustomQuery(query, arguments))
+            );
+        }
+
+        /// <summary>
+        /// Performs an update using the query
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The update query</param>
+        /// <returns>The number of rows updated.</returns>
+        public static int Update(this IDbConnection connection, Query query)
+        {
+            if (query.Parsed.Type != QueryType.Update)
+                throw new InvalidOperationException($"Cannot use a query of type {query.Parsed.Type} for UPDATE");
+            var q = connection.GetDialect().RenderStatement(query);
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
+                return cmd.ExecuteNonQuery(q.Value);
+        }        
 
         /// <summary>
         /// Updates the item, using the primary key to locate it.
@@ -656,27 +764,12 @@ namespace Ceen.Database
         /// <typeparam name="T">The data type parameter.</typeparam>
         public static bool UpdateItem<T>(this IDbConnection connection, T item)
         {
-            var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(typeof(T));
-
-            if (mapping.PrimaryKeys.Length == 0)
-                throw new ArgumentException("Cannot perform update there are no primary keys on the table");
-
-            var txt = 
-                $"UPDATE {dialect.QuoteName(mapping.Name)}"
-                + $" SET {string.Join(", ", mapping.UpdateColumns.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?" ))}"
-                + $" WHERE " + string.Join(" AND ", mapping.PrimaryKeys.Select(x => $"{dialect.QuoteName(x.ColumnName)} = ?"));
-
-            using (var cmd = connection.CreateCommandWithParameters(txt))
-                return cmd.ExecuteNonQuery(mapping.UpdateColumns.Select(x => {
-                    switch (x.AutoGenerateAction)
-                    {
-                        case AutoGenerateAction.ClientChangeTimestamp:
-                            return DateTime.Now;
-                        default:
-                            return x.GetValueForDb(item);
-                    }                    
-                }).Concat(mapping.PrimaryKeys.Select(x => x.GetValueForDb(item)))) > 0;
+            return Update(connection,
+                GetDialect(connection).
+                    Query<T>()
+                    .Update(item)
+                    .MatchPrimaryKeys(item)
+            ) > 0;
         }
 
         /// <summary>
@@ -690,42 +783,7 @@ namespace Ceen.Database
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
-            return DeleteItemById(connection, typeof(T), mapping.PrimaryKeys.Select(x => x.GetValueForDb(item)).ToArray());
-        }
-
-        /// <summary>
-        /// Deletes the item with the given ID
-        /// </summary>
-        /// <returns><c>true</c>, if item was deleted, <c>false</c> otherwise.</returns>
-        /// <param name="connection">The connection to use</param>
-        /// <param name="ids">The primary key.</param>
-        /// <param name="tdata">The data type</param>
-        /// <typeparam name="T">The data type parameter.</typeparam>
-        public static bool DeleteItemById(this IDbConnection connection, Type tdata, params object[] ids)
-        {
-            var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(tdata);
-            if (mapping.PrimaryKeys.Length == 0)
-                throw new ArgumentException("Cannot perform delete by ID when there are no primary keys on the table");
-            if (ids == null || ids.Length != mapping.PrimaryKeys.Length)
-                throw new ArgumentException($"Expected {mapping.PrimaryKeys.Length} keys but got {ids?.Length}");
-
-
-            var txt = dialect.CreateDeleteByIdCommand(tdata);
-            using (var cmd = connection.CreateCommandWithParameters(txt))
-                return cmd.ExecuteNonQuery(ids) > 0;
-        }
-
-        /// <summary>
-        /// Deletes items matching the where clause
-        /// </summary>
-        /// <param name="connection">The connection to use</param>
-        /// <param name="whereclause">The where clause</param>
-        /// <param name="arguments">The arguments for the where clause</param>
-        /// <returns>The number of items</returns>
-        public static int Delete<T>(this IDbConnection connection, string whereclause, params object[] arguments)
-        {
-            return Delete(connection, typeof(T), whereclause, arguments);
+            return DeleteItemById<T>(connection, mapping.PrimaryKeys.Select(x => x.GetValueForDb(item)).ToArray());
         }
 
         /// <summary>
@@ -737,50 +795,48 @@ namespace Ceen.Database
         /// <returns>The number of items</returns>
         public static int Delete<T>(this IDbConnection connection, Expression<Func<T, bool>> query)
         {
-            return Delete(connection, typeof(T), QueryUtil.FromLambda(query));
+            return Delete(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Delete()
+                    .Where(query)
+                );
         }
 
         /// <summary>
         /// Deletes items matching the where clause
         /// </summary>
         /// <param name="connection">The connection to use</param>
-        /// <param name="tdata">The data type to use</param>
         /// <param name="query">The query to use</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
         /// <returns>The number of items</returns>
         public static int Delete<T>(this IDbConnection connection, QueryElement query)
         {
-            return Delete(connection, typeof(T), query);
+            return Delete(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Delete()
+                    .Where(query)
+            );
         }
 
         /// <summary>
         /// Deletes items matching the where clause
         /// </summary>
         /// <param name="connection">The connection to use</param>
-        /// <param name="tdata">The data type to use</param>
-        /// <param name="query">The query to use</param>
-        /// <returns>The number of items</returns>
-        public static int Delete(this IDbConnection connection, Type tdata, QueryElement query)
-        {
-            var q = connection.GetDialect().RenderClause(tdata, query);
-            return Delete(connection, tdata, q.Key, q.Value);
-        }
-
-        /// <summary>
-        /// Deletes items matching the where clause
-        /// </summary>
-        /// <param name="connection">The connection to use</param>
-        /// <param name="tdata">The data type to use</param>
         /// <param name="whereclause">The where clause</param>
         /// <param name="arguments">The arguments for the where clause</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
         /// <returns>The number of items</returns>
-        public static int Delete(this IDbConnection connection, Type tdata, string whereclause, params object[] arguments)
+        public static int Delete<T>(this IDbConnection connection, string whereclause, params object[] arguments)
         {
-            var dialect = GetDialect(connection);
-            var mapping = dialect.GetTypeMap(tdata);
-
-            var txt = dialect.CreateDeleteCommand(tdata);
-            using(var cmd = connection.CreateCommandWithParameters(txt + SpacePrefixQuery(whereclause)))
-                return cmd.ExecuteNonQuery(arguments);
+            return Delete(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Delete()
+                    .Where(new CustomQuery(whereclause, arguments)
+                )
+            );
         }
 
         /// <summary>
@@ -792,8 +848,32 @@ namespace Ceen.Database
         /// <typeparam name="T">The data type parameter.</typeparam>
         public static bool DeleteItemById<T>(this IDbConnection connection, params object[] ids)
         {
-            return DeleteItemById(connection, typeof(T), ids);
+            var map = GetDialect(connection).GetTypeMap<T>();
+            return Delete(connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Delete()
+                    .Limit(1)
+                    .MatchPrimaryKeys(ids)
+            ) > 0;
         }
+
+        /// <summary>
+        /// Deletes items matching the where clause
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The query to use</param>
+        /// <returns>The number of items deleted</returns>
+        public static int Delete(this IDbConnection connection, Query query)
+        {
+            if (query.Parsed.Type != QueryType.Delete)
+                throw new InvalidOperationException($"Cannot use a query of type {query.Parsed.Type} for DELETE");
+            var q = connection.GetDialect().RenderStatement(query);
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
+                return cmd.ExecuteNonQuery(q.Value);
+        }
+
+
         /// <summary>
         /// Inserts the given item into the database
         /// </summary>
@@ -803,7 +883,13 @@ namespace Ceen.Database
         /// <returns>The inserted item</returns>
         public static T InsertOrIgnoreItem<T>(this IDbConnection connection, T item)
         {
-            return InsertItem(connection, item, true);
+            return Insert<T>(
+                connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Insert(item)
+                    .IgnoreInsertFailure()
+            );
         }
 
         /// <summary>
@@ -815,63 +901,81 @@ namespace Ceen.Database
         /// <returns>The inserted item</returns>
         public static T InsertItem<T>(this IDbConnection connection, T item)
         {
-            return InsertItem(connection, item, false);
+            // Catch bad mappings from the user
+            if (item is Query)
+                return Insert<T>(connection, (Query)(object)item);
+
+            return Insert<T>(
+                connection,
+                GetDialect(connection)
+                    .Query<T>()
+                    .Insert(item)
+            );
         }
 
         /// <summary>
         /// Inserts the given item into the database
         /// </summary>
         /// <param name="connection">The connection to use</param>
-        /// <param name="item">The item to insert.</param>
-        /// <param name="useInsertOrIgnore">Use &quote;INSERT OR IGNORE&quote; instead of the usual &quote;INSERT&quote; command </param>
+        /// <param name="query">The query to use.</param>
         /// <typeparam name="T">The data type parameter.</typeparam>
         /// <returns>The inserted item</returns>
-        private static T InsertItem<T>(IDbConnection connection, T item, bool useInsertOrIgnore)
+        public static T Insert<T>(this IDbConnection connection, Query<T> query)
+        {
+            return Insert<T>(connection, (Query)query);
+        }
+
+        /// <summary>
+        /// Inserts the given item into the database
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The query to use.</param>
+        /// <typeparam name="T">The data type parameter.</typeparam>
+        /// <returns>The inserted item</returns>
+        public static T Insert<T>(this IDbConnection connection, Query query)
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
+            
+            var q = dialect.RenderStatement(query);
+            var item = (T)query.Parsed.InsertItem;
 
-            using (var cmd = connection.CreateCommandWithParameters(dialect.CreateInsertCommand(typeof(T), useInsertOrIgnore)))
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
             {
-                // TODO: We might want to read the value from the database
-                // instead of relying on the generated value as we might
-                // have precision loss for the timestamps when going to the DB and back,
-                // which would result in value returned from create and subsequent select
-                // operations to differ
-                var clientgenerated = new Dictionary<ColumnMapping, object>();
-
-                var arguments = mapping.InsertColumns.Select(x =>
+                if (!mapping.IsPrimaryKeyAutogenerated)
                 {
-                    switch (x.AutoGenerateAction)
-                    {
-                        case AutoGenerateAction.ClientCreateTimestamp:
-                        case AutoGenerateAction.ClientChangeTimestamp:
-                            return clientgenerated[x] = DateTime.Now; 
-                        case AutoGenerateAction.ClientGenerateGuid:
-                            // If the object already has a primary key, use it
-                            if (string.IsNullOrWhiteSpace(x.GetValue(item) as string))
-                                return clientgenerated[x] = Guid.NewGuid().ToString();
-                            break;
-                    }
-
-                    return x.GetValueForDb(item);
-                });
-
-                if (!mapping.IsPrimaryKeyAutogenerated) {
-                    var res = cmd.ExecuteNonQuery(arguments) > 0;
-                    foreach (var x in clientgenerated)
-                        x.Key.SetValue(item, x.Value);
-                    return item;
+                    var res = cmd.ExecuteNonQuery(q.Value) > 0;
+                    foreach (var n in mapping.PrimaryKeys)
+                        n.SetValueFromDb(item, query.Parsed.UpdateValues[n.MemberName]);
                 }
-
-                var id = cmd.ExecuteScalar(arguments);
-                var pk = mapping.PrimaryKeys.First();
-                pk.SetValueFromDb(item, id);
-                foreach (var x in clientgenerated)
-                    x.Key.SetValue(item, x.Value);
-
-                return item;
+                else
+                {
+                    var id = cmd.ExecuteScalar(q.Value);
+                    var pk = mapping.PrimaryKeys.First();
+                    pk.SetValueFromDb(item, id);
+                }
             }
+
+            // TODO: We could also read back the client generated to ensure that the values do not
+            // have small precision differences
+            foreach (var x in mapping.ClientGenerated)
+                if (query.Parsed.UpdateValues.TryGetValue(x.MemberName, out var v))
+                    x.SetValue(item, v);
+
+            if (mapping.DatabaseGenerated.Count > (mapping.IsPrimaryKeyAutogenerated ? 1 : 0))
+            {
+                // Read back the client and database generated values
+                var cols = mapping.DatabaseGenerated.Concat(mapping.ClientGenerated);
+                SelectSingle(
+                    connection,
+                    connection.Query<T>()
+                        .Select(cols.Select(x => x.MemberName).ToArray())
+                        .MatchPrimaryKeys(item),
+                    () => item
+                );
+            }
+
+            return item;
         }
 
         /// <summary>
@@ -906,6 +1010,17 @@ namespace Ceen.Database
         public static TableMapping GetTypeMap<T>(this IDbConnection connection)
         {
             return GetDialect(connection).GetTypeMap<T>();
+        }
+
+        /// <summary>
+        /// Gets the type map for a given type
+        /// </summary>
+        /// <param name="connection">The connection to get the dialect from</param>
+        /// <param name="type">The type to get the map from</param>
+        /// <returns>The table mapping for the type</returns>
+        public static TableMapping GetTypeMap(this IDbConnection connection, Type type)
+        {
+            return GetDialect(connection).GetTypeMap(type);
         }
 
     }
