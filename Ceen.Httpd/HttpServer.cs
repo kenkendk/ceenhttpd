@@ -619,7 +619,10 @@ namespace Ceen.Httpd
             config.DebugLogHandler?.Invoke("Stopping", taskid, null);
             rc.Stop(taskid);
 
-            config.DebugLogHandler?.Invoke("Socket stopped, waiting for workers ...", taskid, null);
+            config.DebugLogHandler?.Invoke("Socket stopped, waiting for modules ...", taskid, null);
+            await Task.WhenAny(config.ShutdownAsync(), Task.Delay(5000));
+
+            config.DebugLogHandler?.Invoke("Socket and modules stopped, waiting for workers ...", taskid, null);
             await rc.FinishedTask;
 
             config.DebugLogHandler?.Invoke("Stopped", taskid, null);
@@ -826,7 +829,7 @@ namespace Ceen.Httpd
 
                         // Log a message indicating that we failed setting up SSL                        
                         using (var httpRequest = new HttpRequest(remoteEndPoint, logtaskid, logtaskid, null, SslProtocols.None, () => false))
-                            await LogRequestCompletedMessageAsync(controller, new HttpContext(httpRequest, null, storage), aex, DateTime.Now, new TimeSpan());
+                            await LogRequestCompletedMessageAsync(controller, new HttpContext(httpRequest, null, storage, config), aex, DateTime.Now, new TimeSpan());
 
                         return;
 					}
@@ -882,7 +885,8 @@ namespace Ceen.Httpd
 						context = new HttpContext(
                             cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol, isConnected),
 							resp = new HttpResponse(stream, config),
-							storage
+							storage,
+							config
 						);
 
 						// Make sure the response knows the context
@@ -1033,10 +1037,13 @@ namespace Ceen.Httpd
                     try { stream.Close(); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to close stream: {nex}", logtaskid, cur); }
 
+                    context?.LogWarningAsync("Request handler failed", ex);
+
                     try { await LogRequestCompletedMessageAsync(controller, context, ex, started, DateTime.Now - started); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to log request: {nex}", logtaskid, cur); }
 
                     config.DebugLogHandler?.Invoke("Failed handler", logtaskid, cur);
+
 
                 }
 				finally

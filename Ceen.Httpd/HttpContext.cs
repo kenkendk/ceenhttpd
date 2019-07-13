@@ -24,6 +24,17 @@ namespace Ceen.Httpd
 		public IStorageCreator Storage { get; private set; }
 
 		/// <summary>
+		/// Gets the loaded module info
+		/// </summary>
+		/// <value></value>
+		public ILoadedModuleInfo LoadedModules { get => m_config; }
+
+		/// <summary>
+		/// The runner executing the request
+		/// </summary>
+		private readonly ServerConfig m_config;
+
+		/// <summary>
 		/// Gets or sets the session storage.
 		/// Note that this can be null if there is no session module loaded.
 		/// </summary>
@@ -45,11 +56,13 @@ namespace Ceen.Httpd
 		/// <param name="request">The HTTP request.</param>
 		/// <param name="response">The HTTP response.</param>
 		/// <param name="storage">The storage instance</param>
-		public HttpContext(HttpRequest request, HttpResponse response, IStorageCreator storage)
+		/// <param name="config">The server config</params>
+		public HttpContext(HttpRequest request, HttpResponse response, IStorageCreator storage, ServerConfig config)
 		{
 			this.Request = request;
 			this.Response = response;
 			this.Storage = storage;
+			this.m_config = config;
 		}
 
         /// <summary>

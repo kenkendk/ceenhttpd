@@ -7,8 +7,13 @@ namespace Ceen.Extras
     /// <summary>
     /// Simple cache with events
     /// </summary>
-    public class MemCache : IModuleWithSetup
+    public class MemCache : IModuleWithSetup, INamedModule
     {
+        /// <summary>
+        /// The named memcache instances
+        /// </summary>
+        private static readonly Dictionary<string, MemCache> _instances = new Dictionary<string, MemCache>();
+
         /// <summary>
         /// The maximum number of items in the cache
         /// </summary>
@@ -20,24 +25,35 @@ namespace Ceen.Extras
         public TimeSpan DefaultExpirationTime { get; set; } = new TimeSpan(0);
 
         /// <summary>
+        /// The module name
+        /// </summary>
+        public string Name { get; private set; }
+
+        /// <summary>
         /// The base cache
         /// </summary>
-        private static Ceen.LRUCache<KeyValuePair<DateTime, object>> _cache;
+        private Ceen.LRUCache<KeyValuePair<DateTime, object>> m_cache;
 
         /// <summary>
         /// The update handlers
         /// </summary>
-        private static readonly Dictionary<string, List<Func<string, Task>>> _updateHandlers = new Dictionary<string, List<Func<string, Task>>>();
-
-        /// <summary>
-        /// The default expiration value
-        /// </summary>
-        private static TimeSpan _defaultExpiration;
+        private readonly Dictionary<string, List<Func<string, Task>>> m_updateHandlers = new Dictionary<string, List<Func<string, Task>>>();
 
         /// <summary>
         /// The lock guarding the _updateHandlers dictionary
         /// </summary>
-        private static readonly Ceen.AsyncLock _lock = new Ceen.AsyncLock();
+        private readonly Ceen.AsyncLock m_lock = new Ceen.AsyncLock();
+
+        /// <summary>
+        /// Creates a new anonymous memcache instance
+        /// </summary>
+        public MemCache() { }
+        
+        /// <summary>
+        /// Creates a new named memcache instance
+        /// </summary>
+        /// <param name="name">The name of the instance</param>
+        public MemCache(string name) { Name = name; }
 
         /// <summary>
         /// Expiration callback handler method
@@ -46,7 +62,7 @@ namespace Ceen.Extras
         /// <param name="item">The item being updated or deleted</param>
         /// <param name="deleting"><c>true</c> if the item is being deleted, <c>false</c> otherwise</param>
         /// <returns>An awaitable task</returns>
-        private static Task OnExpire(string key, KeyValuePair<DateTime, object> item, bool deleting)
+        private Task OnExpire(string key, KeyValuePair<DateTime, object> item, bool deleting)
         {
             if (deleting)
                 return NotifyChangeListeners(key, item.Value);
@@ -59,17 +75,17 @@ namespace Ceen.Extras
         /// <param name="key">The key of the item being added or deleted</param>
         /// <param name="item">The item being replaced (the old value)</param>
         /// <returns>An awaitable task</returns>
-        private static Task NotifyChangeListeners(string key, object item)
+        private Task NotifyChangeListeners(string key, object item)
         {
-            if (_updateHandlers.ContainsKey(key))
+            if (m_updateHandlers.ContainsKey(key))
                 Task.Run(async () =>
                 {
-                    _updateHandlers.TryGetValue(key, out var lst);
+                    m_updateHandlers.TryGetValue(key, out var lst);
                     if (lst == null || lst.Count == 0)
                         return;
 
                     Func<string, Task>[] items;
-                    using (await _lock.LockAsync())
+                    using (await m_lock.LockAsync())
                         items = lst.ToArray();
 
                     foreach (var n in items)
@@ -85,14 +101,14 @@ namespace Ceen.Extras
         /// <param name="keys">The keys to monitor</param>
         /// <param name="responder">The function to invoke on changes</param>
         /// <returns>An awaitable task</returns>
-        public static Task MonitorKeys(IEnumerable<string> keys, Func<string, Task> responder)
+        public Task MonitorKeys(IEnumerable<string> keys, Func<string, Task> responder)
         {
-            return _lock.LockedAsync(() =>
+            return m_lock.LockedAsync(() =>
             {
                 foreach (var k in keys)
                 {
-                    if (!_updateHandlers.TryGetValue(k, out var lst))
-                        lst = _updateHandlers[k] = new List<Func<string, Task>>();
+                    if (!m_updateHandlers.TryGetValue(k, out var lst))
+                        lst = m_updateHandlers[k] = new List<Func<string, Task>>();
 
                     if (!lst.Contains(responder))
                         lst.Add(responder);
@@ -106,18 +122,18 @@ namespace Ceen.Extras
         /// <param name="keys">The keys to unmonitor</param>
         /// <param name="responder">The function to remove</param>
         /// <returns>An awaitable task</returns>
-        public static Task UnmonitorKeys(IEnumerable<string> keys, Func<string, Task> responder)
+        public Task UnmonitorKeys(IEnumerable<string> keys, Func<string, Task> responder)
         {
-            return _lock.LockedAsync(() =>
+            return m_lock.LockedAsync(() =>
             {
                 foreach (var k in keys)
                 {
-                    if (!_updateHandlers.TryGetValue(k, out var lst))
+                    if (!m_updateHandlers.TryGetValue(k, out var lst))
                         continue;
 
                     lst.Remove(responder);
                     if (lst.Count == 0)
-                        _updateHandlers.Remove(k);
+                        m_updateHandlers.Remove(k);
                 }
             });
         }
@@ -128,7 +144,7 @@ namespace Ceen.Extras
         /// <param name="keys">The key to monitor</param>
         /// <param name="responder">The function to invoke on changes</param>
         /// <returns>An awaitable task</returns>
-        public static Task MonitorKey(string key, Func<string, Task> responder)
+        public Task MonitorKey(string key, Func<string, Task> responder)
         {
             return MonitorKeys(new string[] { key }, responder);
         }
@@ -139,7 +155,7 @@ namespace Ceen.Extras
         /// <param name="keys">The key to unmonitor</param>
         /// <param name="responder">The function to remove</param>
         /// <returns>An awaitable task</returns>
-        public static Task UnmonitorKey(string key, Func<string, Task> responder)
+        public Task UnmonitorKey(string key, Func<string, Task> responder)
         {
             return UnmonitorKeys(new string[] { key }, responder);
         }
@@ -150,9 +166,9 @@ namespace Ceen.Extras
         /// <param name="key">The key to store the item under</param>
         /// <param name="item">The item to store</param>
         /// <returns>An awaitable task</returns>
-        public static Task AddItem(string key, object item)
+        public Task AddItem(string key, object item)
         {
-            return AddItem(key, item, _defaultExpiration.Ticks == 0 ? new DateTime(0) : DateTime.Now + _defaultExpiration);
+            return AddItem(key, item, DefaultExpirationTime.Ticks == 0 ? new DateTime(0) : DateTime.Now + DefaultExpirationTime);
         }
 
         /// <summary>
@@ -162,7 +178,7 @@ namespace Ceen.Extras
         /// <param name="item">The item to store</param>
         /// <param name="expires">The time the item expires</param>
         /// <returns>An awaitable task</returns>
-        public static Task AddItem(string key, object item, TimeSpan expires)
+        public Task AddItem(string key, object item, TimeSpan expires)
         {
             return AddItem(key, item, DateTime.Now + expires);
         }
@@ -174,9 +190,9 @@ namespace Ceen.Extras
         /// <param name="item">The item to store</param>
         /// <param name="expires">The time the item expires</param>
         /// <returns>An awaitable task</returns>
-        public static async Task AddItem(string key, object item, DateTime expires)
+        public async Task AddItem(string key, object item, DateTime expires)
         {
-            await _cache.AddOrReplaceAsync(key, new KeyValuePair<DateTime, object>(expires, item));
+            await m_cache.AddOrReplaceAsync(key, new KeyValuePair<DateTime, object>(expires, item));
             await NotifyChangeListeners(key, item);
         }
 
@@ -185,9 +201,9 @@ namespace Ceen.Extras
         /// </summary>
         /// <param name="key">The key of the item to remove</param>
         /// <returns>An awaitable task</returns>
-        public static Task RemoveItem(string key)
+        public Task RemoveItem(string key)
         {
-            return _cache.TryGetUnlessAsync(key, (a, b) => true);
+            return m_cache.TryGetUnlessAsync(key, (a, b) => true);
         }
 
         /// <summary>
@@ -195,10 +211,10 @@ namespace Ceen.Extras
         /// </summary>
         /// <param name="key">The key of the item to remove</param>
         /// <returns>An awaitable task</returns>
-        public static async Task<object> TryGetValue(string key)
+        public async Task<object> TryGetValue(string key)
         {
             var exp = DateTime.Now;
-            var item = await _cache.TryGetUnlessAsync(key, (a, b) => b.Key.Ticks != 0 && b.Key < exp);
+            var item = await m_cache.TryGetUnlessAsync(key, (a, b) => b.Key.Ticks != 0 && b.Key < exp);
             return item.Key ? item.Value.Value : null;
         }
 
@@ -207,15 +223,73 @@ namespace Ceen.Extras
         /// </summary>
         public void AfterConfigure()
         {
-            if (_cache != null)
+            if (m_cache != null)
                 throw new InvalidOperationException("Can only initialize memcache once");
 
-            _defaultExpiration = DefaultExpirationTime;
-            _cache = new LRUCache<KeyValuePair<DateTime, object>>(
+            m_cache = new LRUCache<KeyValuePair<DateTime, object>>(
                 countlimit: MaxCacheItems,
                 expirationHandler: OnExpire
             );
+
+            // Register the first instance as the default instance
+            if (_instances.Count == 0)
+                _instances.Add(string.Empty, this);
+            if (!string.IsNullOrWhiteSpace(Name))
+                _instances.Add(Name, this);
         }
+
+        /// <summary>
+        /// Attempts to get the memcache with the given name
+        /// </summary>
+        /// <param name="name">The name of the instance to locate</param>
+        /// <returns>The memcache instance or null</returns>
+        public static MemCache GetByName(string name)
+        {
+            _instances.TryGetValue(name ?? string.Empty, out var m);
+            return m;
+        }
+
+        /// <summary>
+        /// Creates a typed helper bound to the given key
+        /// </summary>
+        /// <param name="key">The key to bind to</param>
+        /// <typeparam name="T">The type to use</typeparam>
+        /// <returns>The helper</returns>
+        public static CacheHelperInstance<T> Helper<T>(string instance, string key)
+            where T : class
+            => (GetByName(instance) ?? throw new ArgumentException($"No memcache with the name: {instance}"))
+                .Helper<T>(key);
+
+        /// <summary>
+        /// Creates a typed helper bound to the given key
+        /// </summary>
+        /// <param name="key">The key to bind to</param>
+        /// <typeparam name="T">The type to use</typeparam>
+        /// <returns>The helper</returns>
+        public static CacheHelperInstanceWithSubkey<T> SubKeyHelper<T>(string instance, string key)
+            where T : class
+            => (GetByName(instance) ?? throw new ArgumentException($"No memcache with the name: {instance}"))
+                .SubKeyHelper<T>(key);
+
+        /// <summary>
+        /// Creates a typed helper bound to the given key
+        /// </summary>
+        /// <param name="key">The key to bind to</param>
+        /// <typeparam name="T">The type to use</typeparam>
+        /// <returns>The helper</returns>
+        public CacheHelperInstance<T> Helper<T>(string key)
+            where T : class 
+            => new CacheHelperInstance<T>(this, key);
+
+        /// <summary>
+        /// Creates a typed helper bound to the given key prefix
+        /// </summary>
+        /// <param name="key">The key prefix to bind to</param>
+        /// <typeparam name="T">The type to use</typeparam>
+        /// <returns>The helper</returns>
+        public CacheHelperInstanceWithSubkey<T> SubKeyHelper<T>(string key)
+            where T : class
+            => new CacheHelperInstanceWithSubkey<T>(this, key);
 
         /// <summary>
         /// Helper method to provide type-safe access to a cache value
@@ -231,37 +305,30 @@ namespace Ceen.Extras
             /// <summary>
             /// The default expiration time to use
             /// </summary>
-            private readonly TimeSpan m_defaultExpiration;
+            private readonly MemCache m_parent;
 
             /// <summary>
             /// Constructs a new CacheHelperInstance
             /// </summary>
+            /// <param name="parent">The parent memcache instance</param>
             /// <param name="key">The key used to store the data</param>
-            public CacheHelperInstance(string key)
-                : this(key, MemCache._defaultExpiration)
-            {}
-
-            /// <summary>
-            /// Constructs a new CacheHelperInstance
-            /// </summary>
-            /// <param name="key">The key used to store the data</param>
-            /// <param name="defaultExpiration">The default expiration time to use</param>
-            public CacheHelperInstance(string key, TimeSpan defaultExpiration)
+            public CacheHelperInstance(MemCache parent, string key)
             {
+                m_parent = parent ?? throw new ArgumentNullException(nameof(parent));
                 m_key = key ?? throw new ArgumentNullException(nameof(key));
-                m_defaultExpiration = defaultExpiration;
+
             }
 
             /// <summary>
             /// Clears the key from the cache
             /// </summary>
             /// <returns>An awaitable task</returns>
-            public Task InvalidateAsync() => MemCache.RemoveItem(m_key);
+            public Task InvalidateAsync() => m_parent.RemoveItem(m_key);
             /// <summary>
             /// Gets the value from the cache, or null
             /// </summary>
             /// <returns>The value or null</returns>
-            public async Task<T> TryGetValueAsync() => (await MemCache.TryGetValue(m_key)) as T;
+            public async Task<T> TryGetValueAsync() => (await m_parent.TryGetValue(m_key)) as T;
             /// <summary>
             /// Gets the value from the cache, or creates it
             /// </summary>
@@ -276,8 +343,8 @@ namespace Ceen.Extras
             public async Task<T> TryGetValueAsync(Func<Task<T>> p)
             {
                 T res;
-                if ((res = await TryGetValue(m_key) as T) == null)
-                    await AddItem(m_key, res = await p());
+                if ((res = await m_parent.TryGetValue(m_key) as T) == null)
+                    await m_parent.AddItem(m_key, res = await p());
 
                 return res;
             }
@@ -286,14 +353,14 @@ namespace Ceen.Extras
             /// </summary>
             /// <param name="value">The value to set</param>
             /// <returns>An awaitable task</returns>
-            public Task SetValueAsync(T value) => MemCache.AddItem(m_key, value, m_defaultExpiration.Ticks == 0 ? new DateTime(0) : DateTime.Now + m_defaultExpiration);
+            public Task SetValueAsync(T value) => m_parent.AddItem(m_key, value, m_parent.DefaultExpirationTime.Ticks == 0 ? new DateTime(0) : DateTime.Now + m_parent.DefaultExpirationTime);
             /// <summary>
             /// Sets or updates the cached value
             /// </summary>
             /// <param name="value">The value to set</param>
             /// <param name="expires">The life-time of the entry</param>
             /// <returns>An awaitable task</returns>
-            public Task SetValueAsync(T value, TimeSpan expires) => MemCache.AddItem(m_key, value, expires);
+            public Task SetValueAsync(T value, TimeSpan expires) => m_parent.AddItem(m_key, value, expires);
         }
 
         /// <summary>
@@ -311,25 +378,17 @@ namespace Ceen.Extras
             /// <summary>
             /// The default expiration time to use
             /// </summary>
-            private readonly TimeSpan m_defaultExpiration;
+            private readonly MemCache m_parent;
 
             /// <summary>
             /// Constructs a new CacheHelperInstanceWithSubkey
             /// </summary>
+            /// <param name="parent">The memcache instance to use</param>
             /// <param name="key">The key used to store the data</param>
-            public CacheHelperInstanceWithSubkey(string key)
-                : this(key, MemCache._defaultExpiration)
-            { }
-
-            /// <summary>
-            /// Constructs a new CacheHelperInstanceWithSubkey
-            /// </summary>
-            /// <param name="key">The key used to store the data</param>
-            /// <param name="defaultExpiration">The default expiration time to use</param>
-            public CacheHelperInstanceWithSubkey(string key, TimeSpan defaultExpiration)
+            public CacheHelperInstanceWithSubkey(MemCache parent, string key)
             {
+                m_parent = parent ?? throw new ArgumentNullException(nameof(parent));
                 m_key = key ?? throw new ArgumentNullException(nameof(key));
-                m_defaultExpiration = defaultExpiration;
             }
 
             /// <summary>
@@ -343,12 +402,12 @@ namespace Ceen.Extras
             /// Clears a subkey from the cache
             /// </summary>
             /// <returns>An awaitable task</returns>
-            public Task InvalidateAsync(string subkey) => MemCache.RemoveItem(GetKeyForSubkey(subkey));
+            public Task InvalidateAsync(string subkey) => m_parent.RemoveItem(GetKeyForSubkey(subkey));
             /// <summary>
             /// Gets the value from the cache, or null
             /// </summary>
             /// <returns>The value or null</returns>
-            public async Task<T> TryGetValueAsync(string subkey) => (await MemCache.TryGetValue(GetKeyForSubkey(subkey))) as T;
+            public async Task<T> TryGetValueAsync(string subkey) => (await m_parent.TryGetValue(GetKeyForSubkey(subkey))) as T;
             /// <summary>
             /// Gets the value from the cache, or creates it
             /// </summary>
@@ -363,8 +422,8 @@ namespace Ceen.Extras
             public async Task<T> TryGetValueAsync(string subkey, Func<Task<T>> p)
             {
                 T res;
-                if ((res = await TryGetValue(GetKeyForSubkey(subkey)) as T) == null)
-                    await AddItem(GetKeyForSubkey(subkey), res = await p());
+                if ((res = await m_parent.TryGetValue(GetKeyForSubkey(subkey)) as T) == null)
+                    await m_parent.AddItem(GetKeyForSubkey(subkey), res = await p());
 
                 return res;
             }
@@ -373,14 +432,14 @@ namespace Ceen.Extras
             /// </summary>
             /// <param name="value">The value to set</param>
             /// <returns>An awaitable task</returns>
-            public Task SetValueAsync(string subkey, T value) => MemCache.AddItem(GetKeyForSubkey(subkey), value, m_defaultExpiration.Ticks == 0 ? new DateTime(0) : DateTime.Now + m_defaultExpiration);
+            public Task SetValueAsync(string subkey, T value) => m_parent.AddItem(GetKeyForSubkey(subkey), value, m_parent.DefaultExpirationTime.Ticks == 0 ? new DateTime(0) : DateTime.Now + m_parent.DefaultExpirationTime);
             /// <summary>
             /// Sets or updates the cached value
             /// </summary>
             /// <param name="value">The value to set</param>
             /// <param name="expires">The life-time of the entry</param>
             /// <returns>An awaitable task</returns>
-            public Task SetValueAsync(string subkey, T value, TimeSpan expires) => MemCache.AddItem(GetKeyForSubkey(subkey), value, expires);
+            public Task SetValueAsync(string subkey, T value, TimeSpan expires) => m_parent.AddItem(GetKeyForSubkey(subkey), value, expires);
         }
     }
 }

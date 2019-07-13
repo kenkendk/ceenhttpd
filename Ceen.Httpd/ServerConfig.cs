@@ -1,16 +1,17 @@
 ﻿using System;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace Ceen.Httpd
 {
 	/// <summary>
 	/// Configuration of a server instance
 	/// </summary>
-	public class ServerConfig
+	public class ServerConfig : ILoadedModuleInfo
 	{
 		/// <summary>
 		/// The socket backlog.
@@ -137,12 +138,12 @@ namespace Ceen.Httpd
 		/// The storage creator
 		/// </summary>
 		public IStorageCreator Storage { get; set; }
-
-		/// <summary>
-		/// A cached copy of the server name and version,
-		/// for use in the output headers.
-		/// </summary>
-		public static readonly string SERVER_NAME;
+		
+        /// <summary>
+        /// A cached copy of the server name and version,
+        /// for use in the output headers.
+        /// </summary>
+        public static readonly string SERVER_NAME;
 
 		/// <summary>
 		/// Static initializer for the <see cref="T:Ceen.Httpd.ServerConfig"/> class.
@@ -299,7 +300,48 @@ namespace Ceen.Httpd
 
             PostProcessors.Add(postprocessor);
             return this;
-        }		
-	}
+        }
+
+		/// <summary>
+		/// Calls all shutdown modules
+		/// </summary>
+		/// <returns>A combined task</returns>
+		public Task ShutdownAsync()
+		{
+			var res = Ceen.Context
+				.GetItemsOfType<IWithShutdown>(this)
+				.Select(x => x.ShutdownAsync())
+				.ToArray();
+
+			if (res.Length == 0)
+				return Task.FromResult(true);
+			return Task.WhenAll(res);
+		}
+
+
+        /// <summary>
+        /// The handlers loaded by the router
+        /// </summary>
+        IEnumerable<KeyValuePair<string, IHttpModule>> ILoadedModuleInfo.Handlers 
+			=> (Router as Router)?.Rules.Select(x => new KeyValuePair<string, IHttpModule>(x.Key?.ToString(), x.Value));
+
+        /// <summary>
+        /// The logger instances
+        /// </summary>
+        IEnumerable<ILogger> ILoadedModuleInfo.Loggers 
+			=> Loggers;
+
+        /// <summary>
+        /// The loaded modules
+        /// </summary>
+        IEnumerable<IModule> ILoadedModuleInfo.Modules 
+			=> Modules;
+
+        /// <summary>
+        /// The loaded post-processors
+        /// </summary>
+        IEnumerable<IPostProcessor> ILoadedModuleInfo.PostProcessors 
+			=> PostProcessors;
+    }
 }
 

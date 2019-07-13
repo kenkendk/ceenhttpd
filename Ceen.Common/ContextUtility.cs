@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Ceen
@@ -147,5 +148,54 @@ namespace Ceen
         {
             return Current.LogWarningAsync(null, ex);
         }
+
+
+        /// <summary>
+        /// Gets a named module of the given type
+        /// </summary>
+        /// <param name="self">The context instance</param>
+        /// <param name="name">The name of the module to find</param>
+        /// <param name="comparer">The string comparer</param>
+        /// <typeparam name="T">The type of item to return</typeparam>
+        /// <returns>The first match</returns>
+        public static T GetNamedItem<T>(this IHttpContext self, string name, StringComparison comparer = StringComparison.OrdinalIgnoreCase)
+            => GetNamedItem<T>(self.LoadedModules, name);
+
+        /// <summary>
+        /// Gets a named module of the given type
+        /// </summary>
+        /// <param name="self">The module info instance</param>
+        /// <param name="name">The name of the module to find</param>
+        /// <param name="comparer">The string comparer</param>
+        /// <typeparam name="T">The type of item to return</typeparam>
+        /// <returns>The first match</returns>
+        public static T GetNamedItem<T>(this ILoadedModuleInfo self, string name, StringComparison comparer = StringComparison.OrdinalIgnoreCase)
+            => GetItemsOfType<INamedModule>(self)
+                .Where(x => string.Equals(x.Name, name, comparer))
+                .OfType<T>()
+                .FirstOrDefault();
+
+        /// <summary>
+        /// Gets all items assignable to a specific type
+        /// </summary>
+        /// <param name="self">The module info instance</param>
+        /// <typeparam name="T">The type of items to return</typeparam>
+        /// <returns>The items matchin the given type</returns>
+        public static IEnumerable<T> GetItemsOfType<T>(this IHttpContext self)
+            => GetItemsOfType<T>(self.LoadedModules);
+
+        /// <summary>
+        /// Gets all items assignable to a specific type
+        /// </summary>
+        /// <param name="self">The module info instance</param>
+        /// <typeparam name="T">The type of items to return</typeparam>
+        /// <returns>The items matchin the given type</returns>
+        public static IEnumerable<T> GetItemsOfType<T>(this ILoadedModuleInfo self)
+            => new T[0]
+                .Concat(self?.Handlers?.Select(x => x.Value).OfType<T>() ?? new T[0])
+                .Concat(self?.Loggers?.OfType<T>() ?? new T[0])
+                .Concat(self?.Modules?.OfType<T>() ?? new T[0])
+                .Concat(self?.PostProcessors?.OfType<T>() ?? new T[0]);
+
     }
 }

@@ -461,6 +461,11 @@ namespace Ceen
 		/// </summary>
 		IDictionary<string, string> LogData { get; }
 
+		/// <summary>
+		/// Information about loaded modules
+		/// </summary>
+		ILoadedModuleInfo LoadedModules { get; }
+
         /// <summary>
         /// Logs a message
         /// </summary>
@@ -469,6 +474,41 @@ namespace Ceen
         /// <param name="ex">The exception to log</param>
         /// <returns>An awaitable task</returns>
         Task LogMessageAsync(LogLevel level, string message, Exception ex);
+	}
+
+	/// <summary>
+	/// Interface for querying the current running server about the loaded modules
+	/// </summary>
+	public interface ILoadedModuleInfo
+	{
+        /// <summary>
+        /// The handlers loaded by the router
+        /// </summary>
+        IEnumerable<KeyValuePair<string, IHttpModule>> Handlers { get; }
+        /// <summary>
+        /// The logger instances
+        /// </summary>
+        IEnumerable<ILogger> Loggers { get; }
+        /// <summary>
+        /// The loaded modules
+        /// </summary>
+        IEnumerable<IModule> Modules { get; }
+        /// <summary>
+        /// The loaded post-processors
+        /// </summary>
+        IEnumerable<IPostProcessor> PostProcessors { get; }
+    }
+
+	/// <summary>
+	/// Interface for giving a module a unique name,
+	/// allowing for easier access through the <see name="ILoadedModuleInfo" />
+	/// </summary>
+	public interface INamedModule
+	{
+		/// <summary>
+		/// The name of the module
+		/// </summary>
+		string Name { get; }
 	}
 
 	/// <summary>
@@ -495,10 +535,22 @@ namespace Ceen
         void AfterConfigure();
     }
 
-	/// <summary>
-	/// Basic interface for a request handler
-	/// </summary>
-	public interface IHttpModule
+    /// <summary>
+    /// Shared interface for marking a module or logger as needing to shutdown
+    /// </summary>
+    public interface IWithShutdown
+    {
+        /// <summary>
+        /// Method called when module needs to shut down
+        /// </summary>
+		/// <returns>An awaitable task</returns>
+        Task ShutdownAsync();
+    }
+
+    /// <summary>
+    /// Basic interface for a request handler
+    /// </summary>
+    public interface IHttpModule
 	{
 		/// <summary>
 		/// Process the request for the specified context.

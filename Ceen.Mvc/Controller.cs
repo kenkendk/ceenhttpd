@@ -17,9 +17,23 @@ namespace Ceen.Mvc
 	}
 
 	/// <summary>
-	/// Implementation of a controller
+	/// Interface for allowing a controller to reconfigure the static parts
+	/// from attributes to runtime values
 	/// </summary>
-	public abstract class Controller
+    public interface IIDynamicConfiguredController
+    {
+		/// <summary>
+		/// Change a statically parsed route at runtime
+		/// </summary>
+		/// <param name="x">The route to change</param>
+		/// <returns>The patched route</returns>
+        PartialParsedRoute PatchRoute(PartialParsedRoute x);
+    }
+
+    /// <summary>
+    /// Implementation of support methods in a controller
+    /// </summary>
+    public abstract class Controller
 	{
 		/// <summary>
 		/// Returns the result as JSON encoded with UTF-8

@@ -11,7 +11,7 @@ namespace Ceen.Extras
     /// Queues requests and flushes them in batches out-of-band,
     /// to avoid clogging/interfering with normal execution
     /// </summary>
-    public class LogModule : DatabaseBackedModule, IMessageLogger, IStartLogger, ILoggerWithSetup
+    public class LogModule : DatabaseBackedModule, IMessageLogger, IStartLogger, ILoggerWithSetup, INamedModule
     {
         /// <summary>
         /// Represents a logged HTTP request
@@ -115,6 +115,11 @@ namespace Ceen.Extras
         }
 
         /// <summary>
+        /// Gets or sets the name of the module
+        /// </summary>
+        public string Name { get; set; } = "LogModule";
+
+        /// <summary>
         /// The time between flushing the log data
         /// </summary>
         public TimeSpan FLUSH_PERIOD { get; set; } = TimeSpan.FromSeconds(5);
@@ -133,6 +138,13 @@ namespace Ceen.Extras
         /// A list of requests that are started and needs to be created in the log table
         /// </summary>
         private Dictionary<string, HttpLogEntry> m_startedEntries = new Dictionary<string, HttpLogEntry>();
+
+        /// <summary>
+        /// The lock guarding access to the lists with entries and lines
+        /// </summary>
+        /// <returns></returns>
+        private readonly AsyncLock m_lock = new AsyncLock();
+
         /// <summary>
         /// A list of entries that are completed and needs to be updated in the log table
         /// </summary>
@@ -144,25 +156,9 @@ namespace Ceen.Extras
         private List<HttpLogEntryLine> m_lines = new List<HttpLogEntryLine>();
 
         /// <summary>
-        /// The list of currently loaded log modules.
-        /// TODO: Should be possible to get this from the execution context
-        /// </summary>
-        private static List<LogModule> _loadedModules = new List<LogModule>();
-
-        /// <summary>
-        /// Gets the loaded log modules
-        /// </summary>
-        public static IEnumerable<LogModule> LoadedModules { get => _loadedModules.AsReadOnly(); }
-
-        /// <summary>
         /// The runner task
         /// </summary>
         private Task m_runner = null;
-
-        /// <summary>
-        /// The lock guarding database access
-        /// </summary>
-        private readonly AsyncLock m_db_lock = new AsyncLock();
 
         /// <summary>
         /// Creates a new instance of the log handler
@@ -171,7 +167,6 @@ namespace Ceen.Extras
             : base()
         {
             ConnectionString = "logdata.sqlite";
-            _loadedModules.Add(this);
         }
 
         /// <summary>
@@ -311,14 +306,11 @@ namespace Ceen.Extras
                 m_runner = null;
             }
 
-            // Ensure we only have one runner or SQLite gets confused
-            // but do not block the normal log data pickup during the database writes
+            // This detaching allows us to take and hold the database lock
+            // an not delay new log entries while we keep the lock
             try
             {
-                using (await m_db_lock.LockAsync())
-                using (var tr = m_con.BeginTransaction())
-                using (var db = new TransactionConnection(m_con, tr))
-                {
+                await m_con.RunInTransactionAsync(db => {
                     foreach (var n in s)
                         try { db.InsertItem(n.Value); }
                         catch (Exception ex) { Console.WriteLine(ex); }
@@ -337,12 +329,6 @@ namespace Ceen.Extras
 
                         try
                         {
-                            // db.Delete<HttpLogEntryLine>(
-                            //     $"WHERE {db.QuotedColumnName<HttpLogEntryLine>(nameof(HttpLogEntryLine.ParentID))} " +
-                            //     $"IN (SELECT {db.QuotedColumnName<HttpLogEntry>(nameof(HttpLogEntry.ID))} FROM {db.QuotedTableName<HttpLogEntry>()} WHERE {db.QuotedColumnName<HttpLogEntry>(nameof(HttpLogEntry.Finished))} < ?)",
-                            //     DateTime.Now - MAX_LOG_AGE
-                            // );
-
                             // Remove old lines
                             db.Delete<HttpLogEntry>(
                                 x => x.Finished < DateTime.Now - MAX_LOG_AGE
@@ -356,10 +342,7 @@ namespace Ceen.Extras
                         }
                         catch (Exception ex) { Console.WriteLine(ex); }
                     }
-
-                    tr.Commit();
-                }
-
+                });
             }
             catch (Exception ex)
             {
