@@ -522,7 +522,24 @@ namespace Ceen.Httpd.Cli
 		{
 			var cfg = CreateServerConfig(config);
 
-			if (config.AutoLoadAssemblies)
+            // Expose our configuration to allow modules to call back, 
+			// beware that these values should never be reported to the client
+			// as there might be proxies in front which will make them useless
+			// to clients not running on the local machine
+			if (config.ListenHttp)
+			{
+				var parsedip = ParseUtil.ParseIPAddress(config.HttpAddress);
+				var ip = parsedip == IPAddress.Any ? "127.0.0.1" : parsedip.ToString();
+            	Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", "http://" + ip + ":" + config.HttpPort);
+			}
+            if (config.ListenHttps)
+			{
+                var parsedip = ParseUtil.ParseIPAddress(config.HttpsAddress);
+                var ip = parsedip == IPAddress.Any ? "127.0.0.1" : parsedip.ToString();
+                Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", "http://" + ip + ":" + config.HttpsPort);
+			}
+
+            if (config.AutoLoadAssemblies)
 			{
 				// Workaround for unittests not providing EntryAssembly
 				var callingasm = Assembly.GetEntryAssembly();
