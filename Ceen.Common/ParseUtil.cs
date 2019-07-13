@@ -29,7 +29,7 @@ namespace Ceen
 
             var res = new TimeSpan(0);
             var len = 0;
-            foreach (var m in new Regex("(?<number>[-|+]?[0-9]+)(?<suffix>[wdhms])", RegexOptions.IgnoreCase).Matches(value).Cast<Match>())
+            foreach (var m in new Regex("\\s*(?<number>[-|+]?[0-9]+)(?<suffix>[wdhms])\\s*", RegexOptions.IgnoreCase).Matches(value).Cast<Match>())
             {
                 if (!m.Success)
                     break;
