@@ -244,6 +244,38 @@ namespace Ceen.Mvc
 	}
 
 	/// <summary>
+	/// Represents the parsed route before binding any variables
+	/// </summary>
+	public class PartialParsedRoute
+	{
+		/// <summary>
+		/// The controller instance to use
+		/// </summary>
+		public Controller Controller;
+		/// <summary>
+		/// The path fragment on the controller
+		/// </summary>
+		public string ControllerPath;
+		/// <summary>
+		/// The path fragment on the interface
+		/// </summary>
+		public string InterfacePath;
+		/// <summary>
+		/// The path fragment on the method
+		/// </summary>
+		public string MethodPath;
+		/// <summary>
+		/// The method to invoke
+		/// </summary>
+		public MethodInfo Method;
+		/// <summary>
+		/// The verbs accepted by the method
+		/// </summary>
+		public string[] Verbs;
+
+	}
+
+	/// <summary>
 	/// Router that can route to a set of controllers
 	/// </summary>
 	public class ControllerRouter : IRouter, IHttpModule
@@ -327,8 +359,9 @@ namespace Ceen.Mvc
 
 		private static RouteParser BuildParse(IEnumerable<Controller> controllers, ControllerRouterConfig config)
 		{
-			var controller_routes =
-				controllers.SelectMany(x =>
+			var controller_routes = controllers
+				.Where(x => !(x is ManualRoutingController))
+				.SelectMany(x =>
 				{
 					string name;
 					var nameattr = x.GetType().GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
@@ -415,17 +448,26 @@ namespace Ceen.Mvc
 					if (routes.Count() == 0)
 						routes = new[] { string.Empty };
 
-					return routes.Select(y => new
+					// Get any accepted verbs
+					var verbs = x.Method.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant()).ToArray();
+
+					return routes.Select(y => new PartialParsedRoute()
 					{
 						Controller = x.Controller,
-						ControllerRoute = x.ControllerRoute,
+						ControllerPath = x.ControllerRoute,
 						InterfacePath = x.InterfacePath,
 						Method = x.Method,
-						MethodRoute = y						
+						MethodPath = y,		
+						Verbs = verbs
 					});
 					
 				}
-			).ToArray();
+			)
+			// Attach custom controller routes
+			.Concat(
+				controllers.OfType<ManualRoutingController>().SelectMany(x => x.Routes)
+			)
+			.ToArray();
 
 			// Now we have the cartesian product of all route/controller/action pairs, then build the target strings
 			var tmp = new RouteParser(config.Template, !config.CaseSensitive, null);
@@ -435,8 +477,11 @@ namespace Ceen.Mvc
 			var target_strings =
 				target_routes.SelectMany(x =>
 				{
-					var methodverbs = x.Method.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant());
-					var entry = new RouteEntry(x.Controller, x.Method, methodverbs.ToArray(), null);
+					// Provide a hook point for the dynamic routing option
+					if (x.Controller is IIDynamicConfiguredController idc)
+						x = idc.PatchRoute(x);
+
+					var entry = new RouteEntry(x.Controller, x.Method, x.Verbs, null);
 
 					var path = new RouteParser("/", !config.CaseSensitive, entry);
 
@@ -448,7 +493,7 @@ namespace Ceen.Mvc
 							path = path.Append(x.InterfacePath, !config.CaseSensitive, entry);
 					}
 
-					var ct = string.IsNullOrWhiteSpace(x.ControllerRoute) ? config.Template : x.ControllerRoute;
+					var ct = string.IsNullOrWhiteSpace(x.ControllerPath) ? config.Template : x.ControllerPath;
 
 					if (!string.IsNullOrWhiteSpace(ct))
 					{
@@ -462,7 +507,7 @@ namespace Ceen.Mvc
 						}
 					}
 
-					var mt = x.MethodRoute;
+					var mt = x.MethodPath;
 					if (!string.IsNullOrWhiteSpace(mt))
 					{
 						if (mt.StartsWith("/", StringComparison.Ordinal))
@@ -497,9 +542,9 @@ namespace Ceen.Mvc
 					.SelectMany(y => actionnames.Select(
 						z => path
 							.Bind(config.ControllerGroupName, y, !config.CaseSensitive, true)
-							.Bind(config.ActionGroupName, z, !config.CaseSensitive, true)
+							.Bind(config.ActionGroupName, z, !config.CaseSensitive, true)							
 							.PrunePath()
-							.ReplaceTarget(x.Controller, x.Method, methodverbs.ToArray())
+							.ReplaceTarget(x.Controller, x.Method, x.Verbs)
 							)
 		                );
 				}
@@ -581,6 +626,9 @@ namespace Ceen.Mvc
 			var values = new object[method.ArgumentCount];
             var hasreadbody = false;
 
+			foreach (var m in urlmatch)
+				context.Request.RequestState[m.Key] = m.Value;
+
 			for (var ix = 0; ix < values.Length; ix++)
 			{
 				var e = method.Parameters[ix];
@@ -616,6 +664,10 @@ namespace Ceen.Mvc
 					values[e.ArgumentIndex] = e.Parameter.DefaultValue;
 				else
 					values[e.ArgumentIndex] = e.Parameter.ParameterType.IsValueType ? Activator.CreateInstance(e.Parameter.ParameterType) : null;
+
+				// Provide the bound variables to the processing module
+				if (!e.IsContextParameter)
+					context.Request.RequestState[e.Name] = values[e.ArgumentIndex];
 			}
 
 			var res = method.Method.Invoke(controller, values);
