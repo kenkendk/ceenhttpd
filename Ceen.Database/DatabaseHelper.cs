@@ -750,6 +750,11 @@ namespace Ceen.Database
         {
             if (query.Parsed.Type != QueryType.Update)
                 throw new InvalidOperationException($"Cannot use a query of type {query.Parsed.Type} for UPDATE");
+
+            var dialect = GetDialect(connection);
+            var mapping = dialect.GetTypeMap(query.Parsed.DataType);
+            mapping.Validate(query.Parsed.UpdateValues);
+
             var q = connection.GetDialect().RenderStatement(query);
             using (var cmd = connection.CreateCommandWithParameters(q.Key))
                 return cmd.ExecuteNonQuery(q.Value);
@@ -936,9 +941,11 @@ namespace Ceen.Database
         {
             var dialect = GetDialect(connection);
             var mapping = dialect.GetTypeMap(typeof(T));
-            
-            var q = dialect.RenderStatement(query);
+
             var item = (T)query.Parsed.InsertItem;
+            mapping.Validate(item);
+
+            var q = dialect.RenderStatement(query);
 
             using (var cmd = connection.CreateCommandWithParameters(q.Key))
             {

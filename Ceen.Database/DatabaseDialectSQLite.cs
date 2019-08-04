@@ -404,6 +404,19 @@ namespace Ceen.Database
                     string.Equals(compare.Operator, "NOT IN", StringComparison.OrdinalIgnoreCase)
                 )
                 {
+                    // Support for "IN" with sub-query
+                    if (compare.RightHandSide is Query rhq) 
+                    {
+                        if (rhq.Parsed.Type != QueryType.Select)
+                            throw new ArgumentException("The query must be a select statement for exactly one column", nameof(compare.RightHandSide));
+                        if (rhq.Parsed.SelectColumns.Count() != 1)
+                            throw new ArgumentException("The query must be a select statement for exactly one column", nameof(compare.RightHandSide));
+
+                        var rvp = RenderStatement(rhq);
+                        args.AddRange(rvp.Value);
+                        return $"{RenderWhereClause(type, compare.LeftHandSide, args)} {compare.Operator} ({rvp.Key})";
+                    }
+
                     var rhsel = compare.RightHandSide;
                     IEnumerable items = null;
                     
