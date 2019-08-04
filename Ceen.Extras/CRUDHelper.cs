@@ -132,6 +132,25 @@ namespace Ceen.Extras
         public virtual Query<TValue> OnQuery(AccessType type, TKey id, Query<TValue> q) => q;
 
         /// <summary>
+        /// Avoid repeated allocations of unused tasks
+        /// </summary>
+        /// <returns></returns>
+        protected readonly Task m_completedTask = Task.FromResult(true);
+
+        /// <summary>
+        /// Hook function for validating an item before inserting it
+        /// </summary>
+        /// <param name="item">The item being inserted</param>
+        protected virtual Task BeforeInsertAsync(TValue item) => m_completedTask;
+
+        /// <summary>
+        /// Hook function for validating an item before inserting it
+        /// </summary>
+        /// <param name="key">The ID of the item being inserted</param>
+        /// <param name="item">The item being inserted</param>
+        protected virtual Task BeforeUpdateAsync(TKey key, Dictionary<string, object> values) => m_completedTask;
+
+        /// <summary>
         /// The different access types
         /// </summary>
         public enum AccessType
@@ -149,6 +168,29 @@ namespace Ceen.Extras
         }
 
         /// <summary>
+        /// Statically allocated instance of a null result
+        /// </summary>
+        protected static readonly Task<IResult> NULL_RESULT_TASK = Task.FromResult<IResult>(null);
+
+        /// <summary>
+        /// Custom exception handler, used to report messages from validation to the user
+        /// </summary>
+        /// <param name="ex">The error to handle</param>
+        /// <returns>A result if the error was handled, <c>null</c> otherwise</returns>
+        protected virtual Task<IResult> HandleExceptionAsync(Exception ex)
+        {
+            if (ex is ValidationException vex)
+            {
+                var pre = string.Empty;
+                if (vex.Member != null)
+                    pre = vex.Member.Name + " - ";
+                return Task.FromResult(Status(BadRequest, pre + vex.Message));
+            }
+
+            return NULL_RESULT_TASK;
+        }
+
+        /// <summary>
         /// Gets an item
         /// </summary>
         /// <param name="id">The item to get</param>
@@ -159,19 +201,29 @@ namespace Ceen.Extras
         public virtual async Task<IResult> Get(TKey id)
         {
             await Authorize(AccessType.Get, id);
-            var q = Connection
-                    .Query<TValue>()
-                    .Select()
-                    .MatchPrimaryKeys(new object[] { id })
-                    .Limit(1);
+            try
+            {
+                var q = Connection
+                        .Query<TValue>()
+                        .Select()
+                        .MatchPrimaryKeys(new object[] { id })
+                        .Limit(1);
 
-            OnQuery(AccessType.Get, id, q);
+                OnQuery(AccessType.Get, id, q);
 
-            var res = await Connection.RunInTransactionAsync(db => db.SelectSingle(q));
-            if (res == null)
-                return NotFound;
+                var res = await Connection.RunInTransactionAsync(db => db.SelectSingle(q));
+                if (res == null)
+                    return NotFound;
 
-            return Json(res);
+                return Json(res);
+            }
+            catch (Exception ex)
+            {
+                var r = await HandleExceptionAsync(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }
         }
 
         /// <summary>
@@ -181,30 +233,65 @@ namespace Ceen.Extras
         /// <param name="values">The values to patch with</param>
         /// <returns>The response</returns>
         [HttpPut]
+        [HttpPatch]
         [Ceen.Mvc.Name("index")]
         [Route("{id}")]
         public virtual async Task<IResult> Patch(TKey id, Dictionary<string, object> values)
         {
             await Authorize(AccessType.Update, id);
-            if (values == null)
+            if (values == null || values.Count == 0)
                 return BadRequest;
 
-            // Make the field names case insensitive
-            var realvalues = new Dictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
-            var q = Connection
-                .Query<TValue>()
-                .Update(realvalues)
-                .MatchPrimaryKeys(new object[] { id })
-                .Limit(1);
-
-            OnQuery(AccessType.Update, id, q);
-
-            return await Connection.RunInTransactionAsync(db =>
+            try
             {
-                if (db.Update(q) > 0)
-                    return Json(db.SelectItemById<TValue>(id));
-                return NotFound;
-            });
+                await BeforeUpdateAsync(id, values);
+
+                // We need to keep the lock, otherwise we could have 
+                // a race between reading the current item and updating
+
+                // We do not want to deserialize the data while holding the lock,
+                // as that would make a any hanging transfer hold the lock.
+                // So we accept a dictionary as input, but we cannot call `Populate`
+                // with the dictionary directly, so we re-serialize it to a string,
+                // such that we can call `Populate` without any potential hang.
+
+                // This is not ideal, but we cannot accept a TValue as input,
+                // because it might be partial (PATCH) and applying the partial
+                // input would cause data loss, and we cannot go back and see which
+                // properties were present
+
+                // Re-build a string representation of the data
+                var jsonSr = Newtonsoft.Json.JsonConvert.SerializeObject(values);
+
+                return await Connection.RunInTransactionAsync(db =>
+                {
+                    var item = db.SelectItemById<TValue>(id);
+                    if (item == null)
+                        return NotFound;
+
+                    // Patch with the source data
+                    Newtonsoft.Json.JsonConvert.PopulateObject(jsonSr, item);
+
+                    var q = Connection
+                        .Query<TValue>()
+                        .Update(item)
+                        .MatchPrimaryKeys(new object[] { id })
+                        .Limit(1);
+
+                    OnQuery(AccessType.Update, id, q);
+
+                    if (db.Update(q) > 0)
+                        return Json(db.SelectItemById<TValue>(id));
+                    return NotFound;
+                });
+            }
+            catch (Exception ex)
+            {
+                var r = await HandleExceptionAsync(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }
         }
 
         /// <summary>
@@ -220,17 +307,29 @@ namespace Ceen.Extras
             if (item == null)
                 return BadRequest;
 
-            var q = Connection
-                .Query<TValue>()
-                .Insert(item);
-
-            OnQuery(AccessType.Add, default(TKey), q);
-
-            return Json(await Connection.RunInTransactionAsync(db =>
+            try
             {
-                db.Insert(q);
-                return item;
-            }));
+                await BeforeInsertAsync(item);
+
+                var q = Connection
+                    .Query<TValue>()
+                    .Insert(item);
+
+                OnQuery(AccessType.Add, default(TKey), q);
+
+                return Json(await Connection.RunInTransactionAsync(db =>
+                {
+                    db.Insert(q);
+                    return item;
+                }));
+            }
+            catch (Exception ex)
+            {
+                var r = await HandleExceptionAsync(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }
         }
 
         /// <summary>
@@ -245,20 +344,30 @@ namespace Ceen.Extras
         {
             await Authorize(AccessType.Delete, id);
 
-            var q = Connection
-                    .Query<TValue>()
-                    .Delete()
-                    .Limit(1)
-                    .MatchPrimaryKeys(new object[] { id });
-
-            OnQuery(AccessType.Delete, id, q);
-
-            return await Connection.RunInTransactionAsync(db =>
+            try
             {
-                if (db.Delete(q) > 0)
-                    return OK;
-                return NotFound;
-            });
+                var q = Connection
+                        .Query<TValue>()
+                        .Delete()
+                        .Limit(1)
+                        .MatchPrimaryKeys(new object[] { id });
+
+                OnQuery(AccessType.Delete, id, q);
+
+                return await Connection.RunInTransactionAsync(db =>
+                {
+                    if (db.Delete(q) > 0)
+                        return OK;
+                    return NotFound;
+                });
+            }
+            catch (Exception ex)
+            {
+                var r = await HandleExceptionAsync(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }
         }
 
         /// <summary>
@@ -284,24 +393,34 @@ namespace Ceen.Extras
             if (request == null)
                 return BadRequest;
 
-            var q = Connection
-                .Query<TValue>()
-                .Select()
-                .Where(request.Filter)
-                .OrderBy(request.SortOrder)
-                .Offset(request.Offset)
-                .Limit(request.Count);
+            try
+            {
+                var q = Connection
+                    .Query<TValue>()
+                    .Select()
+                    .Where(request.Filter)
+                    .OrderBy(request.SortOrder)
+                    .Offset(request.Offset)
+                    .Limit(request.Count);
 
-            OnQuery(AccessType.List, default(TKey), q);
+                OnQuery(AccessType.List, default(TKey), q);
 
-            return Json(await Connection.RunInTransactionAsync(db =>
-                new ListResponse()
-                {
-                    Offset = request.Offset,
-                    Total = db.SelectCount(q),
-                    Result = db.Select(q).ToArray()
-                }
-            ));
+                return Json(await Connection.RunInTransactionAsync(db =>
+                    new ListResponse()
+                    {
+                        Offset = request.Offset,
+                        Total = db.SelectCount(q),
+                        Result = db.Select(q).ToArray()
+                    }
+                ));
+            }
+            catch (Exception ex)
+            {
+                var r = await HandleExceptionAsync(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }
         }
     }
 }
