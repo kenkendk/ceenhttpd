@@ -77,10 +77,10 @@ namespace Ceen.Httpd
             if (m_passthrough)
             {
                 using (var cs = new CancellationTokenSource(m_idletime))
-                using (cancellationToken.Register(()=>cs.Cancel()))
+                using (cancellationToken.Register(() => cs.Cancel()))
                 {
                     rtask = m_parent.ReadAsync(buffer, offset, count, cs.Token);
-                    rt = await Task.WhenAny( m_timeouttask, m_stoptask, rtask);
+                    rt = await Task.WhenAny(m_timeouttask, m_stoptask, rtask);
                 }
 
                 if (rt != rtask)
@@ -101,7 +101,7 @@ namespace Ceen.Httpd
             using (cancellationToken.Register(() => cs.Cancel()))
             {
                 rtask = m_parent.ReadAsync(buffer, offset, (int) Math.Min(count, m_bytesleft), cs.Token);
-                rt = await Task.WhenAny( m_timeouttask, m_stoptask, rtask);
+                rt = await Task.WhenAny(m_timeouttask, m_stoptask, rtask);
             }
 
             if (rt != rtask)
@@ -138,6 +138,23 @@ namespace Ceen.Httpd
         {
             get => m_bytesread;
             set => throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Helper method to consume the body of the request
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns><c>true</c> if the bytes could be discarded, <c>false</c> otherwise</returns>
+        public async Task<bool> DiscardAllAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            if (m_passthrough)
+                return false;
+
+            var buf = new byte[1024 * 8];
+            while(m_bytesleft > 0)
+                await ReadAsync(buf, 0, buf.Length, cancellationToken);
+
+            return true;
         }
         #endregion
     }

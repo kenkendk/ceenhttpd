@@ -876,33 +876,33 @@ namespace Ceen.Httpd
 						return;
 
 					do
-					{
+                    {
                         cur?.Dispose();
 
                         var reqid = SetLoggingRequestID();
-						bs.ResetReadLength(config.MaxPostSize);
-						started = DateTime.Now;
-						context = new HttpContext(
+                        bs.ResetReadLength(config.MaxPostSize);
+                        started = DateTime.Now;
+                        context = new HttpContext(
                             cur = new HttpRequest(endpoint, logtaskid, reqid, clientcert, sslProtocol, isConnected),
-							resp = new HttpResponse(stream, config),
-							storage,
-							config
-						);
+                            resp = new HttpResponse(stream, config),
+                            storage,
+                            config
+                        );
 
-						// Make sure the response knows the context
-						resp.Context = context;
+                        // Make sure the response knows the context
+                        resp.Context = context;
 
-						// Setup up the callback for allowing handlers to report errors
-						context.LogHandlerDelegate = (level, message, ex) => LogProcessingMessage(controller, context, ex, level, message, DateTime.Now);
+                        // Setup up the callback for allowing handlers to report errors
+                        context.LogHandlerDelegate = (level, message, ex) => LogProcessingMessage(controller, context, ex, level, message, DateTime.Now);
 
-						// Set up call context access to this instance
-						Context.SetCurrentContext(context);
+                        // Set up call context access to this instance
+                        Context.SetCurrentContext(context);
 
                         var timeoutcontroltask = new TaskCompletionSource<bool>();
-						var idletime = TimeSpan.FromSeconds(config.RequestHeaderReadTimeoutSeconds);
+                        var idletime = TimeSpan.FromSeconds(config.RequestHeaderReadTimeoutSeconds);
 
-						// Set up timeout for processing
-						cur.SetProcessingTimeout(TimeSpan.FromSeconds(config.MaxProcessingTimeSeconds));
+                        // Set up timeout for processing
+                        cur.SetProcessingTimeout(TimeSpan.FromSeconds(config.MaxProcessingTimeSeconds));
 
                         config.DebugLogHandler?.Invoke("Parsing headers", logtaskid, endpoint);
                         try
@@ -941,16 +941,16 @@ namespace Ceen.Httpd
                             throw;
                         }
 
-						string keepalive;
-						cur.Headers.TryGetValue("Connection", out keepalive);
-						if (("keep-alive".Equals(keepalive, StringComparison.OrdinalIgnoreCase) || keepingalive) && requests > 1)
-						{
-							resp.KeepAlive = true;
-							if (!keepingalive)
-								resp.AddHeader("Keep-Alive", string.Format("timeout={0}, max={1}", config.KeepAliveTimeoutSeconds, config.KeepAliveMaxRequests));
-						}
-						else
-							resp.KeepAlive = false;
+                        string keepalive;
+                        cur.Headers.TryGetValue("Connection", out keepalive);
+                        if (("keep-alive".Equals(keepalive, StringComparison.OrdinalIgnoreCase) || keepingalive) && requests > 1)
+                        {
+                            resp.KeepAlive = true;
+                            if (!keepingalive)
+                                resp.AddHeader("Keep-Alive", string.Format("timeout={0}, max={1}", config.KeepAliveTimeoutSeconds, config.KeepAliveMaxRequests));
+                        }
+                        else
+                            resp.KeepAlive = false;
 
 						// Inform loggers of the request with all fields filled
                         await LogRequestStartedAsync(config, cur);
@@ -958,7 +958,7 @@ namespace Ceen.Httpd
                         config.DebugLogHandler?.Invoke("Running handler", logtaskid, cur);
 
                         try
-						{
+                        {
                             // Trigger the streams to stop reading/writing data when the timeout happens
                             using (cur.TimeoutCancellationToken.Register(() => timeoutcontroltask.TrySetCanceled(), useSynchronizationContext: false))
                             {
@@ -988,29 +988,42 @@ namespace Ceen.Httpd
                                 }
                                 while (resp.IsRedirectingInternally);
                             }
-						}
-						catch (HttpException hex)
-						{
-							// Try to set the status code to 500
-							if (resp.HasSentHeaders)
-								throw;
+                        }
+                        catch (HttpException hex)
+                        {
+                            // Try to set the status code if possible
+                            if (resp.HasSentHeaders)
+                                throw;
 
-							resp.StatusCode = hex.StatusCode;
-							resp.StatusMessage = hex.StatusMessage;
-						}
+                            resp.StatusCode = hex.StatusCode;
+                            resp.StatusMessage = hex.StatusMessage;
+                        }
 
                         config.DebugLogHandler?.Invoke("Flushing response", logtaskid, cur);
+
+						// We must consume the entire body, 
+						// otherwise we do not know when the next header starts
+						var allBytesRead = false;
+
+						// Empty the body, if possible
+						if (resp.KeepAlive && cur.Body is LimitedBodyStream lbs)
+							allBytesRead = await lbs.DiscardAllAsync(cur.TimeoutCancellationToken);
+
+                        // Toggle the keep-alive flag if possible
+                        if (resp.KeepAlive && !resp.HasSentHeaders && !allBytesRead)
+                            resp.KeepAlive = false;
 
                         // If the handler has not flushed, we do it
                         await resp.FlushAndSetLengthAsync();
 
-						// Check if keep-alive is possible
-						keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength;
-						requests--;
+						// Request completed without failures
+                        await LogRequestCompletedMessageAsync(controller, context, null, started, DateTime.Now - started);
 
-						await LogRequestCompletedMessageAsync(controller, context, null, started, DateTime.Now - started);
+                        // Check if keep-alive is possible
+                        keepingalive = resp.KeepAlive && resp.HasWrittenCorrectLength && allBytesRead;
+                        requests--;
 
-					} while (keepingalive);
+                    } while (keepingalive);
 				}
 				catch (Exception ex)
 				{
@@ -1021,6 +1034,7 @@ namespace Ceen.Httpd
 						{
 							if (!resp.HasSentHeaders)
 							{
+								resp.KeepAlive = false;
 								resp.StatusCode = Ceen.HttpStatusCode.InternalServerError;
 								resp.StatusMessage = HttpStatusMessages.DefaultMessage(Ceen.HttpStatusCode.InternalServerError);
 							}
@@ -1040,8 +1054,6 @@ namespace Ceen.Httpd
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to log request: {nex}", logtaskid, cur); }
 
                     config.DebugLogHandler?.Invoke("Failed handler", logtaskid, cur);
-
-
                 }
 				finally
 				{
@@ -1066,6 +1078,6 @@ namespace Ceen.Httpd
                     await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStartedAsync(cur)));
             }
         }
-	}
+    }
 
 }
