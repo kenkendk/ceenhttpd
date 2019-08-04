@@ -276,6 +276,22 @@ namespace Ceen.Database
         public static QueryElement NotIn(object lhs, IEnumerable<object> args) => new Compare(lhs, "NOT IN", args);
 
         /// <summary>
+        /// Checks if an element is in a list
+        /// </summary>
+        /// <param name="lhs">The item to examine</param>
+        /// <param name="other">The query to check if the value is in</param>
+        /// <returns>A query element</returns>
+        public static QueryElement In(object lhs, Query other) => new Compare(lhs, "IN", other);
+        /// <summary>
+        /// Checks if an element is in a list
+        /// </summary>
+        /// <param name="lhs">The item to examine</param>
+        /// <param name="other">The query to check if the value is not in</param>
+        /// <returns>A query element</returns>
+        public static QueryElement NotIn(object lhs, Query other) => new Compare(lhs, "NOT IN", other);
+
+
+        /// <summary>
         /// Negates an expression
         /// </summary>
         /// <param name="expr">The expression to negate</param>
@@ -1222,6 +1238,38 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Adds an additional where clause to the query, using a sub-query to filter
+        /// </summary>
+        /// <param name="column">The column to match</param>
+        /// <param name="subquery">The subquery to use</param>
+        /// <returns>The query instance</returns>
+        public Query<T> WhereIn(string column, Query subquery)
+        {
+            return Where(
+                QueryUtil.In(
+                    column,
+                    subquery
+                )
+            );
+        }
+
+        /// <summary>
+        /// Adds an additional where clause to the query, using a sub-query to filter
+        /// </summary>
+        /// <param name="column">The column to match</param>
+        /// <param name="subquery">The subquery to use</param>
+        /// <returns>The query instance</returns>
+        public Query<T> WhereNotIn(string column, Query subquery)
+        {
+            return Where(
+                QueryUtil.NotIn(
+                    column,
+                    subquery
+                )
+            );
+        }
+
+        /// <summary>
         /// Prepends a match for the primary key to the where clause
         /// </summary>
         /// <param name="item">The item with the primary key values</param>
@@ -1525,6 +1573,13 @@ namespace Ceen.Database
             LeftHandSide = lefthandside;
             Operator = @operator;
             RightHandSide = righthandside;
+            if (RightHandSide is Query rhq)
+            {
+                if (rhq.Parsed.Type != QueryType.Select)
+                    throw new ArgumentException("The query must be a select statement for exactly one column", nameof(righthandside));
+                if (rhq.Parsed.SelectColumns.Count() != 1)
+                    throw new ArgumentException("The query must be a select statement for exactly one column", nameof(righthandside));
+            }
         }
 
         /// <summary>
