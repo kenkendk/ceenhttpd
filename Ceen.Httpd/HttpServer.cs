@@ -919,8 +919,12 @@ namespace Ceen.Httpd
                         }
                         catch (HttpException hex)
                         {
+							// Since we throw, make sure we log this incomplete request
+                            await LogRequestStartedAsync(config, cur);
+
                             // Errors during header parsing are unlikely to
                             // keep the connection in a consistent state
+                            resp.KeepAlive = false;
                             resp.StatusCode = hex.StatusCode;
                             resp.StatusMessage = hex.StatusMessage;
                             await resp.FlushHeadersAsync();
@@ -930,6 +934,10 @@ namespace Ceen.Httpd
                         catch (Exception ex)
                         {
                             config.DebugLogHandler?.Invoke($"Failed while reading header: {ex}", logtaskid, cur);
+
+                            // Since we throw, make sure we log this incomplete request
+                            await LogRequestStartedAsync(config, cur);
+
                             throw;
                         }
 
@@ -944,19 +952,8 @@ namespace Ceen.Httpd
 						else
 							resp.KeepAlive = false;
 
-
-						if (config.Loggers != null)
-						{
-							var count = config.Loggers.Count;
-							if (count == 1)
-							{
-								var sl = config.Loggers[0] as IStartLogger;
-								if (sl != null)
-									await sl.LogRequestStartedAsync(cur);
-							}
-							else if (count != 0)
-								await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStartedAsync(cur)));
-						}
+						// Inform loggers of the request with all fields filled
+                        await LogRequestStartedAsync(config, cur);
 
                         config.DebugLogHandler?.Invoke("Running handler", logtaskid, cur);
 
@@ -1053,6 +1050,22 @@ namespace Ceen.Httpd
                 }
 			}
 		}
+
+        private static async Task LogRequestStartedAsync(ServerConfig config, HttpRequest cur)
+        {
+            if (config.Loggers != null)
+            {
+                var count = config.Loggers.Count;
+                if (count == 1)
+                {
+                    var sl = config.Loggers[0] as IStartLogger;
+                    if (sl != null)
+                        await sl.LogRequestStartedAsync(cur);
+                }
+                else if (count != 0)
+                    await Task.WhenAll(config.Loggers.Where(x => x is IStartLogger).Cast<IStartLogger>().Select(x => x.LogRequestStartedAsync(cur)));
+            }
+        }
 	}
 
 }
