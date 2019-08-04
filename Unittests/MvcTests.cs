@@ -230,7 +230,7 @@ namespace Unittests
 	}
 
 	[TestFixture()]
-	public class Test
+	public class MvcTest
 	{
 		[Test()]
 		public void TestRoutingWithConflictingVerbs()
@@ -350,7 +350,9 @@ namespace Unittests
 
 				Assert.AreEqual(ControllerItems.WAIT_INDEX, server.GetStatusMessage("/api/v1/wait", "GET"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed), server.GetStatusMessage("/api/v1/wait", "POST"));
-			}
+				
+                Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/api/v1/4/detail"));
+            }
 
 		}		
 		[Test()]
@@ -396,7 +398,9 @@ namespace Unittests
 
 				Assert.AreEqual(ControllerItems.WAIT_INDEX, server.GetStatusMessage("/api/v1/wait", "GET"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed), server.GetStatusMessage("/api/v1/wait", "POST"));
-			}
+
+                Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/api/v1/4/detail"));
+            }
 			      
 		}
 
@@ -437,8 +441,9 @@ namespace Unittests
 
 				Assert.AreEqual(ControllerItems.WAIT_INDEX, server.GetStatusMessage("/api/v1/wait", "GET"));
 				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed), server.GetStatusMessage("/api/v1/wait", "POST"));
-			}
 
+                Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/api/v1/4/detail"));
+            }
 		}
 	}
 }
