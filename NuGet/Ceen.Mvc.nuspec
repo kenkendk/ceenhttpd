@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Model-View-Controller package for Ceen.Httpd</description>
-    <releaseNotes>Version bump</releaseNotes>
+    <releaseNotes>Improved multipage response envelope</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>

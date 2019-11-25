@@ -4,6 +4,7 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
 
     <IsPackable>false</IsPackable>
+    <ReleaseVersion>0.9.8</ReleaseVersion>
   </PropertyGroup>
 
   <ItemGroup>

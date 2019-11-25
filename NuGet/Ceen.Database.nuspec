@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Database and ORM support for Ceen.Httpd</description>
-    <releaseNotes>Version bump</releaseNotes>
+    <releaseNotes>Improved query support</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>

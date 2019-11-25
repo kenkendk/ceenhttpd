@@ -10,13 +10,13 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A commandline host for Ceen.Httpd</description>
-    <releaseNotes>Added support for supplying numbers and times with textual versions instead of raw numbers</releaseNotes>
+    <releaseNotes>Improved failure handling and reloading</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
         <dependency id="Ceen.Mvc" version="0.9.3" />
-        <dependency id="SockRock" version="1.0.3" />
+        <dependency id="SockRock" version="1.0.5" />
         <dependency id="LeanIPC" version="0.9.1" />
         <!-- <dependency id="SyslogNet.Client" version="0.3.2" /> -->
       </dependencies>
