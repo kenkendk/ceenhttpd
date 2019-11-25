@@ -324,6 +324,6 @@ using Ceen.Extras;
 
 static GuardedConnection _sharedCon = new GuardedConnection(DatabaseHelper.CreateConnection("sample.sqlite"));
 
-var users = _sharedCon.RunInTransactionAsync(con => con.SelectCount<User>(""));
+var users = await _sharedCon.RunInTransactionAsync(con => con.SelectCount<User>(x => x.Active));
 
 ```
