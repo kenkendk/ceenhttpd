@@ -1,9 +1,9 @@
-== Ceen.Database ==
+## Ceen.Database ##
 
 The `Ceen.Database` is a micro [object-relation mapper (ORM)](https://en.wikipedia.org/wiki/Object-relational_mapping) with limited focus on the "relation" part, but more focus on flexibility and type-safety.
 
 
-=== Background ===
+### Background ###
 The motivation for this project is the ubiquitous need for permanent storage in may applications, but particularly for use within a web backend application (i.e. running under `Ceen.Httpd`).
 
 In almost all programming languages and frameworks, there is some support for using relational databases, and within .Net this starts with the `System.Data.IDbConnection` interface. The interface is a backend-agnostic way of issuing commands to an SQL based database.
@@ -15,14 +15,14 @@ However, they are often slow for simple things, such as flat-table queries, wher
 Unfortunately, Dapper does not support creation of tables, requiring the user to write the SQL queries by hand, and make sure they are compatible with the underlying SQL dialect. Another downside of Dapper is the need to embed strings with the names of properties, causing problems when fields are renamed.
 
 
-=== Database agnostic ===
+### Database agnostic ###
 A crucial component in `Ceen.Database` is the `IDatabaseDialect`, which contains all database specific code. As the project is targeted for micro-services, the only implementation so far is the `SQliteDatabaseDialect`, but adding new providers can be done easily. If you intend to implement a new dialect, the `DatabaseDialectBase` can be derived from, where you would only need to implement the abstract methods.
 
 You can use the `Ceen.Database.DatabaseHelper.CreateConnection()` helper method to create a `System.Data.IDbConnection` instance in a portable manner, or use the specific database methods. Once you have the `System.Data.IDbConnection` instance, you can call `Ceen.Database.DatabaseHelper.GetDialect()` and provide the dialect you want to use. If you do not call this method, the first use of the database instance will assign `Ceen.Database.DatabaseHelper.DefaultDialect` to the instance.
 
 Most methods in `Ceen.Database` are extension methods to `System.Data.IDbConnection` so they will show up if you have `using Ceen.Database;` at the top of your file.
 
-=== Mapping data ===
+### Mapping data ###
 In a type-safe focused language, such as C#, many features of the language are lost if the types are not statically defined. For this reason, a key component in `Ceen.Database` is the use of `TableMapping` where a C# type can be used to describe a database table.
 
 An example:
@@ -81,7 +81,7 @@ If you need to, you can always fall back to providing a custom SQL and executing
 
 By default, the call will add `IF NOT EXISTS` (or similar based on SQL dialect), such that it is always safe to call this method without checking for table existence. The method will also default to adding new columns, as this can be done with no data loss. Renamed columns are not detected, so you need custom logic to move data if you rename or remove columns, and need to access the data.
 
-=== Table rules ===
+### Table rules ###
 When working with relational data, and especially in a web-service, it is required to perform some kind of validation on the input data. Some validation can be done on the client to provide fast user feedback, but server-side validation is required to avoid various data-based attacks, such as dumping huge binary strings into the database.
 
 If you prefer, you can add this validation manually in the code that accepts the input, but for some uses, it is simper to add validation directly on the tables. An example could be:
@@ -121,7 +121,7 @@ class User
 
 In this example, the `Username` field is unique by itself, whereas the `Firstname` and `Lastname` fields combined are unique. Unlike the validation rules, these constraints are enforced via the database schema, and cannot be bypassed. For some use-cases, constraints can also speed up query speeds.
 
-=== Data queries ===
+### Data queries ###
 
 With `Ceen.Database` there are multiple layers you can use to issue queries to the database. All the layers are implemented as extensions to `System.Data.IDbConnection` so you need to add `using Ceen.Database;` in order to access them.
 
@@ -200,7 +200,7 @@ var user = db.SelectSingle<User>(x => x.Username == username && x.Password == pa
 
 This more concise syntax has some overhead in parsing the query function, but makes it trivial to read and write. Only a subset of operators are supported, but common query issues, such as datetimes, nulls, greater/less, parenthesis, IN, etc. are supported.
 
-=== Create, Retrieve, Update, Delete: CRUD operations ===
+### Create, Retrieve, Update, Delete: CRUD operations ###
 
 Creating an entry is done simply with the `InsertItem` method:
 
@@ -270,7 +270,7 @@ var c = db.Update(
 );
 ```
 
-=== Parsing user supplied SQL ===
+### Parsing user supplied SQL ###
 
 When writing a web service, it is often required that the client can request filtering, sorting, and pagination. There are many ways to allow the client to perform this, ranging from a fixed set of allowed queries, over some manual construction of query parameters, to something like GraphQL. While all these have benefits, there is something very familiar to SQL.
 
@@ -310,7 +310,7 @@ db.Select(q);
 
 ```
 
-=== SQLite and multithreading ===
+### SQLite and multithreading ###
 When writing a web service, it is paramount that it can handle multiple requests simultaneously. This is generally not a problem, but some databases, notably SQLite, do not support concurrent access.
 
 To support such databases, `Ceen.Extras` includes the class `GuardedConnection` which wraps any `System.Data.IDbInstance`, and provides the `RunInTransactionAsync` method that uses an `AsyncLock` to guard the database from concurrent access. The guarding disables the lock if the database does not require it.
