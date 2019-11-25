@@ -258,7 +258,7 @@ class HackedList {
 
 
 var db = DatabaseHelper.CreateConnection("sample.sqlite");
-// Similar to: UPDATE User SET Hacked=1 WHERE Email IN (SELECT HackedID WHERE Type LIKE "email")
+// Similar to: UPDATE User SET Hacked=1 WHERE Email IN (SELECT HackedID FROM HackedList WHERE Type LIKE "email")
 var c = db.Update(
 	db.Query<User>()
 	  .Update(new { Hacked = true })
