@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>Ceen.Extras</id>
+    <version>0.9.3</version>
+    <authors>Kenneth Skovhede</authors>
+    <owners>Kenneth Skovhede</owners>
+    <!-- <license type="expression">MIT</license> -->
+    <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Extras for Ceen</description>
+    <releaseNotes>Initial release</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2019</copyright>
+    <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
+    <dependencies>
+        <dependency id="Ceen.Common" version="0.9.3" />
+        <dependency id="Ceen.Mvc" version="0.9.3" />
+        <dependency id="Ceen.Database" version="0.9.3" />
+      </dependencies>
+  </metadata>
+  <files>
+    <file src="Ceen.Extras.dll" target="lib/netstandard2.0" />
+  </files>
+</package>
