@@ -30,15 +30,6 @@ namespace Ceen.Database
         /// Creates a new connection wrapper
         /// </summary>
         /// <param name="connection">The connection to wrap</param>
-        public TransactionConnection(IDbConnection connection)
-        {
-            m_connection = connection;
-        }
-
-        /// <summary>
-        /// Creates a new connection wrapper
-        /// </summary>
-        /// <param name="connection">The connection to wrap</param>
         /// <param name="transaction">The transaction to use</param>
         public TransactionConnection(IDbConnection connection, IDbTransaction transaction)
         {
