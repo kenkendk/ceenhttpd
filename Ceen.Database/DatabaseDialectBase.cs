@@ -145,14 +145,13 @@ namespace Ceen.Database
         /// <param name="offset">The optional offset to use</param>
         /// <param name="limit">The maximum number of items to use</param>
         /// <returns>The limit fragment</returns>
-        public abstract string Limit(int limit, int? offset = null);
+        public abstract string Limit(long limit, long? offset = null);
 
         /// <summary>
         /// Renders an SQL where clause from a query element
         /// </summary>
         /// <param name="type">The type to generate the clause for.</param>
         /// <param name="element">The element to use</param>
-        /// <param name="order">The query order</param>
         /// <returns>The SQL where clause</returns>
         public abstract KeyValuePair<string, object[]> RenderWhereClause(Type type, QueryElement element);
 

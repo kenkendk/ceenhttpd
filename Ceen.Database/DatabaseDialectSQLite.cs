@@ -334,7 +334,7 @@ namespace Ceen.Database
         /// <param name="offset">The optional offset to use</param>
         /// <param name="limit">The maximum number of items to use</param>
         /// <returns>The limit fragment</returns>
-        public override string Limit(int limit, int? offset)
+        public override string Limit(long limit, long? offset)
         {
             if (offset == null)
                 return $"LIMIT {limit}";

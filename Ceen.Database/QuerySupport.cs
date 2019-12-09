@@ -604,7 +604,7 @@ namespace Ceen.Database
         /// <summary>
         /// The limit to use
         /// </summary>
-        private Tuple<int, int> m_limit;
+        private Tuple<long, long> m_limit;
         /// <summary>
         /// The order to use
         /// </summary>
@@ -661,7 +661,7 @@ namespace Ceen.Database
         /// <summary>
         /// The limit to apply, or null for unlimited
         /// </summary>
-        public Tuple<int, int> LimitParams { get => m_limit; }
+        public Tuple<long, long> LimitParams { get => m_limit; }
 
         /// <summary>
         /// Gets the update values
@@ -985,7 +985,7 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="limit">The limit to use</param>
         /// <returns>The query instance</returns>
-        public ParsedQuery Limit(int limit)
+        public ParsedQuery Limit(long limit)
         {
             if (m_isCompleted)
                 throw new InvalidOperationException("Cannot change the query after it is finalized");
@@ -995,12 +995,12 @@ namespace Ceen.Database
                 throw new InvalidOperationException($"Cannot use {nameof(Limit)} on an INSERT statement");
 
             if (m_limit == null)
-                m_limit = new Tuple<int, int>(limit, -1);
+                m_limit = new Tuple<long, long>(limit, -1);
             else
             {
                 if (m_limit.Item1 != -1)
                     throw new ArgumentException("Cannot set the limit more than once");
-                m_limit = new Tuple<int, int>(limit, m_limit.Item2);
+                m_limit = new Tuple<long, long>(limit, m_limit.Item2);
             }
 
             return this;
@@ -1010,7 +1010,7 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="offset">The limit to use</param>
         /// <returns>The query instance</returns>
-        public ParsedQuery Offset(int offset)
+        public ParsedQuery Offset(long offset)
         {
             if (m_isCompleted)
                 throw new InvalidOperationException("Cannot change the query after it is finalized");
@@ -1020,12 +1020,12 @@ namespace Ceen.Database
                 throw new InvalidOperationException($"Can only use {nameof(Offset)} on SELECT");
 
             if (m_limit == null)
-                m_limit = new Tuple<int, int>(-1, offset);
+                m_limit = new Tuple<long, long>(-1, offset);
             else
             {
                 if (m_limit.Item2 != -1)
                     throw new InvalidOperationException("Cannot set the offset more than once");
-                m_limit = new Tuple<int, int>(m_limit.Item1, offset);
+                m_limit = new Tuple<long, long>(m_limit.Item1, offset);
             }
 
             return this;
@@ -1367,7 +1367,7 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="limit">The limit to use</param>
         /// <returns>The query instance</returns>
-        public Query<T> Limit(int limit)
+        public Query<T> Limit(long limit)
         {
             m_query.Limit(limit);
             return this;
@@ -1377,7 +1377,7 @@ namespace Ceen.Database
         /// </summary>
         /// <param name="offset">The limit to use</param>
         /// <returns>The query instance</returns>
-        public Query<T> Offset(int offset)
+        public Query<T> Offset(long offset)
         {
             m_query.Offset(offset);
             return this;
