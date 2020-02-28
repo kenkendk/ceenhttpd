@@ -36,7 +36,7 @@ namespace Ceen.Httpd.Handler
 			if (context.Session != null)
 				return false;
 			
-			var sessiontoken = context.Request.Cookies[CookieName];
+			var sessiontoken = context.Request.SessionID = context.Request.Cookies[CookieName];
 
 			if (!string.IsNullOrWhiteSpace(sessiontoken))
 			{
@@ -47,7 +47,7 @@ namespace Ceen.Httpd.Handler
 			}
 
 			// Create new storage
-			sessiontoken = Guid.NewGuid().ToString();
+			sessiontoken = context.Request.SessionID = Guid.NewGuid().ToString();
 			context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true);
 			context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, (int)ExpirationSeconds.TotalSeconds, true);
 
