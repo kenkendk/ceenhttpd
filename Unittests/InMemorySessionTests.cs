@@ -75,7 +75,7 @@ namespace Unittests
     public class InMemorySessionTests
     {
         [Test]
-        public void TestResetProcessingTimeout()
+        public void TestInMemorySessions()
         {
             var sessionhandler = 
                 new CustomSessionHandler() {
