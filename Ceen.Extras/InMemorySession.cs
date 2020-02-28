@@ -9,31 +9,31 @@ namespace Ceen.Extras.InMemorySession
     /// Handler for registering a session on a request
     /// </summary>
     public class InMemorySessionHandler : IHttpModule
-	{
-		/// <summary>
-		/// Gets or sets the name of the cookie with the token.
-		/// </summary>
-		public string CookieName { get; set; } = "ceen-session-token";
+    {
+        /// <summary>
+        /// Gets or sets the name of the cookie with the token.
+        /// </summary>
+        public string CookieName { get; set; } = "ceen-session-token";
 
-		/// <summary>
-		/// Gets or sets the number of seconds a session is valid.
-		/// </summary>
-		public TimeSpan ExpirationSeconds { get; set; } = TimeSpan.FromMinutes(30);
+        /// <summary>
+        /// Gets or sets the number of seconds a session is valid.
+        /// </summary>
+        public TimeSpan ExpirationSeconds { get; set; } = TimeSpan.FromMinutes(30);
 
-		/// <summary>
-		/// Gets or sets a value indicating if the session cookie gets the &quot;secure&quot; option set,
-		/// meaning that it will only be sent over HTTPS
-		/// </summary>
-		public bool SessionCookieSecure { get; set; } = false;
+        /// <summary>
+        /// Gets or sets a value indicating if the session cookie gets the &quot;secure&quot; option set,
+        /// meaning that it will only be sent over HTTPS
+        /// </summary>
+        public bool SessionCookieSecure { get; set; } = false;
 
-		/// <summary>
-		/// Handles the request
-		/// </summary>
-		/// <returns>The awaitable task.</returns>
-		/// <param name="context">The requests context.</param>
-		public async Task<bool> HandleAsync(IHttpContext context)
-		{
-			var sessiontoken = context.Request.Cookies[CookieName];
+        /// <summary>
+        /// Handles the request
+        /// </summary>
+        /// <returns>The awaitable task.</returns>
+        /// <param name="context">The requests context.</param>
+        public async Task<bool> HandleAsync(IHttpContext context)
+        {
+            var sessiontoken = context.Request.Cookies[CookieName];
             if (string.IsNullOrWhiteSpace(sessiontoken) || !InMemorySession.SessionExists(sessiontoken)) 
             {
                 sessiontoken = Guid.NewGuid().ToString();
@@ -43,8 +43,8 @@ namespace Ceen.Extras.InMemorySession
             context.Request.SessionID = sessiontoken;
             await InMemorySession.GetOrCreateSessionAsync(context, ExpirationSeconds, OnCreateAsync, OnExpireAsync);
 
-			return false;
-		}
+            return false;
+        }
 
         /// <summary>
         /// Virtual method for custom handling of newly created sessions
@@ -64,7 +64,7 @@ namespace Ceen.Extras.InMemorySession
         /// <returns>An awaitable task</returns>
         protected virtual Task OnExpireAsync(string id, Dictionary<string, object> values)
             => Task.FromResult(true);
-  	}
+      }
 
     /// <summary>
     /// Helper class for providing support for sessions that are only backed by memory,

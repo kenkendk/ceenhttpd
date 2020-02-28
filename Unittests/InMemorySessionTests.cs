@@ -152,24 +152,24 @@ namespace Unittests
             }
         }
 
-		private string GetResponse(ServerRunner server, string path, CookieContainer cookieJar, string verb = "GET")
-		{
-			try
-			{
-				var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}{path}");
-				req.Method = verb;
+        private string GetResponse(ServerRunner server, string path, CookieContainer cookieJar, string verb = "GET")
+        {
+            try
+            {
+                var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}{path}");
+                req.Method = verb;
                 req.CookieContainer = cookieJar;
-				using (var res = (System.Net.HttpWebResponse)req.GetResponse())
+                using (var res = (System.Net.HttpWebResponse)req.GetResponse())
                 {
                     using(var rs = res.GetResponseStream())
                     using(var tr = new StreamReader(rs))
                         return tr.ReadToEnd();
                 }
-			}
-			catch (System.Net.WebException wex)
-			{
-				throw;
-			}
-		}                
+            }
+            catch (System.Net.WebException wex)
+            {
+                throw;
+            }
+        }                
     }
 }
