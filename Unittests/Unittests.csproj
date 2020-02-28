@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Ceen.Httpd\Ceen.Httpd.csproj" />
     <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
     <ProjectReference Include="..\Ceen.Httpd.Cli\Ceen.Httpd.Cli.csproj" />
+    <ProjectReference Include="..\Ceen.Extras\Ceen.Extras.csproj" />
   </ItemGroup>
 
   <ItemGroup>
