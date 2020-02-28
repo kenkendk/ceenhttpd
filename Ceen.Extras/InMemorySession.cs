@@ -105,7 +105,7 @@ namespace Ceen.Extras.InMemorySession
             /// <summary>
             /// The duration for this item
             /// </summary>
-            public readonly TimeSpan Duration;
+            public TimeSpan Duration;
             /// <summary>
             /// The session values
             /// </summary>
@@ -136,6 +136,11 @@ namespace Ceen.Extras.InMemorySession
         /// The list of active sessions
         /// </summary>
         private static Dictionary<string, SessionItem> _sessions = new Dictionary<string, SessionItem>();
+
+        /// <summary>
+        /// List of items, sorted by expiration time (in ticks)
+        /// </summary>
+        private static SortedList<long, List<string>> _expirations = new SortedList<long, List<string>>();
 
         /// <summary>
         /// The current expiration task
@@ -169,6 +174,50 @@ namespace Ceen.Extras.InMemorySession
 
             lock(_lock)
                 return _sessions.ContainsKey(id);
+        }
+
+        /// <summary>
+        /// Updates the timeout-duration for a session.
+        /// If the session does not exist, this method does nothing.
+        /// </summary>
+        /// <param name="self">The session to update</param>
+        /// <param name="duration">The new duration</param>
+        public static void SetSessionDuration(this IHttpContext self, TimeSpan duration)
+            => SetSessionDuration(self.Request.SessionID, duration);
+
+        /// <summary>
+        /// Updates the timeout-duration for a session.
+        /// If the session does not exist, this method does nothing.
+        /// </summary>
+        /// <param name="self">The session to update</param>
+        /// <param name="duration">The new duration</param>
+        public static void SetSessionDuration(this IHttpRequest self, TimeSpan duration)
+            => SetSessionDuration(self.SessionID, duration);
+
+        /// <summary>
+        /// Updates the timeout-duration for a session.
+        /// If the session does not exist, this method does nothing.
+        /// </summary>
+        /// <param name="id">The session to update</param>
+        /// <param name="duration">The new duration</param>
+        public static void SetSessionDuration(string id, TimeSpan duration)
+        {
+            lock(_lock)
+            {
+                _sessions.TryGetValue(id, out var res);
+                if (res == null)
+                    return;
+
+                _expirations[res.Expires.Ticks].Remove(res.ID);
+                res.Duration = duration;
+                res.Expires = DateTime.Now + res.Duration;
+
+                _expirations.TryGetValue(res.Expires.Ticks, out var lst);
+                if (lst == null)
+                    _expirations[res.Expires.Ticks] = lst = new List<string>();
+                _expirations[res.Expires.Ticks].Add(res.ID);
+            }
+
         }
 
         /// <summary>
@@ -245,10 +294,18 @@ namespace Ceen.Extras.InMemorySession
                     _sessions[id] = res = new SessionItem(id, duration.Ticks == 0 ? SessionDuration: duration) {
                         ExpireCallback = expireCallback
                     };
-                    created = true;
+                    created = true;                    
+                }
+                else
+                {
+                    _expirations[res.Expires.Ticks].Remove(res.ID);
                 }
 
                 res.Expires = DateTime.Now.Add(res.Duration);
+                _expirations.TryGetValue(res.Expires.Ticks, out var lst);
+                if (lst == null)
+                    _expirations[res.Expires.Ticks] = lst = new List<string>();
+                _expirations[res.Expires.Ticks].Add(res.ID);
             }
 
             if (created)
@@ -293,8 +350,11 @@ namespace Ceen.Extras.InMemorySession
             SessionItem res;
             lock(_lock)
             {
-                if (_sessions.TryGetValue(id, out res))
-                    _sessions.Remove(id);                
+                if (_sessions.TryGetValue(id, out res) && res != null)
+                {
+                    _sessions.Remove(res.ID);
+                    _expirations[res.Expires.Ticks].Remove(res.ID);
+                }
             }
 
             StartExpireTimer();
@@ -370,23 +430,33 @@ namespace Ceen.Extras.InMemorySession
         private static async Task<DateTime> ExpireItemsAsync()
         {
             var expired = new Queue<SessionItem>();            
-            var now = DateTime.Now;
-            var nextExpire = now.AddDays(1);
+            var now = DateTime.Now.Ticks;
+            var nextExpire = now + TimeSpan.TicksPerDay;
 
             lock(_lock)
             {
-                foreach(var s in _sessions)
+                // The list is sorted, so we can grab the oldest items from the top
+                while(_expirations.Count > 0)
                 {
-                    if (s.Value.Expires < now)
-                        expired.Enqueue(s.Value);
-                    else if (s.Value.Expires < nextExpire)
-                        nextExpire = s.Value.Expires;
-                }
+                    if (_expirations.Keys[0] < now)
+                    {
+                        foreach(var k in _expirations.Values[0])
+                        {
+                            expired.Enqueue(_sessions[k]);
+                            _sessions.Remove(k);
+                        }
 
-                foreach(var s in expired)
-                    _sessions.Remove(s.ID);
+                        _expirations.RemoveAt(0);
+                    }
+                    else
+                    {
+                        nextExpire = _expirations.Keys[0];
+                        break;
+                    }
+                }                
             }
 
+            // Invoke callback methods on each expired item
             while(expired.Count > 0) 
             {
                 var s = expired.Dequeue();
@@ -403,7 +473,7 @@ namespace Ceen.Extras.InMemorySession
                 }
             }
 
-            return nextExpire;
+            return new DateTime(nextExpire);
         }
     }
 }
