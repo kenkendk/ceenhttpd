@@ -41,6 +41,18 @@ namespace Ceen.Httpd.Cli
 	}
 
 	/// <summary>
+	/// A definition of a CLI defined route
+	/// </summary>
+	[Serializable]
+	public class WiredRouteDefinition : RouteDefinition
+	{
+		/// <summary>
+		/// The verbs allowed for the path
+		/// </summary>
+		public string Verbs { get; set; }
+	}	
+
+	/// <summary>
 	/// A definition of a logger to attach
 	/// </summary>
 	[Serializable]
