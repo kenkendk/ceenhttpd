@@ -8,7 +8,7 @@
     <RootNamespace>NetFullRunner</RootNamespace>
     <AssemblyName>NetFullRunner</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
-    <ReleaseVersion>0.9.8</ReleaseVersion>
+    <ReleaseVersion>0.9.9</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>

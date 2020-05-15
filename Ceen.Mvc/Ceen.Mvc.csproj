@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Ceen.Mvc</AssemblyName>
-    <ReleaseVersion>0.9.8</ReleaseVersion>
+    <ReleaseVersion>0.9.9</ReleaseVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType />

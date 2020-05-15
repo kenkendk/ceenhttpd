@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Database and ORM support for Ceen.Httpd</description>
-    <releaseNotes>Improved query support</releaseNotes>
+    <releaseNotes>Added support for deleting tables</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
