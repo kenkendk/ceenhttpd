@@ -67,11 +67,13 @@ cp ../Ceen.Security/bin/Release/netstandard2.0/*.dll .
 cp ../Ceen.Httpd.Cli/bin/Release/netstandard2.0/*.dll .
 
 SED_EXPR_VER="s/.*\<version\>.*/    \<version\>${VERSION}\<\/version\>/"
-SED_EXPR_DEP="s/\(.*\)\<dependency.*id\=\"Ceen\.\(.*\)\".*/\1\<dependency id\=\"Ceen.\2\" version\=\"${VERSION}\" \/\>/"
+SED_EXPR_DEP="s/\(.*\)\<dependency.*id\=\"Ceen\.\(.*\)\" version\=.*/\1\<dependency id\=\"Ceen.\2\" version\=\"${VERSION}\" \/\>/"
 
 for NUSPEC in $(find . -type f -name "*.nuspec"); do
 	sed "${SED_EXPR_VER}" "${NUSPEC}" > "${NUSPEC}.tmp01.tmp"
 	sed "${SED_EXPR_DEP}" "${NUSPEC}.tmp01.tmp" > "${NUSPEC}.tmp.nuspec"
+
+	echo "Building ${NUSPEC}.tmp.nuspec"
 	"${NUGET}" "pack" "${NUSPEC}.tmp.nuspec"
 	rm "${NUSPEC}.tmp01.tmp" "${NUSPEC}.tmp.nuspec"
 done
