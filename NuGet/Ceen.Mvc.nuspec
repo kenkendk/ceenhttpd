@@ -14,7 +14,7 @@
     <copyright>Copyright Kenneth Skovhede 2019</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
-        <dependency id="Newtonsoft.Json" version="10.0.3" />
+        <dependency id="Newtonsoft.Json" version="12.0.3" />
         <dependency id="Ceen.Httpd" version="0.9.3" />
     </dependencies>
   </metadata>
