@@ -73,6 +73,10 @@ namespace Ceen
         }
     }
 
+    /// <summary>
+    /// Helper methods for performing various common operations
+    /// on a request instance
+    /// </summary>
     public static class RequestUtility
     {
 		/// <summary>
@@ -219,6 +223,22 @@ namespace Ceen
             return IsContentType(contenttype, "multipart/form-data");
 		}
 
+        /// <summary>
+        /// Returns a value indicating if the content type is of a certain type
+        /// </summary>
+        /// <param name="request">The request to evaluate the content type for</param>
+        /// <param name="test">The type to test for</param>
+        /// <returns><c>true</c> if the content-type matches the test type; <c>false</c> otherwise</returns>
+        public static bool IsContentType(this IHttpRequest request, string test)
+            => IsContentType(request.ContentType, test);
+
+
+        /// <summary>
+        /// Returns a value indicating if the content type is of a certain type
+        /// </summary>
+        /// <param name="contenttype">The content-type string</param>
+        /// <param name="test">The type to test for</param>
+        /// <returns><c>true</c> if the content-type matches the test type; <c>false</c> otherwise</returns>
         public static bool IsContentType(string contenttype, string test)
         {
             if (string.IsNullOrWhiteSpace(contenttype))
@@ -226,15 +246,23 @@ namespace Ceen
 
             var firstdelim = contenttype.IndexOfAny(new char[] { ';', ' ', ',' });
             if (firstdelim < 0)
-                firstdelim = contenttype.Length - 1;
+                firstdelim = contenttype.Length;
 
             return string.Equals(contenttype.Substring(0, firstdelim), test, StringComparison.OrdinalIgnoreCase);
         }
 
 		/// <summary>
-		/// Returns a value indicating if the request is a multi-part request
+		/// Returns a value indicating if the content type is indicating Json data
 		/// </summary>
-		/// <returns><c>true</c>, if multi-part was used, <c>false</c> otherwise.</returns>
+		/// <returns><c>true</c>, if the content type is json, <c>false</c> otherwise.</returns>
+		/// <param name="request">The request instance.</param>
+		public static bool IsJsonRequest(this IHttpRequest request)
+            => IsJsonRequest(request.ContentType);
+
+		/// <summary>
+		/// Returns a value indicating if the content type is indicating Json data
+		/// </summary>
+		/// <returns><c>true</c>, if the content type is json, <c>false</c> otherwise.</returns>
 		/// <param name="contenttype">The request contenttype to examine.</param>
 		public static bool IsJsonRequest(string contenttype)
 		{
