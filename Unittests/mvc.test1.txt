@@ -1,0 +1,3 @@
+wirecontroller /api/v1/entry Unittests.ControllerItems+ApiExampleController
+wirecontroller /home Unittests.ControllerItems+HomeController
+wirecontroller /api/v1/wait Unittests.ControllerItems+WaitExample

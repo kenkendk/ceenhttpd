@@ -239,6 +239,7 @@ namespace Unittests
 			{
 				using (var server = new ServerRunner(
 					new Ceen.Httpd.ServerConfig()
+					.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 					.AddRoute(
 						typeof(ConflictControllerItems1)
 						.GetNestedTypes()
@@ -258,6 +259,7 @@ namespace Unittests
 			{
 				using (var server = new ServerRunner(
 					new Ceen.Httpd.ServerConfig()
+					.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 					.AddRoute(
 						typeof(ConflictControllerItems2)
 						.GetNestedTypes()
@@ -276,6 +278,7 @@ namespace Unittests
 		{
 			using (var server = new ServerRunner(
 				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 				.AddRoute("/api/v1/wait", new RequirementControllerItems.TestHandler())
 				.AddRoute(
 					new[] { typeof(RequirementControllerItems.WaitExample) } 
@@ -292,6 +295,7 @@ namespace Unittests
 
 			using (var server = new ServerRunner(
 				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 				.AddRoute("/api/v1/wait/detail", new RequirementControllerItems.TestHandler())
 				.AddRoute(
 					new[] { typeof(RequirementControllerItems.WaitExample) }
@@ -312,6 +316,7 @@ namespace Unittests
 		{
 			using (var server = new ServerRunner(
 				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 				.AddRoute(
 					typeof(ControllerItems)
 					.GetNestedTypes()
@@ -360,6 +365,7 @@ namespace Unittests
 		{
 			using (var server = new ServerRunner(
 				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 				.AddRoute(
 					typeof(ControllerItems)
 					.GetNestedTypes()
@@ -404,47 +410,169 @@ namespace Unittests
 			      
 		}
 
+		/// <summary>
+		/// Helper method to ensure that the different ways of routing
+		/// result in the same setup
+		/// </summary>
+		/// <param name="server">The server runner instance</param>
+		private void CommonTesting(ServerRunner server)
+		{
+			Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/"));
+			Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/home"));
+			Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/xyz"));
+			Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/home1"));
+
+			Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "GET"));
+			Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "XYZ"));
+
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/home1", "XYZ"));
+			Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "XYZ"));
+			Assert.AreEqual(ControllerItems.ENTRY_DEFAULT_INDEX, server.GetStatusMessage("/api/v1/entry"));
+			Assert.AreEqual(ControllerItems.ENTRY_INDEX_ID, server.GetStatusMessage("/api/v1/entry/4"));
+			Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/x"));
+			Assert.AreEqual(ControllerItems.ENTRY_DETAIL_INDEX, server.GetStatusMessage("/api/v1/entry/detail"));
+			Assert.AreEqual(ControllerItems.ENTRY_DETAIL_ID, server.GetStatusMessage("/api/v1/entry/detail/7"));
+			Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/detail/y"));
+
+			Assert.AreEqual(ControllerItems.ENTRY_DETAIL_CROSS, server.GetStatusMessage("/api/v1/entry/7/detail"));
+
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/"));
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1"));
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/home"));
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/xyz"));
+
+			Assert.AreEqual(ControllerItems.WAIT_INDEX, server.GetStatusMessage("/api/v1/wait", "GET"));
+			Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed), server.GetStatusMessage("/api/v1/wait", "POST"));
+
+			Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/api/v1/4/detail"));
+		}
+
 		[Test()]
 		public void TestRoutingWithoutDefaultController()
 		{
 			using (var server = new ServerRunner(
 				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
 				.AddRoute(
 					typeof(ControllerItems)
 					.GetNestedTypes()
 					.ToRoute())
 				))
 			{
-				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/"));
-				Assert.AreEqual(HttpStatusCode.OK, server.GetStatusCode("/home"));
-				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/xyz"));
-				Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/home1"));
-
-				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "GET"));
-				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "XYZ"));
-
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/home1", "XYZ"));
-				Assert.AreEqual(ControllerItems.XYZ_HOME_INDEX, server.GetStatusMessage("/home", "XYZ"));
-				Assert.AreEqual(ControllerItems.ENTRY_DEFAULT_INDEX, server.GetStatusMessage("/api/v1/entry"));
-				Assert.AreEqual(ControllerItems.ENTRY_INDEX_ID, server.GetStatusMessage("/api/v1/entry/4"));
-				Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/x"));
-				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_INDEX, server.GetStatusMessage("/api/v1/entry/detail"));
-				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_ID, server.GetStatusMessage("/api/v1/entry/detail/7"));
-				Assert.AreEqual(HttpStatusCode.BadRequest, server.GetStatusCode("/api/v1/entry/detail/y"));
-
-				Assert.AreEqual(ControllerItems.ENTRY_DETAIL_CROSS, server.GetStatusMessage("/api/v1/entry/7/detail"));
-
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/"));
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1"));
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/home"));
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.NotFound), server.GetStatusMessage("/api/v1/xyz"));
-
-				Assert.AreEqual(ControllerItems.WAIT_INDEX, server.GetStatusMessage("/api/v1/wait", "GET"));
-				Assert.AreEqual(HttpStatusMessages.DefaultMessage(HttpStatusCode.MethodNotAllowed), server.GetStatusMessage("/api/v1/wait", "POST"));
-
-                Assert.AreEqual(HttpStatusCode.NotFound, server.GetStatusCode("/api/v1/4/detail"));
+				CommonTesting(server);
             }
 		}
+
+		[Test()]
+		public void TestRoutingWithManualRoutes()
+		{
+			var inst = new ControllerItems.ApiExampleController();
+
+			using (var server = new ServerRunner(
+				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+				.AddRoute(
+					new ManualRoutingController()
+						// We need to supply the function argument types, as C# does not support
+						// automatic inference of these
+						.Wire<IHttpContext>(             "GET /api/v1/entry", inst.Index)
+						.Wire<IHttpContext, int, string>("GET /api/v1/entry/{id}", inst.Index)
+						.Wire<IHttpContext, int>(        "GET /api/v1/entry/{id}/detail", inst.Cross)
+						.Wire<int>(                      "POST /api/v1/entry/{id}", inst.Update)
+						.Wire<IHttpContext>(             "GET /api/v1/entry/detail", inst.Detail)
+						.Wire<IHttpContext, int>(        "GET|POST /api/v1/entry/detail/{id}", inst.Detail)
+						// If the methods have no arguments, we do not need to supply types
+						.Wire(                           "* /home", new ControllerItems.HomeController().Index)
+						.Wire(                           "GET /api/v1/wait", new ControllerItems.WaitExample().Index)
+						.ToRoute()
+				)))
+			{
+				CommonTesting(server);
+            }
+		}
+
+		[Test()]
+		public void TestRoutingWithManualRoutesWithoutInstances()
+		{
+			using (var server = new ServerRunner(
+				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+				.AddRoute(
+					new ManualRoutingController()
+						// For types with overloaded methods, we need to specify which overload
+						// The WireWith() helper saves us constantly referencing the type
+						.WireWith<ControllerItems.ApiExampleController>()
+							.Wire("GET /api/v1/entry", nameof(ControllerItems.ApiExampleController.Index), typeof(IHttpContext))
+							.Wire("GET /api/v1/entry/{id}", nameof(ControllerItems.ApiExampleController.Index), typeof(IHttpContext), typeof(int), typeof(string))
+							.Wire("GET /api/v1/entry/{id}/detail", nameof(ControllerItems.ApiExampleController.Cross))
+							.Wire("POST /api/v1/entry/{id}", nameof(ControllerItems.ApiExampleController.Update))
+							.Wire("GET /api/v1/entry/detail", nameof(ControllerItems.ApiExampleController.Detail), typeof(IHttpContext))
+							.Wire("GET|POST /api/v1/entry/detail/{id}", nameof(ControllerItems.ApiExampleController.Detail), typeof(IHttpContext), typeof(int))
+						.Wire<ControllerItems.HomeController>(      "* /home", nameof(ControllerItems.HomeController.Index))
+						.Wire<ControllerItems.WaitExample>(         "GET /api/v1/wait", nameof(ControllerItems.WaitExample.Index))
+						.ToRoute()
+				)))
+			{
+				CommonTesting(server);
+            }
+		}
+
+		[Test()]
+		public void TestRoutingWithManualRoutesWithoutInstancesPrefixed()
+		{
+			using (var server = new ServerRunner(
+				new Ceen.Httpd.ServerConfig()
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+				.AddRoute(
+					new ManualRoutingController()
+						// Wire the full controllers, but use a custom prefix
+						.WireController<ControllerItems.ApiExampleController>("/api/v1/entry")
+						.WireController(new ControllerItems.HomeController(), "/home")
+						.WireController(typeof(ControllerItems.WaitExample), "/api/v1/wait")
+						.ToRoute()
+				)))
+			{
+				CommonTesting(server);
+            }
+		}
+
+		[Test()]
+		public void TestRoutingWithManualFromConfig1()
+		{
+			var inst = new ControllerItems.ApiExampleController();
+
+			var filepath = System.IO.Path.Combine(
+				System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+				, "mvc.test1.txt");
+
+			var cfg = Ceen.Httpd.Cli.ConfigParser.ParseTextFile(filepath);
+
+			using (var server = new ServerRunner(
+				Ceen.Httpd.Cli.ConfigParser.ValidateConfig(cfg)
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+			))
+			{
+				CommonTesting(server);
+            }
+		}
+
+		[Test()]
+		public void TestRoutingWithManualFromConfig2()
+		{
+			var filepath = System.IO.Path.Combine(
+				System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+				, "mvc.test2.txt");
+
+			var cfg = Ceen.Httpd.Cli.ConfigParser.ParseTextFile(filepath);
+
+			using (var server = new ServerRunner(
+				Ceen.Httpd.Cli.ConfigParser.ValidateConfig(cfg)
+				.AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+			))
+			{
+				CommonTesting(server);
+            }
+		}													
 	}
 }
 
