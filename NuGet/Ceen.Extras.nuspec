@@ -11,7 +11,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Extras for Ceen</description>
     <releaseNotes>Initial release</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2019</copyright>
+    <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
