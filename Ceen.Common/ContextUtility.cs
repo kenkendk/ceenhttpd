@@ -6,6 +6,140 @@ using System.Threading.Tasks;
 namespace Ceen
 {
     /// <summary>
+    /// Helper class for providing a context for each run
+    /// </summary>
+    public static class LoaderContext
+    {
+        /// <summary>
+        /// Interface for allowing the caller to freeze the scope
+        /// </summary>
+        public interface ILoaderContextInstance : IDisposable
+        {
+            /// <summary>
+            /// Freezes the scope
+            /// </summary>
+            void Freeze();
+        }
+
+        /// <summary>
+        /// Helper class to keep all instances
+        /// </summary>
+        private class ContextKeeper : ILoaderContextInstance
+        {
+            /// <summary>
+            /// The instances created
+            /// </summary>
+            public Dictionary<Type, object> Instances = new Dictionary<Type, object>();
+
+            /// <summary>
+            /// The variable keeping track of the freeze state
+            /// </summary>
+            public bool Frozen;
+
+            /// <summary>
+            /// Freezes the scope
+            /// </summary>
+            public void Freeze() => Frozen = true;
+
+            /// <summary>
+            /// Disposes all references to allow the GC to clean up
+            /// </summary>
+            public void Dispose()
+            {
+                Instances = null;
+            }
+        }
+
+        /// <summary>
+        /// The loader scope, using AsyncLocal
+        /// </summary>
+        private static readonly System.Threading.AsyncLocal<ContextKeeper> m_activeContext 
+            = new System.Threading.AsyncLocal<ContextKeeper>() { 
+                Value = new ContextKeeper() 
+            };
+
+        /// <summary>
+        /// Ensures that there is a single instance of the given type
+        /// </summary>
+        /// <typeparam name="T">The type of the item</typeparam>
+        /// <returns>The item</returns>
+        public static T EnsureSingletonInstance<T>()
+            where T : new()
+            => EnsureSingletonInstance(() => new T());
+
+        /// <summary>
+        /// Ensures that there is a single instance of the given type
+        /// </summary>
+        /// <param name="creator">The method used to create the instance</param>
+        /// <typeparam name="T">The type of the item</typeparam>
+        /// <returns>The item</returns>
+        public static T EnsureSingletonInstance<T>(Func<T> creator)
+        {
+            if (creator == null)
+                throw new ArgumentNullException(nameof(creator));
+            var c = m_activeContext.Value;
+            if (c.Frozen)
+                throw new ArgumentException("Cannot register instance after the context is frozen");
+            if (c.Instances.TryGetValue(typeof(T), out var n))
+                return (T)n;
+            
+            var inst = creator();
+            if (inst == null)
+                throw new ArgumentException($"Creator function did not return an instance for type {typeof(T)}");
+            
+            // Re-check, in case the creation of the item registers itself
+            if (c.Instances.TryGetValue(typeof(T), out n))
+                return (T)n;
+
+            // Then add it
+            c.Instances.Add(typeof(T), inst);
+            return inst;
+        }
+
+        /// <summary>
+        /// Registers the singleton, throws an exception if there is already an instance registered 
+        /// </summary>
+        /// <param name="item">The instance to register as the only instance in the loader scope</param>
+        /// <typeparam name="T">The type of the item</typeparam>
+        /// <returns>The item</returns>
+        public static T RegisterSingletonInstance<T>(T item)
+        {
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+
+            var c = m_activeContext.Value;
+            if (c.Frozen)
+                throw new ArgumentException("Cannot register instance after the context is frozen");
+            if (c.Instances.ContainsKey(typeof(T)))
+                throw new Exception($"This scope already has an instance of type {typeof(T)}");
+            c.Instances.Add(typeof(T), item);
+
+            return item;
+        }
+
+        /// <summary>
+        /// Gets the singleton registered for the type
+        /// </summary>
+        /// <typeparam name="T">The type of the item</typeparam>
+        /// <returns>The singleton instance</returns>
+        public static T SingletonInstance<T>()
+        {
+            var c = m_activeContext.Value;
+            if (c.Instances.TryGetValue(typeof(T), out var n))
+                return (T)n;
+
+            throw new Exception($"This scope does not have an instance of {typeof(T)}");
+        }
+
+        /// <summary>
+        /// Sets the current active context
+        /// </summary>
+        /// <param name="current">The context to set</param>
+        public static ILoaderContextInstance StartContext()
+            => m_activeContext.Value = new ContextKeeper();
+    }
+
+    /// <summary>
     /// Helper class for providing the current execution context via the call context
     /// </summary>
     public static class Context
