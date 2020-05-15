@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 
 namespace Ceen.Database
@@ -178,6 +179,47 @@ namespace Ceen.Database
     }
 
     /// <summary>
+    /// Rule that checks that a string value is one of the allowed sets
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
+    public class StringInListRuleAttribute : ValidationBaseAttribute
+    {
+        /// <summary>
+        /// Flag indicating if the compare is done with case insensitive
+        /// </summary>
+        public readonly bool CaseInsensitive;
+        /// <summary>
+        /// The choices to check for a match
+        /// </summary>
+        public readonly string[] Choices;
+
+        /// <summary>
+        /// Constructs a new choice-list validation rule
+        /// </summary>
+        /// <param name="choices">The valid choices</param>
+        /// <param name="caseInsensitive">Flag indicating if the compare is done with case insensitive</param>
+        public StringInListRuleAttribute(string[] choices, bool caseInsensitive = false)
+        {
+            Choices = choices ?? throw new ArgumentNullException();
+            if (choices.Length == 0)
+                throw new ArgumentOutOfRangeException(nameof(choices));
+            CaseInsensitive = caseInsensitive;
+        }
+
+        /// <summary>
+        /// Validates that the value is not empty
+        /// </summary>
+        /// <param name="value">The value to validate</param>
+        public override void Validate(object value)
+        {
+            if (!(value is string))
+                throw new ValidationException(this, "Value was not a string");
+            if (!Choices.Any(x => string.Equals(x, value as string, CaseInsensitive ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture)))
+                throw new ValidationException(this, $"Value must be one of: {string.Join(", ", Choices)}");
+        }
+    }
+
+    /// <summary>
     /// Rule that checks that a string value has no linefeeds
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
@@ -205,7 +247,7 @@ namespace Ceen.Database
     }
 
     /// <summary>
-    /// Rule that checks that a string value is not empty
+    /// Rule that checks that an integer value is within a certain range
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
     public class IntegerRangeRuleAttribute : ValidationBaseAttribute
@@ -274,7 +316,7 @@ namespace Ceen.Database
     }
 
     /// <summary>
-    /// Rule that checks that a string has a fitting length
+    /// Rule that checks that a floating point value is within a certain range
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
     public class FloatRangeRuleAttribute : ValidationBaseAttribute
@@ -322,7 +364,7 @@ namespace Ceen.Database
     }
 
     /// <summary>
-    /// Rule that checks that a string value is not empty
+    /// Rule that checks that a string has a length within the allowed bounds
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
     public class StringLengthRuleAttribute : ValidationBaseAttribute
