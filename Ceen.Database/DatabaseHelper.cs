@@ -174,6 +174,31 @@ namespace Ceen.Database
             }
         }
 
+        /// <summary>
+        /// Deletes the table for the given type
+        /// </summary>
+        /// <typeparam name="T">The type of the table to delete.</typeparam>
+        /// <param name="connection">The connection to use</param>
+        public static void DeleteTable<T>(this IDbConnection connection)
+        {
+            DeleteTable(connection, typeof(T));
+        }
+
+        /// <summary>
+        /// Deletes a table for the given type
+        /// </summary>
+        /// <param name="type">The type of the table to delete.</param>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="ifExists">Only delete table if it exists</param>
+        public static void DeleteTable(this IDbConnection connection, Type type, bool ifExists = true)
+        {
+            var dialect = GetDialect(connection);
+            var mapping = dialect.GetTypeMap(type);
+
+            var sql = dialect.DeleteTableSql(type);
+            using (var cmd = connection.CreateCommand(sql))
+                cmd.ExecuteNonQuery();
+        }
 
         /// <summary>
         /// Checks if the table for the given type exists

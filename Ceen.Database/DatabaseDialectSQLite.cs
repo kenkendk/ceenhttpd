@@ -155,6 +155,23 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Returns a delete-table sql statement
+        /// </summary>
+        /// <param name="recordtype">The datatype to delete from the table.</param>
+        /// <param name="ifExists">Only delete table if it exists</param>
+        public override string DeleteTableSql(Type recordtype, bool ifExists = true)
+        {
+            var mapping = GetTypeMap(recordtype);
+
+            return string.Format(
+                @"DROP TABLE{0} {1}",
+                ifExists ? " IF EXISTS" : "",
+                QuoteName(mapping.Name)
+            );
+        }
+
+
+        /// <summary>
         /// Creates a command that checks if a table exists
         /// </summary>
         /// <returns>The table exists command.</returns>

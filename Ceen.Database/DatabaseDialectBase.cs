@@ -118,6 +118,13 @@ namespace Ceen.Database
         public abstract string CreateTableSql(Type recordtype, bool ifNotExists = true);
 
         /// <summary>
+        /// Returns a delete-table sql statement
+        /// </summary>
+        /// <param name="recordtype">The datatype to delete from the table.</param>
+        /// <param name="ifExists">Only delete table if it exists</param>
+        public abstract string DeleteTableSql(Type recordtype, bool ifExists = true);
+
+        /// <summary>
         /// Creates a command that checks if a table exists
         /// </summary>
         /// <returns>The table exists command.</returns>
