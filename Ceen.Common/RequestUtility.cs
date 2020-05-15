@@ -432,5 +432,21 @@ namespace Ceen
         {
             return context.LogMessageAsync(LogLevel.Debug, message, ex);
         }
+
+        /// <summary>
+        /// Gets the remote IP from the request as a string (or null)
+        /// </summary>
+        /// <param name="self">The request instance</param>
+        /// <returns>The remote IP</returns>
+        public static string GetRemoteIP(this Ceen.IHttpRequest self)
+            => (self.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString();
+
+        /// <summary>
+        /// Gets the remote IP from the request as a string (or null)
+        /// </summary>
+        /// <param name="self">The context instance</param>
+        /// <returns>The remote IP</returns>
+        public static string GetRemoteIP(this Ceen.IHttpContext self)
+            => GetRemoteIP(self?.Request);
     }
 }
