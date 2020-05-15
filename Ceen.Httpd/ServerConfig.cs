@@ -110,7 +110,7 @@ namespace Ceen.Httpd
 		/// Gets or sets the default name of the server reported in response headers.
 		/// </summary>
 		/// <value>The default name of the server.</value>
-		public string DefaultServerName { get; set; } = SERVER_NAME;
+		public string DefaultServerName { get; set; }
 			
 		/// <summary>
 		/// The server certificate if used for serving SSL requests
@@ -138,20 +138,17 @@ namespace Ceen.Httpd
 		/// The storage creator
 		/// </summary>
 		public IStorageCreator Storage { get; set; }
-		
-        /// <summary>
-        /// A cached copy of the server name and version,
-        /// for use in the output headers.
-        /// </summary>
-        public static readonly string SERVER_NAME;
 
+		/// <summary>
+		/// The loader context for this instance
+		/// </summary>
+		public IDisposable LoaderContext;
+		
 		/// <summary>
 		/// Static initializer for the <see cref="T:Ceen.Httpd.ServerConfig"/> class.
 		/// </summary>
 		static ServerConfig()
 		{
-			var version = typeof(ServerConfig).Assembly.GetName().Version;
-			SERVER_NAME = string.Format("ceenhttpd/{0}.{1}", version.Major, version.Minor);
 		}
 
 		/// <summary>
@@ -159,6 +156,9 @@ namespace Ceen.Httpd
 		/// </summary>
 		public ServerConfig()
 		{
+			var version = typeof(ServerConfig).Assembly.GetName().Version;
+			DefaultServerName = string.Format("ceenhttpd/{0}.{1}", version.Major, version.Minor);
+
 			AddDefaultResponseHeaders = DefaultHeaders;
 		}
 
@@ -306,16 +306,18 @@ namespace Ceen.Httpd
 		/// Calls all shutdown modules
 		/// </summary>
 		/// <returns>A combined task</returns>
-		public Task ShutdownAsync()
+		public async Task ShutdownAsync()
 		{
 			var res = Ceen.Context
 				.GetItemsOfType<IWithShutdown>(this)
 				.Select(x => x.ShutdownAsync())
 				.ToArray();
 
-			if (res.Length == 0)
-				return Task.FromResult(true);
-			return Task.WhenAll(res);
+			if (res.Length != 0)
+				await Task.WhenAll(res);
+			
+			if (LoaderContext != null)
+				LoaderContext.Dispose();
 		}
 
 
