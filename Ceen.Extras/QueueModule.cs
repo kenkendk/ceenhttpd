@@ -20,14 +20,21 @@ namespace Ceen.Extras
         };
 
         /// <summary>
-        /// A shared lock to guard the named queue lookup
+        /// The singleton class used as the queue manager
         /// </summary>
-        private static object _lock = new object();
+        private class QueueManager
+        {
+            /// <summary>
+            /// A shared lock to guard the named queue lookup
+            /// </summary>
+            public readonly object Lock = new object();
 
-        /// <summary>
-        /// The queue modules that are loaded
-        /// </summary>
-        private static Dictionary<string, QueueModule> _modules = new Dictionary<string, QueueModule>();
+            /// <summary>
+            /// The queue modules that are loaded
+            /// </summary>
+            public readonly Dictionary<string, QueueModule> Queues = new Dictionary<string, QueueModule>();
+        }
+
 
         /// <summary>
         /// Returns a named queue
@@ -36,8 +43,9 @@ namespace Ceen.Extras
         /// <returns>The queue</returns>
         public static QueueModule GetQueue(string name) 
         { 
-            lock (_lock) 
-                return _modules[name];   
+            var m = LoaderContext.SingletonInstance<QueueManager>();
+            lock (m.Lock) 
+                return m.Queues[name];   
         }
 
         /// <summary>
@@ -52,6 +60,10 @@ namespace Ceen.Extras
             return q != null && q.IsSecureRequest(request);
         }
 
+        /// <summary>
+        /// The queue manager instance for this scope
+        /// </summary>
+        private readonly QueueManager m_manager;
 
         /// <summary>
         /// The unique name of the queue
@@ -228,6 +240,7 @@ namespace Ceen.Extras
         public QueueModule(string name)
         {
             Name = name;
+            m_manager = LoaderContext.EnsureSingletonInstance<QueueManager>();
         }
 
 
@@ -237,8 +250,8 @@ namespace Ceen.Extras
         public override void AfterConfigure()
         {
             // If we share the database with another queue, share the connection as well
-            lock (_lock)
-                foreach (var m in _modules)
+            lock (m_manager.Lock)
+                foreach (var m in m_manager.Queues)
                     if (m.Value.ConnectionClass == this.ConnectionClass && m.Value.ConnectionString == this.ConnectionString)
                     {
                         m_con = m.Value.m_con;
@@ -335,8 +348,8 @@ namespace Ceen.Extras
 
             m_ratelimiter = new RateLimit(m_ratelimitcount, m_ratelimitWindow);
 
-            lock(_lock)
-                _modules.Add(Name, this);
+            lock(m_manager.Lock)
+                m_manager.Queues.Add(Name, this);
 
             // Activate the runner
             SignalRunner();
@@ -464,7 +477,7 @@ namespace Ceen.Extras
             if (ids == null || ids.Length == 0)
                 return;
 
-            lock (_lock)
+            lock (m_manager.Lock)
                 m_forcestarts.AddRange(ids);
             SignalRunner();
         }
@@ -476,7 +489,7 @@ namespace Ceen.Extras
         {
             m_invokeRunner.TrySetResult(true);
             if (m_runner == null || m_runner.IsCompleted)
-                lock (_lock)
+                lock (m_manager.Lock)
                     if (m_runner == null || m_runner.IsCompleted)
                         m_runner = Task.Run(SchedulerRunAsync);                
         }
@@ -587,7 +600,7 @@ namespace Ceen.Extras
                     List<long> ids = null;
 
                     // Get the forced list, if it has any entries
-                    lock(_lock)
+                    lock(m_manager.Lock)
                         if (m_forcestarts.Count > 0) 
                             ids = System.Threading.Interlocked.Exchange(ref m_forcestarts, new List<long>());
 

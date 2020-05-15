@@ -10,7 +10,9 @@ namespace Ceen.Extras
     public class MemCache : IModuleWithSetup, INamedModule
     {
         /// <summary>
-        /// The named memcache instances
+        /// The named memcache instances.
+        /// This item is not stored in modules, because it supports being reloaded,
+        /// and is supposed to keep data between config reloads
         /// </summary>
         private static readonly Dictionary<string, MemCache> _instances = new Dictionary<string, MemCache>();
 
