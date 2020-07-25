@@ -27,6 +27,12 @@ namespace Ceen.Extras.InMemorySession
         public bool SessionCookieSecure { get; set; } = false;
 
         /// <summary>
+        /// Gets or sets the value for the cookie &quot;samesite&quot; attribute.
+        /// The default is &quot;Strict&quot; meaning that the cookie will not be shared with other sites.
+        /// </summary>
+        public string SessionCookieSameSite { get; set; } = "Strict";
+
+        /// <summary>
         /// Handles the request
         /// </summary>
         /// <returns>The awaitable task.</returns>
@@ -37,7 +43,7 @@ namespace Ceen.Extras.InMemorySession
             if (string.IsNullOrWhiteSpace(sessiontoken) || !InMemorySession.SessionExists(sessiontoken)) 
             {
                 sessiontoken = Guid.NewGuid().ToString();
-                context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true);
+                context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true, samesite: SessionCookieSameSite);
             }
 
             context.Request.SessionID = sessiontoken;

@@ -310,7 +310,8 @@ namespace Ceen
 		/// <param name="maxage">The optional maximum age.</param>
 		/// <param name="secure">A flag for making the cookie available over SSL only.</param>
 		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
-		IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false);
+		/// <param name="samesite">The samesite attribute for the cookie</param>
+		IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false, string samesite = null);
 
 		/// <summary>
 		/// Adds a header to the output, use null to delete a header.

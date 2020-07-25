@@ -587,7 +587,8 @@ namespace Ceen.Httpd
 		/// <param name="maxage">The optional maximum age.</param>
 		/// <param name="secure">A flag for making the cookie available over SSL only.</param>
 		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
-		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false)
+		/// <param name="samesite">The samesite attribute for the cookie</param>
+		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false, string samesite = null)
 		{
 			var cookie = new ResponseCookie(name, value) 
 			{
@@ -596,7 +597,8 @@ namespace Ceen.Httpd
 				Expires = expires,
 				MaxAge = maxage,
 				Secure = secure,
-				HttpOnly = httponly
+				HttpOnly = httponly,
+				SameSite = samesite
 			};
 			this.Cookies.Add(cookie);
 
