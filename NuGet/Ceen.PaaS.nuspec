@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>Ceen.PaaS</id>
+    <version>0.9.3</version>
+    <authors>Kenneth Skovhede</authors>
+    <owners>Kenneth Skovhede</owners>
+    <!-- <license type="expression">MIT</license> -->
+    <licenseUrl>https://raw.githubusercontent.com/kenkendk/ceenhttpd/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Platform-as-a-Service addons for Ceen.Httpd</description>
+    <releaseNotes>First release</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2020</copyright>
+    <tags>HTTP HTTPS SSL TLS async await mvc server paas</tags>
+    <dependencies>
+        <dependency id="Ceen.Httpd" version="0.9.3" />
+        <dependency id="Ceen.Extras" version="0.9.3" />
+        <dependency id="Ceen.Mvc" version="0.9.3" />
+        <dependency id="Ceen.Security" version="0.9.3" />
+        <dependency id="Ceen.Database" version="0.9.3" />
+        <dependency id="HtmlSanitizer" version="5.0.310" />
+        <dependency id="Markdig" version="0.20.0" />
+        <dependency id="SixLabors.ImageSharp" version="1.0.0-rc0001" />
+        <dependency id="System.Data.SQLite.Core" version="1.0.112" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="Ceen.Security.dll" target="lib/netstandard2.0" />
+  </files>
+</package>
