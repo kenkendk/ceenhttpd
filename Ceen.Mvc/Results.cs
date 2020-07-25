@@ -30,7 +30,7 @@ namespace Ceen.Mvc
 	/// <summary>
 	/// Result wrapper for providing a status code result
 	/// </summary>
-	internal struct StatusCodeResult : IStatusCodeResult
+	public struct StatusCodeResult : IStatusCodeResult
 	{
 		/// <summary>
 		/// Gets the status code.
@@ -44,14 +44,21 @@ namespace Ceen.Mvc
 		public string StatusMessage { get; private set; }
 
 		/// <summary>
+		/// A flag indicating if caching of the result should be disabled
+		/// </summary>
+		/// <value></value>
+		public bool DisableCaching { get; private set; }
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.StatusCodeResult"/> struct.
 		/// </summary>
 		/// <param name="code">The status code.</param>
 		/// <param name="message">The status message.</param>
-		public StatusCodeResult(HttpStatusCode code, string message = null)
+		public StatusCodeResult(HttpStatusCode code, string message = null, bool disableCaching = true)
 		{
 			StatusCode = code;
 			StatusMessage = message ?? HttpStatusMessages.DefaultMessage(code);
+			DisableCaching = disableCaching;
 		}
 
 		/// <summary>
@@ -60,6 +67,9 @@ namespace Ceen.Mvc
 		/// <param name="context">The context to use.</param>
 		public Task Execute(IHttpContext context)
 		{
+			if (DisableCaching)
+				context.Response.SetNonCacheable();
+
 			context.Response.StatusCode = StatusCode;
 			context.Response.StatusMessage = StatusMessage;
 			return Task.FromResult(true);

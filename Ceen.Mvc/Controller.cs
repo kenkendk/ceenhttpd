@@ -86,16 +86,7 @@ namespace Ceen.Mvc
 		/// <param name="code">The status code.</param>
 		/// <param name="message">An optional status message.</param>
 		protected IResult Status(HttpStatusCode code, string message = null, bool disablecaching = true)
-		{
-			return new LambdaResult(ctx =>
-			{
-				if (disablecaching)
-					ctx.Response.SetNonCacheable();
-
-				ctx.Response.StatusCode = code;
-				ctx.Response.StatusMessage = message ?? HttpStatusMessages.DefaultMessage(code);
-			});
-		}
+			=> new StatusCodeResult(code, message, disablecaching);
 
 		/// <summary>
 		/// Sets the status for the request
@@ -103,16 +94,7 @@ namespace Ceen.Mvc
 		/// <param name="code">The status code.</param>
 		/// <param name="message">An optional status message.</param>
 		protected IResult Status(IStatusCodeResult code, string message = null, bool disablecaching = true)
-		{
-			return new LambdaResult(ctx =>
-			{
-				if (disablecaching)
-					ctx.Response.SetNonCacheable();
-
-				ctx.Response.StatusCode = code.StatusCode;
-				ctx.Response.StatusMessage = message ?? code.StatusMessage;
-			});
-		}
+			=> new StatusCodeResult(code.StatusCode, message ?? code.StatusMessage, disablecaching);
 
 		/// <summary>
 		/// Sends a &quot;400 - Bad request&quot; response
