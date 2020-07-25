@@ -13,7 +13,13 @@ namespace Ceen.Database
     /// using static Ceen.Database.QueryUtil
     /// </summary>
     public static class QueryUtil
-    {       
+    {
+        /// <summary>
+        /// Returns an empty query
+        /// </summary>
+        /// <returns>The empty query</returns>
+        public static Empty Empty => new Empty();
+
         /// <summary>
         /// Creates a new query order (ascending)
         /// </summary>
@@ -1247,7 +1253,7 @@ namespace Ceen.Database
         {
             return Where(
                 QueryUtil.In(
-                    column,
+                    new Property(column),
                     subquery
                 )
             );
@@ -1263,7 +1269,7 @@ namespace Ceen.Database
         {
             return Where(
                 QueryUtil.NotIn(
-                    column,
+                    new Property(column),
                     subquery
                 )
             );
