@@ -130,35 +130,36 @@ namespace Ceen.Database
         public abstract void Validate(object value);
     }
 
-    /// <summary>
-    /// Rule checking with a function
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]
-    public class FunctionRuleAttribute : ValidationBaseAttribute
-    {
-        /// <summary>
-        /// The method to invoke
-        /// </summary>
-        private readonly Action<object> m_method;
+    // This is not possible because the constructor cannot take a the Action<object> argument (CS0181)
+    // /// <summary>
+    // /// Rule checking with a function
+    // /// </summary>
+    // [AttributeUsage(AttributeTargets.Class | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]
+    // public class FunctionRuleAttribute : ValidationBaseAttribute
+    // {
+    //     /// <summary>
+    //     /// The method to invoke
+    //     /// </summary>
+    //     private readonly Action<object> m_method;
 
-        /// <summary>
-        /// Constructs a new function based rule
-        /// </summary>
-        /// <param name="method">The function used to validate the parameter</param>
-        public FunctionRuleAttribute(Action<object> method)
-        {
-            m_method = method ?? throw new ArgumentNullException(nameof(method));
-        }
+    //     /// <summary>
+    //     /// Constructs a new function based rule
+    //     /// </summary>
+    //     /// <param name="method">The function used to validate the parameter</param>
+    //     public FunctionRuleAttribute(Action<object> method)
+    //     {
+    //         m_method = method ?? throw new ArgumentNullException(nameof(method));
+    //     }
 
-        /// <summary>
-        /// Validates a value by invoking the function
-        /// </summary>
-        /// <param name="value">The value to validate</param>
-        public override void Validate(object value)
-        {
-            m_method(value);
-        }
-    }
+    //     /// <summary>
+    //     /// Validates a value by invoking the function
+    //     /// </summary>
+    //     /// <param name="value">The value to validate</param>
+    //     public override void Validate(object value)
+    //     {
+    //         m_method(value);
+    //     }
+    // }
 
 
     /// <summary>
