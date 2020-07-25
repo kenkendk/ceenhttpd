@@ -208,7 +208,7 @@ namespace Ceen.Extras
                 m_lines.Add(new HttpLogEntryLine()
                 {
                     ParentID = context.Request.LogRequestID,
-                    When = when,
+                    When = when.ToUniversalTime(),
                     LogLevel = loglevel,
                     Data = message,
                     Exception = ex?.ToString()
@@ -232,8 +232,8 @@ namespace Ceen.Extras
             {
                 ID = context.Request.LogRequestID,
                 ConnectionID = context.Request.LogConnectionID,
-                Started = started,
-                Finished = started + duration,
+                Started = started.ToUniversalTime(),
+                Finished = started.ToUniversalTime() + duration,
                 ResponseStatusCode = (int)context.Response.StatusCode,
                 ResponseStatusMessage = context.Response.StatusMessage,
                 ResponseSize = context.Response.ContentLength,
@@ -268,7 +268,7 @@ namespace Ceen.Extras
             {
                 ID = request.LogRequestID,
                 ConnectionID = request.LogConnectionID,
-                Started = request.RequestProcessingStarted,
+                Started = request.RequestProcessingStarted.ToUniversalTime(),
                 ResponseStatusCode = 0,
                 ResponseStatusMessage = "-",
                 ResponseSize = -1,
@@ -331,7 +331,7 @@ namespace Ceen.Extras
                         {
                             // Remove old lines
                             db.Delete<HttpLogEntry>(
-                                x => x.Finished < DateTime.Now - MAX_LOG_AGE
+                                x => x.Finished < DateTime.UtcNow - MAX_LOG_AGE
                             );
 
                             // Remove any line not attached to an entry
