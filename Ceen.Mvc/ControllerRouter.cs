@@ -222,6 +222,59 @@ namespace Ceen.Mvc
 		}
 
 		/// <summary>
+		/// Searches the type inheritance tree until it finds the desired attribute.
+		/// This approach allows a derived class to override attributes, but defaults to inheriting.
+		/// </summary>
+		/// <param name="self">The type to examine</param>
+		/// <typeparam name="T">The attribute type to find</typeparam>
+		/// <returns>The attributes found</returns>
+		public static IEnumerable<T> SearchCustomAttributes<T>(this Type self)
+			where T : Attribute
+		{
+			if (self == null)
+				throw new ArgumentNullException(nameof(self));
+			
+			do
+			{
+				var res = self.GetCustomAttributes(typeof(T), false);
+				if (res != null && res.Length > 0)
+					return res.Cast<T>();
+
+				self = self.BaseType;
+			} while(self != null);
+
+			return new T[0];
+		}
+
+		/// <summary>
+		/// Searches the type inheritance tree until it finds the desired attribute.
+		/// This approach allows a derived class to override attributes, but defaults to inheriting.
+		/// </summary>
+		/// <param name="self">The type to examine</param>
+		/// <typeparam name="T">The attribute type to find</typeparam>
+		/// <returns>The attributes found</returns>
+		public static IEnumerable<T> SearchCustomAttributes<T>(this MethodInfo self)
+			where T : Attribute
+		{
+			if (self == null)
+				throw new ArgumentNullException(nameof(self));
+			
+			do
+			{
+				var res = self.GetCustomAttributes(typeof(T), false);
+				if (res != null && res.Length > 0)
+					return res.Cast<T>();
+
+				var next = self.GetBaseDefinition();
+				if (self == next)
+					break;
+				self = next;
+			} while(self != null);
+
+			return new T[0];
+		}		
+
+		/// <summary>
 		/// Gets the name of an item
 		/// </summary>
 		/// <returns>The item name.</returns>
@@ -229,7 +282,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		public static string GetItemName(this Type self, ControllerRouterConfig config)
 		{
-			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			var nameattr = self.SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 			// Extract an assigned name
 			if (nameattr != null)
 				return nameattr.Name;
@@ -272,7 +325,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		public static string GetItemName(this MethodInfo self, ControllerRouterConfig config)
 		{
-			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			var nameattr = self.SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 			// Extract an assigned name
 			if (nameattr != null)
 				return nameattr.Name;
@@ -454,7 +507,7 @@ namespace Ceen.Mvc
 				.SelectMany(x =>
 				{
 					string name;
-					var nameattr = x.GetType().GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+					var nameattr = x.GetType().SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 					// Extract controller name
 					if (nameattr != null)
 						name = nameattr.Name;
@@ -470,7 +523,7 @@ namespace Ceen.Mvc
 							name = name.ToLowerInvariant();
 					}
 
-					var routes = x.GetType().GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+					var routes = x.GetType().SearchCustomAttributes<RouteAttribute>().Cast<RouteAttribute>().Select(y => y.Route);
 					
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
@@ -532,14 +585,14 @@ namespace Ceen.Mvc
 			return
 				target_method_routes.SelectMany(x =>
 				{
-					var routes = x.Method.GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+					var routes = x.Method.SearchCustomAttributes<RouteAttribute>().Cast<RouteAttribute>().Select(y => y.Route);
 
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
 						routes = new[] { string.Empty };
 
 					// Get any accepted verbs
-					var verbs = x.Method.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant()).ToArray();
+					var verbs = x.Method.SearchCustomAttributes<HttpVerbFilterAttribute>().Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant()).ToArray();
 
 					return routes.Select(y => new PartialParsedRoute()
 					{
@@ -717,8 +770,8 @@ namespace Ceen.Mvc
 		{
 			// Make sure dependencies are met
 			if (controller != null)
-				context.Request.RequireHandler(controller.GetType().GetCustomAttributes<RequireHandlerAttribute>());
-			context.Request.RequireHandler(method.Method.GetCustomAttributes<RequireHandlerAttribute>());
+				context.Request.RequireHandler(controller.GetType().SearchCustomAttributes<RequireHandlerAttribute>());
+			context.Request.RequireHandler(method.Method.SearchCustomAttributes<RequireHandlerAttribute>());
 			
 			// Apply each argument in turn
 			var values = new object[method.ArgumentCount];
