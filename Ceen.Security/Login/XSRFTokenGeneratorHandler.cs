@@ -57,7 +57,7 @@ namespace Ceen.Security.Login
 				// If the connection is using SSL, require SSL for the cookie
 				var usingssl = context.Request.SslProtocol != System.Security.Authentication.SslProtocols.None;
 
-				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, secure: usingssl);
+				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, secure: usingssl, samesite: XSRFCookieSameSite);
 			}
 
 			return false;
