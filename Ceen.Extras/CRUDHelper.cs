@@ -81,6 +81,34 @@ namespace Ceen.Extras
     }
 
     /// <summary>
+    /// Class for containing the exception wrapper code
+    /// </summary>
+    public static class CRUDExceptionHelper
+    {
+        /// <summary>
+        /// Helper method that extracts known exceptions into status messages
+        /// </summary>
+        /// <param name="ex">The error to handle</param>
+        /// <returns>A result if the error was handled, <c>null</c> otherwise</returns>
+        public static IResult WrapExceptionMessage(Exception ex)
+        {
+            if (ex is ValidationException vex)
+            {
+                var pre = string.Empty;
+                if (vex.Member != null)
+                    pre = vex.Member.Name + " - ";
+                return new StatusCodeResult(HttpStatusCode.BadRequest, pre + vex.Message);
+            }
+            else if (ex is FilterParser.ParserException pex)
+            {
+                return new StatusCodeResult(HttpStatusCode.BadRequest, "Filter error: " + pex.Message);
+            }
+
+            return null;
+        }    
+    }
+
+    /// <summary>
     /// Simple CRUD helper
     /// </summary>
     /// <typeparam name="TKey">The key type</typeparam>
@@ -88,6 +116,65 @@ namespace Ceen.Extras
     public abstract class CRUDHelper<TKey, TValue> :  Controller
         where TValue : new()
     {
+        /// <summary>
+        /// Helper to allow reporting the updated item entry
+        /// in overridden methods
+        /// </summary>
+        protected class CRUDResult : IResult
+        {
+            /// <summary>
+            /// The item being returned
+            /// </summary>
+            public readonly TValue Item;
+            /// <summary>
+            /// The result to execute
+            /// </summary>
+            private readonly IResult Result;
+
+            /// <summary>
+            /// Constructs a new result instance
+            /// </summary>
+            /// <param name="parent">The parent controller</param>
+            /// <param name="item">The item to report</param>
+            /// <param name="result">The result item to report</param>
+            public CRUDResult(Controller parent, TValue item, IResult result)
+            {
+                Item = item;
+                Result = result ?? throw new ArgumentNullException(nameof(result));
+            }
+
+            /// <inheritdoc />
+            public Task Execute(IHttpContext context)
+            {
+                return Result.Execute(context);
+            }
+        }
+
+        /// <summary>
+        /// Returns a response value
+        /// </summary>
+        /// <param name="item">The item to wrap</param>
+        /// <returns>The wrapped result item</returns>
+        protected IResult ReportJson(object item)
+        {
+            if (item is TValue tv)            
+                return new CRUDResult(this, tv, Json(tv));
+            return Json(item);
+        }
+
+        /// <summary>
+        /// Attempts to extract the item from a result
+        /// </summary>
+        /// <param name="item">The result to examine</param>
+        /// <returns>The item, or null</returns>
+        protected TValue ExtractResult(IResult item)
+        {
+            if (item is CRUDResult cr)
+                return cr.Item;
+
+            return default(TValue);
+        }
+
         /// <summary>
         /// The database instance to use
         /// </summary>
@@ -129,7 +216,7 @@ namespace Ceen.Extras
         /// <param name="id">The key of the item, unless adding or listing</param>
         /// <param name="q">The query</param>
         /// <returns>The query</returns>
-        public virtual Query<TValue> OnQuery(AccessType type, TKey id, Query<TValue> q) => q;
+        public virtual Task<Query<TValue>> OnQueryAsync(AccessType type, TKey id, Query<TValue> q) => Task.FromResult(q);
 
         /// <summary>
         /// Avoid repeated allocations of unused tasks
@@ -149,6 +236,13 @@ namespace Ceen.Extras
         /// <param name="key">The ID of the item being inserted</param>
         /// <param name="item">The item being inserted</param>
         protected virtual Task BeforeUpdateAsync(TKey key, Dictionary<string, object> values) => m_completedTask;
+
+        /// <summary>
+        /// Hook function that can convert a source item before passing it to the Json serializer
+        /// </summary>
+        /// <param name="source">The item to patch</param>
+        /// <returns>The patched object</returns>
+        protected virtual object PostProcess(TValue source) => source;
 
         /// <summary>
         /// The different access types
@@ -179,13 +273,9 @@ namespace Ceen.Extras
         /// <returns>A result if the error was handled, <c>null</c> otherwise</returns>
         protected virtual Task<IResult> HandleExceptionAsync(Exception ex)
         {
-            if (ex is ValidationException vex)
-            {
-                var pre = string.Empty;
-                if (vex.Member != null)
-                    pre = vex.Member.Name + " - ";
-                return Task.FromResult(Status(BadRequest, pre + vex.Message));
-            }
+            var t = CRUDExceptionHelper.WrapExceptionMessage(ex);
+            if (t != null)
+                return Task.FromResult(t);
 
             return NULL_RESULT_TASK;
         }
@@ -209,13 +299,14 @@ namespace Ceen.Extras
                         .MatchPrimaryKeys(new object[] { id })
                         .Limit(1);
 
-                OnQuery(AccessType.Get, id, q);
+                q = await OnQueryAsync(AccessType.Get, id, q);
 
+                // TODO: Should return NotFound for non-nullable entries as well 
                 var res = await Connection.RunInTransactionAsync(db => db.SelectSingle(q));
                 if (res == null)
                     return NotFound;
 
-                return Json(res);
+                return ReportJson(PostProcess(res));
             }
             catch (Exception ex)
             {
@@ -263,7 +354,7 @@ namespace Ceen.Extras
                 // Re-build a string representation of the data
                 var jsonSr = Newtonsoft.Json.JsonConvert.SerializeObject(values);
 
-                return await Connection.RunInTransactionAsync(db =>
+                return await Connection.RunInTransactionAsync(async db =>
                 {
                     var item = db.SelectItemById<TValue>(id);
                     if (item == null)
@@ -278,10 +369,10 @@ namespace Ceen.Extras
                         .MatchPrimaryKeys(new object[] { id })
                         .Limit(1);
 
-                    OnQuery(AccessType.Update, id, q);
+                    q = await OnQueryAsync(AccessType.Update, id, q);
 
                     if (db.Update(q) > 0)
-                        return Json(db.SelectItemById<TValue>(id));
+                        return ReportJson(PostProcess(db.SelectItemById<TValue>(id)));
                     return NotFound;
                 });
             }
@@ -315,13 +406,13 @@ namespace Ceen.Extras
                     .Query<TValue>()
                     .Insert(item);
 
-                OnQuery(AccessType.Add, default(TKey), q);
+                q = await OnQueryAsync(AccessType.Add, default(TKey), q);
 
-                return Json(await Connection.RunInTransactionAsync(db =>
+                return ReportJson(PostProcess(await Connection.RunInTransactionAsync(db =>
                 {
                     db.Insert(q);
                     return item;
-                }));
+                })));
             }
             catch (Exception ex)
             {
@@ -352,7 +443,7 @@ namespace Ceen.Extras
                         .Limit(1)
                         .MatchPrimaryKeys(new object[] { id });
 
-                OnQuery(AccessType.Delete, id, q);
+                q = await OnQueryAsync(AccessType.Delete, id, q);
 
                 return await Connection.RunInTransactionAsync(db =>
                 {
@@ -403,14 +494,14 @@ namespace Ceen.Extras
                     .Offset(request.Offset)
                     .Limit(request.Count);
 
-                OnQuery(AccessType.List, default(TKey), q);
+                q = await OnQueryAsync(AccessType.List, default(TKey), q);
 
                 return Json(await Connection.RunInTransactionAsync(db =>
                     new ListResponse()
                     {
                         Offset = request.Offset,
                         Total = db.SelectCount(q),
-                        Result = db.Select(q).ToArray()
+                        Result = db.Select(q).Select(PostProcess).ToArray()
                     }
                 ));
             }
