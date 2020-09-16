@@ -202,6 +202,11 @@ namespace Ceen
 		int ContentLength { get; }
 
 		/// <summary>
+		/// Gets the HTTP request hostname, can be null for a HTTP/1.0 request
+		/// </summary>
+		string Hostname { get; }
+
+		/// <summary>
 		/// Gets a dictionary with items attached to the current request.
 		/// </summary>
 		IDictionary<string, object> RequestState { get; }

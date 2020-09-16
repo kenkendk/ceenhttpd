@@ -174,6 +174,17 @@ namespace Ceen.Httpd
             }
         }
 
+		/// <summary>
+		/// Gets the HTTP request hostname, can be null for a HTTP/1.0 request
+		/// </summary>
+        public string Hostname
+        {
+            get
+            {
+                return Headers["Host"];
+            }
+        }        
+
         /// <summary>
         /// Gets the HTTP Content-Length header value
         /// </summary>
