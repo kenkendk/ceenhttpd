@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
-
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <IsPackable>false</IsPackable>
-    <ReleaseVersion>0.9.9</ReleaseVersion>
+    <ReleaseVersion>0.9.8</ReleaseVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +22,7 @@
     <ProjectReference Include="..\Ceen.Mvc\Ceen.Mvc.csproj" />
     <ProjectReference Include="..\Ceen.Httpd.Cli\Ceen.Httpd.Cli.csproj" />
     <ProjectReference Include="..\Ceen.Extras\Ceen.Extras.csproj" />
+    <ProjectReference Include="..\Ceen.PaaS\Ceen.PaaS.csproj" />
   </ItemGroup>
 
   <ItemGroup>
