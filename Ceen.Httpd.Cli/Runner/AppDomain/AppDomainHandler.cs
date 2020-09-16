@@ -153,7 +153,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
             /// <param name="client">The socket handle.</param>
             /// <param name="remoteEndPoint">The remote endpoint.</param>
             /// <param name="logtaskid">The task ID to use.</param>
-            public Task HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
+            public Task HandleRequest(Socket client, EndPoint remoteEndPoint, string logtaskid)
             {
                 // We do not use this for AppDomains
                 throw new MissingMethodException();
@@ -249,7 +249,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
             /// <summary>
             /// The method used to handle requests
             /// </summary>
-            private Action<TcpClient, EndPoint, string> m_handler;
+            private Action<Socket, EndPoint, string> m_handler;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="T:Ceen.Httpd.Cli.Runner.RunnerInstance"/> class.
@@ -290,7 +290,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                 {
                     m_handler = (socket, addr, id) =>
                     {
-                        Wrapper.HandleRequest(socket.Client.DuplicateAndClose(pid), addr, id);
+                        Wrapper.HandleRequest(socket.DuplicateAndClose(pid), addr, id);
                     };
                 }
                 else
@@ -298,9 +298,9 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                     m_handler = (socket, addr, id) =>
                     {
                         // Bugfix workaround for: https://bugzilla.xamarin.com/show_bug.cgi?id=47425
-                        var prev_sh = safe_handle_field.GetValue(socket.Client);
+                        var prev_sh = safe_handle_field.GetValue(socket);
 
-                        var s = socket.Client.DuplicateAndClose(pid);
+                        var s = socket.DuplicateAndClose(pid);
 
                         if (prev_sh != null)
                             GC.SuppressFinalize(prev_sh);
@@ -344,7 +344,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
                 ShouldStop = false;
 
                 RunnerTask = HttpServer.ListenToSocketAsync(
-                    new IPEndPoint(ParseUtil.ParseIPAddress(address), port),
+                    ParseUtil.ParseEndPoint(address, port),
                     usessl,
                     m_token.Token,
                     config,
@@ -483,7 +483,7 @@ namespace Ceen.Httpd.Cli.Runner.AppDomain
         {
             var enabled = !string.IsNullOrWhiteSpace(address);
             // Ensure it parses
-            ParseUtil.ParseIPAddress(address);
+            ParseUtil.ParseEndPoint(address, port);
 
             var prev = m_handlers.Where(x => x.UseSSL == usessl).FirstOrDefault();
             if (enabled)

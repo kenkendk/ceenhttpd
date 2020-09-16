@@ -26,6 +26,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="Ceen.Security.dll" target="lib/netstandard2.0" />
+    <file src="Ceen.PaaS.dll" target="lib/netstandard2.1" />
   </files>
 </package>

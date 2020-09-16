@@ -15,10 +15,10 @@ namespace Ceen.Httpd.Cli.Runner
         /// <summary>
         /// Handles a request
         /// </summary>
-        /// <param name="client">The socket handle.</param>
+        /// <param name="socket">The socket handle.</param>
         /// <param name="remoteEndPoint">The remote endpoint.</param>
         /// <param name="logtaskid">The task ID to use.</param>
-        Task HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid);
+        Task HandleRequest(Socket client, EndPoint remoteEndPoint, string logtaskid);
 
 
         /// <summary>

@@ -73,18 +73,7 @@ namespace Ceen.Httpd
             /// <param name="logtaskid">The task ID to use.</param>
             public void HandleRequest(Socket socket, EndPoint remoteEndPoint, string logtaskid)
             {
-                RunClient(new TcpClient() { Client = socket }, remoteEndPoint, logtaskid, Controller);
-            }
-
-            /// <summary>
-            /// Handles a request
-            /// </summary>
-            /// <param name="client">The TcpClient instance to use.</param>
-            /// <param name="remoteEndPoint">The remote endpoint.</param>
-            /// <param name="logtaskid">The task ID to use.</param>
-            public void HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
-            {
-                RunClient(client, remoteEndPoint, logtaskid, Controller);
+                RunClient(socket, remoteEndPoint, logtaskid, Controller);
             }
 
             /// <summary>
@@ -549,7 +538,7 @@ namespace Ceen.Httpd
 		/// <param name="stoptoken">The stoptoken.</param>
 		/// <param name="config">The server configuration</param>
 		/// <param name="spawner">The method handling the new connection.</param>
-		public static Task ListenToSocketAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, EndPoint, string> spawner)
+		public static Task ListenToSocketAsync(EndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<Socket, EndPoint, string> spawner)
 		{
 			return ListenToSocketInternalAsync(addr, usessl, stoptoken, config, (client, remoteendpoint, logid, controller) => spawner(client, remoteendpoint, logid));
 		}
@@ -637,13 +626,11 @@ namespace Ceen.Httpd
         /// <param name="stoptoken">The stoptoken.</param>
         /// <param name="config">The server configuration</param>
         /// <param name="spawner">The method handling the new connection.</param>
-        private static async Task ListenToSocketInternalAsync(IPEndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<TcpClient, EndPoint, string, RunnerControl> spawner)
+        private static async Task ListenToSocketInternalAsync(EndPoint addr, bool usessl, CancellationToken stoptoken, ServerConfig config, Action<Socket, EndPoint, string, RunnerControl> spawner)
 		{
 			var rc = new RunnerControl(stoptoken, usessl, config);
-
-			var listener = new TcpListener(addr);
-			listener.Start(config.SocketBacklog);
-
+			var socket = SocketUtil.CreateAndBindSocket(addr, config.SocketBacklog);
+			
 			var taskid = SetLoggingSocketHandlerID();
 
 			while (!stoptoken.IsCancellationRequested)
@@ -652,7 +639,7 @@ namespace Ceen.Httpd
                 config.DebugLogHandler?.Invoke("Waiting for throttle", taskid, null);
                 await rc.ThrottleTask;
                 config.DebugLogHandler?.Invoke("Waiting for socket", taskid, null);
-                var ls = listener.AcceptTcpClientAsync();
+                var ls = socket.AcceptAsync();
 
 				if (await Task.WhenAny(rc.StopTask, ls) == ls)
 				{
@@ -669,7 +656,7 @@ namespace Ceen.Httpd
                         config.DebugLogHandler?.Invoke(string.Format("Spawning runner with id: {0}", newtaskid), taskid, newtaskid);
 
                         // Read the endpoint here to avoid crashes when invoking the spawner
-                        var ep = client.Client.RemoteEndPoint;
+                        var ep = client.RemoteEndPoint;
 						ThreadPool.QueueUserWorkItem(x => spawner(client, ep, newtaskid, rc));
 					}
 					catch(Exception ex)
@@ -681,7 +668,7 @@ namespace Ceen.Httpd
 
             config.DebugLogHandler?.Invoke("Stopping", taskid, null);
 
-            listener.Stop();
+            socket.Close();
 			rc.Stop(taskid);
 
             config.DebugLogHandler?.Invoke("Socket stopped, waiting for workers ...", taskid, null);
@@ -755,7 +742,7 @@ namespace Ceen.Httpd
 		/// <param name="usessl">A flag indicating if this instance should use SSL</param>
 		/// <param name="config">The server configuration</param>
 		/// <param name="stoptoken">The stoptoken.</param>
-		public static Task ListenAsync(IPEndPoint addr, bool usessl, ServerConfig config, CancellationToken stoptoken = default(CancellationToken))
+		public static Task ListenAsync(EndPoint addr, bool usessl, ServerConfig config, CancellationToken stoptoken = default(CancellationToken))
 		{
 			if (usessl && (config.SSLCertificate as X509Certificate2 == null || !(config.SSLCertificate as X509Certificate2).HasPrivateKey))
 				throw new Exception("Certificate does not have a private key and cannot be used for signing");
@@ -775,8 +762,7 @@ namespace Ceen.Httpd
 		/// <param name="controller">The controller instance</param>
 		private static void RunClient(SocketInformation socketinfo, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
 		{
-			var client = new TcpClient() { Client = new Socket(socketinfo) };
-			RunClient(client, remoteEndPoint, logtaskid, controller);
+			RunClient(new Socket(socketinfo), remoteEndPoint, logtaskid, controller);
 		}
 
         /// <summary>
@@ -786,10 +772,10 @@ namespace Ceen.Httpd
         /// <param name="remoteEndPoint">The remote endpoint.</param>
         /// <param name="logtaskid">The task id for logging and tracing</param>
         /// <param name="controller">The runner controller.</param>
-        private static async void RunClient(TcpClient client, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
+        private static async void RunClient(Socket client, EndPoint remoteEndPoint, string logtaskid, RunnerControl controller)
         {
             using (client)
-                await RunClient(client.GetStream(), remoteEndPoint, logtaskid, controller, () => client.Connected);
+                await RunClient(new NetworkStream(client), remoteEndPoint, logtaskid, controller, () => client.Connected);
         }
 
         /// <summary>

@@ -633,15 +633,29 @@ namespace Ceen.Httpd.Cli
 			// to clients not running on the local machine
 			if (config.ListenHttp)
 			{
-				var parsedip = ParseUtil.ParseIPAddress(config.HttpAddress);
-				var ip = parsedip == IPAddress.Any ? "127.0.0.1" : parsedip.ToString();
-            	Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", "http://" + ip + ":" + config.HttpPort);
+				var parsedaddr = ParseUtil.ParseEndPoint(config.HttpAddress, config.HttpPort);
+				if (parsedaddr is IPEndPoint ipe)
+				{
+					var ip = ipe.Address == IPAddress.Any ? "127.0.0.1" : ipe.Address.ToString();
+            		Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", "http://" + ip + ":" + ipe.Port);
+				}
+				// else
+				// {
+            	// 	Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", config.HttpAddress);
+				// }
 			}
             if (config.ListenHttps)
 			{
-                var parsedip = ParseUtil.ParseIPAddress(config.HttpsAddress);
-                var ip = parsedip == IPAddress.Any ? "127.0.0.1" : parsedip.ToString();
-                Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", "http://" + ip + ":" + config.HttpsPort);
+				var parsedaddr = ParseUtil.ParseEndPoint(config.HttpsAddress, config.HttpsPort);
+				if (parsedaddr is IPEndPoint ipe)
+				{
+					var ip = ipe.Address == IPAddress.Any ? "127.0.0.1" : ipe.Address.ToString();
+            		Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", "http://" + ip + ":" + ipe.Port);
+				}
+				// else
+				// {
+            	// 	Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", config.HttpsAddress);					
+				// }
 			}
 
             if (config.AutoLoadAssemblies)

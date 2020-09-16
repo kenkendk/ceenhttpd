@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -133,8 +134,8 @@ namespace Ceen
         /// <summary>
         /// Parse an IP Address, supporting &quot;any&quot;, &quot;*&quot;, &quot;local&quot;, and &quot;loopback&quot;
         /// </summary>
-        /// <returns>The IP Address.</returns>
         /// <param name="address">The adress to parse.</param>
+        /// <returns>The IP Address.</returns>
         public static IPAddress ParseIPAddress(string address)
         {
             var enabled = !string.IsNullOrWhiteSpace(address);
@@ -148,6 +149,33 @@ namespace Ceen
                 addr = IPAddress.Parse(address);
 
             return addr;
+        }
+
+        /// <summary>
+        /// The prefix to a hostname that indicates a unix domain socket
+        /// </summary>
+        public const string UNIX_SOCKET_PREFIX = "unix:";
+        
+        /// <summary>
+        /// Parse an EndPoint Address, supporting &quot;any&quot;, &quot;*&quot;, &quot;local&quot;, &quot;loopback&quot;, and &quot;unix:&quot;
+        /// </summary>
+        /// <param name="address">The adress to parse.</param>
+        /// <param name="port">The port number to use, if not in the address.</param>
+        /// <returns>The EndPoint Address.</returns>
+        public static EndPoint ParseEndPoint(string address, int port)
+        {
+            if (!string.IsNullOrWhiteSpace(address) && address.StartsWith(UNIX_SOCKET_PREFIX, StringComparison.OrdinalIgnoreCase))
+                return new UnixDomainSocketEndPoint(address.Substring(UNIX_SOCKET_PREFIX.Length));
+            
+            // Support for having "localhost:1234" as the listen address
+            if (address.Contains(":"))
+            {
+                var parts = address.Split(new char[] { ':' }, 2);
+                if (int.TryParse(parts[1], NumberStyles.Integer, null, out var aport) && aport > 0 && aport <= ushort.MaxValue)
+                    return new IPEndPoint(ParseIPAddress(parts[0]), aport);
+            }
+
+            return new IPEndPoint(ParseIPAddress(address), port);
         }
     
     }

@@ -82,7 +82,7 @@ namespace Ceen.Httpd.Cli.Runner
 
             if (Wrapper is ISelfListen isl && !isl.UseManagedListen)
             {
-                isl.Bind(new IPEndPoint(ParseUtil.ParseIPAddress(address), port), config.SocketBacklog);
+                isl.Bind(ParseUtil.ParseEndPoint(address, port), config.SocketBacklog);
                 RunnerTask = HttpServer.ListenToSocketAsync(
                     isl.ListenAsync, 
                     usessl, 
@@ -94,7 +94,7 @@ namespace Ceen.Httpd.Cli.Runner
             else
             {
                 RunnerTask = HttpServer.ListenToSocketAsync(
-                    new IPEndPoint(ParseUtil.ParseIPAddress(address), port),
+                    ParseUtil.ParseEndPoint(address, port),
                     usessl,
                     m_token.Token,
                     config,

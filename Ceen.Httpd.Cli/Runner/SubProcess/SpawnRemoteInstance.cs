@@ -92,7 +92,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="client">The socket to transfer.</param>
         /// <param name="endPoint">The remote endpoint</param>
         /// <param name="logtaskid">The log task ID</param>
-        public Task HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
+        public Task HandleRequest(Socket client, EndPoint remoteEndPoint, string logtaskid)
         {
             return Instance.HandleRequest(client, remoteEndPoint, logtaskid);
         }
@@ -513,7 +513,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="client">The socket to transfer.</param>
         /// <param name="endPoint">The remote endpoint</param>
         /// <param name="logtaskid">The log task ID</param>
-        public async Task HandleRequest(TcpClient client, EndPoint endPoint, string logtaskid)
+        public async Task HandleRequest(Socket client, EndPoint endPoint, string logtaskid)
         {
             // Make sure we free the handle from this process space
             // the DuplicateAndClose() call should ensure that we do not
@@ -525,7 +525,7 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                 // On Windows we can send directly, as the DuplicateAndClose() call does all the work for us
                 if (SystemHelper.CurrentOS == Platform.Windows)
                 {
-                    var sr = client.Client.DuplicateAndClose(m_proc.Handle.ToInt32());
+                    var sr = client.DuplicateAndClose(m_proc.Handle.ToInt32());
                     await m_proxy.HandleRequest(sr, endPoint, logtaskid);
                 }
                 else

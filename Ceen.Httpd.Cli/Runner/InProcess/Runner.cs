@@ -63,7 +63,7 @@ namespace Ceen.Httpd.Cli.Runner.InProcess
                 return base.StopTask;
             }
 
-            Task IWrappedRunner.HandleRequest(TcpClient client, EndPoint remoteEndPoint, string logtaskid)
+            Task IWrappedRunner.HandleRequest(Socket client, EndPoint remoteEndPoint, string logtaskid)
             {
                 base.HandleRequest(client, remoteEndPoint, logtaskid);
                 return Task.FromResult(true);
