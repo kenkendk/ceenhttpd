@@ -15,6 +15,15 @@ namespace Ceen.Httpd
     internal class HttpRequest : IHttpRequest, IDisposable
     {
         /// <summary>
+        /// The string indicating HTTP version 1.1
+        /// </summary>
+        public const string HTTP_VERSION_1_1 = "HTTP/1.1";
+        /// <summary>
+        /// The string indicating HTTP version 1.0
+        /// </summary>
+        public const string HTTP_VERSION_1_0 = "HTTP/1.0";
+
+        /// <summary>
         /// Gets the HTTP Request line as sent by the client
         /// </summary>
         public string RawHttpRequestLine { get; private set; }
@@ -240,7 +249,7 @@ namespace Ceen.Httpd
                 if (components.Length != 3)
                     throw new HttpException(HttpStatusCode.BadRequest);
 
-                if (components[2] != "HTTP/1.1" && components[2] != "HTTP/1.0")
+                if (components[2] != HTTP_VERSION_1_1 && components[2] != HTTP_VERSION_1_0)
                     throw new HttpException(HttpStatusCode.HTTPVersionNotSupported);
 
                 if (string.IsNullOrWhiteSpace(components[0]) || string.IsNullOrWhiteSpace(components[1]))
@@ -494,6 +503,14 @@ namespace Ceen.Httpd
 
             if (this.ContentLength > config.MaxPostSize)
                 throw new HttpException(HttpStatusCode.PayloadTooLarge);
+            
+            // Disable HTTP/1.0 unless explictly allowed
+            if (!config.AllowLegacyHttp && this.HttpVersion == HTTP_VERSION_1_0)
+                throw new HttpException(HttpStatusCode.HTTPVersionNotSupported);
+
+            // Enforce HTTP/1.1 requiring a header
+            if (this.HttpVersion != HTTP_VERSION_1_0 && string.IsNullOrWhiteSpace(this.Headers["Host"]))
+                throw new HttpException(HttpStatusCode.BadRequest, "Host header missing");                
 
             if (config.AllowHttpMethodOverride)
             {

@@ -57,6 +57,11 @@ namespace Ceen.Httpd
 		public bool AllowHttpMethodOverride { get; set; } = true;
 
 		/// <summary>
+		/// A flag indicating if requests with HTTP/1.0 are allowed
+		/// </summary>
+		public bool AllowLegacyHttp { get; set; } = false;
+
+		/// <summary>
 		/// A value indicating the name of the header, 
 		/// the proxy uses to communicate the source IP of the request.
 		/// Commonly this is set to &quot;X-Real-IP&quot; or &quot;X-Forwarded-For&quot;
