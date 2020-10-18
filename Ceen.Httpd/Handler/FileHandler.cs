@@ -568,7 +568,7 @@ namespace Ceen.Httpd.Handler
                             return SetInvalidRangeHeader(context, bytecount);
                     }
 
-                    if (etagkey != null)
+                    if (etagkey != null && etag == null)
                     {
                         fs.Position = 0;
                         etag = await ComputeETag(fs);
