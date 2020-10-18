@@ -232,7 +232,12 @@ namespace Ceen.Httpd.Handler
 
             // If this was a HEAD request, there is no more we need to do now
             if (string.Equals(context.Request.Method, "HEAD", StringComparison.Ordinal))
+            {
+                // Force the content-length header to be "wrong",
+                // but allowed pr. RFC7230 3.3.2
+                await context.Response.FlushHeadersAsync();
                 return;
+            }
 
             // Make sure we do not cache the response data
             if (fullsize <= 0)
