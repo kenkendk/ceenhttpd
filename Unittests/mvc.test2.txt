@@ -1,0 +1,9 @@
+wire GET /api/v1/entry Unittests.ControllerItems+ApiExampleController.Index Ceen.IHttpContext
+wire GET /api/v1/entry/{id} Unittests.ControllerItems+ApiExampleController.Index Ceen.IHttpContext int string
+wire POST /api/v1/entry/{id} Unittests.ControllerItems+ApiExampleController.Update
+wire GET /api/v1/entry/{id}/detail Unittests.ControllerItems+ApiExampleController.Cross
+wire GET /api/v1/entry/detail Unittests.ControllerItems+ApiExampleController.Detail Ceen.IHttpContext
+wire GET|POST /api/v1/entry/detail/{id} Unittests.ControllerItems+ApiExampleController.Detail Ceen.IHttpContext int
+wire * /home Unittests.ControllerItems+HomeController.Index
+wire GET /api/v1/wait Unittests.ControllerItems+WaitExample.Index
+

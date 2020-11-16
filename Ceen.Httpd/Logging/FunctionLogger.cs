@@ -31,7 +31,7 @@ namespace Ceen.Httpd.Logging
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>
-		public Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+		public Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
 		{
 			return m_func(context, ex, started, duration);
 		}

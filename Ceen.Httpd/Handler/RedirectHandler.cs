@@ -16,7 +16,7 @@ namespace Ceen.Httpd.Handler
 		/// <summary>
 		/// Gets or sets the status message used to report the redirect.
 		/// </summary>
-		public string StatusMessge { get; set; }
+		public string StatusMessage { get; set; }
 
 		/// <summary>
 		/// Gets or sets a value indicating if the redirect is performed internally
@@ -53,7 +53,7 @@ namespace Ceen.Httpd.Handler
 			else
 			{
 				context.Response.StatusCode = StatusCode;
-				context.Response.StatusMessage = StatusMessge;
+				context.Response.StatusMessage = StatusMessage;
 				context.Response.AddHeader("Location", RedirectTarget);
 			}
 

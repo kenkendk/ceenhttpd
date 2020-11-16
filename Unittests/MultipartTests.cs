@@ -64,7 +64,8 @@ namespace Unittests
                                 "Content-Disposition: form-data; name=\"file\"; filename=\"test.txt\"",
                                 "Content-Type: text/plain",
                                 "",
-                                payload + $"--{boundary}--",
+                                payload,
+                                $"--{boundary}--",
                                 ""
                             )
                         );
@@ -124,11 +125,13 @@ namespace Unittests
                                 "Content-Disposition: form-data; name=\"file1\"; filename=\"test1.txt\"",
                                 "Content-Type: text/plain",
                                 "",
-                                payload1 + $"--{boundary}",
+                                payload1,
+                                $"--{boundary}",
                                 "Content-Disposition: form-data; name=\"file2\"; filename=\"test2.txt\"",
                                 "Content-Type: text/plain",
                                 "",
-                                payload2 + $"--{boundary}--",
+                                payload2,
+                                $"--{boundary}--",
                                 ""
                             )
                         );
@@ -187,7 +190,8 @@ namespace Unittests
                                 "Content-Disposition: form-data; name=\"file\"; filename=\"test.txt\"",
                                 "Content-Type: text/plain",
                                 "",
-                                payload + $"--{boundary}--",
+                                payload,
+                                $"--{boundary}--",
                                 "",
                                 "abc" // This should not be here...
                             )

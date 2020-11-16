@@ -10,13 +10,13 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A lightweight HTTP compliant web server written in C# with full async/await implementation</description>
-    <releaseNotes>Fixed some error messages on stop, and some issues with multi-part uploads</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2019</copyright>
+    <releaseNotes>Fixed errors with keep-alive and rejected payloads</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies />
   </metadata>
   <files>
-    <file src="Ceen.Common.dll" target="lib/netstandard2.0" />
-    <file src="Ceen.Httpd.dll" target="lib/netstandard2.0" />
+    <file src="Ceen.Common.dll" target="lib/netstandard2.1" />
+    <file src="Ceen.Httpd.dll" target="lib/netstandard2.1" />
   </files>
 </package>

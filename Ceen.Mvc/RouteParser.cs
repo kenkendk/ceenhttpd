@@ -379,8 +379,7 @@ namespace Ceen.Mvc
 			/// <returns>A <see cref="T:System.String"/> that represents the current <see cref="T:Ceen.Mvc.RouteParser2.Result"/>.</returns>
 			public override string ToString()
 			{
-				return string.Format(" => {0}, {1}", Route.Controller.GetType().FullName, Route.Action.Method);
-
+				return string.Format(" => {0}, {1}", Route.Controller == null ? Route.Action.Method.DeclaringType.FullName : Route.Controller.GetType().FullName, Route.Action.Method);
 			}
 		}
 

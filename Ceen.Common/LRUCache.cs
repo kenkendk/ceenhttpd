@@ -181,7 +181,7 @@ namespace Ceen
         /// <returns>A flag indicating if any results are returned, and the result, if any.</returns>
         /// <param name="key">The key to look for.</param>
         /// <param name="predicate">The predicate method, returns true if the item is invalid.</param>
-        public async Task<KeyValuePair<bool, T>> TryGetUnless(string key, Func<string, T, Task<bool>> predicate)
+        public async Task<KeyValuePair<bool, T>> TryGetUnlessAsync(string key, Func<string, T, Task<bool>> predicate)
         {
             using (await m_lock.LockAsync())
             {
@@ -206,7 +206,7 @@ namespace Ceen
         /// <returns>A flag indicating if any results are returned, and the result, if any.</returns>
         /// <param name="key">The key to look for.</param>
         /// <param name="predicate">The predicate method, returns true if the item is invalid.</param>
-        public async Task<KeyValuePair<bool, T>> TryGetUnless(string key, Func<string, T, bool> predicate)
+        public async Task<KeyValuePair<bool, T>> TryGetUnlessAsync(string key, Func<string, T, bool> predicate)
         {
             using (await m_lock.LockAsync())
             {

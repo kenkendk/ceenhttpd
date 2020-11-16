@@ -117,115 +117,30 @@ namespace Ceen.Httpd.Cli
             if (targettype.IsArray)
             {
                 // TODO: Handle embedded comma values in strings?
-                return
+				var args = 
                     (value ?? "")
                         .Split(',')
-                        .Select(x => ArgumentFromString(ExpandEnvironmentVariables(x), targettype.GetElementType()))
+                        .Select(x => ArgumentFromString((x ?? string.Empty).Trim(), targettype.GetElementType()))
                         .ToArray();
+
+				// Manually convert to the right type
+				var res = Array.CreateInstance(targettype.GetElementType(), args.Length);
+				Array.Copy(args, res, args.Length);
+				return res;
             }
 
             if ((targettype.IsArray || targettype == typeof(string)) && string.Equals(value, "null", StringComparison.OrdinalIgnoreCase))
                 return null;
 
 			if (targettype == typeof(TimeSpan))
-				return ParseDuration(ExpandEnvironmentVariables(value));
+				return ParseUtil.ParseDuration(ExpandEnvironmentVariables(value));
 			if (targettype == typeof(int) || targettype == typeof(uint) || targettype == typeof(long) || targettype == typeof(ulong))
-				return Convert.ChangeType(ParseSize(ExpandEnvironmentVariables(value)), targettype);
-				
-			return Convert.ChangeType(ExpandEnvironmentVariables(value), targettype);
+				return Convert.ChangeType(ParseUtil.ParseSize(ExpandEnvironmentVariables(value)), targettype);
+            if (targettype == typeof(bool))
+                return ParseUtil.ParseBool(ExpandEnvironmentVariables(value));
+
+            return Convert.ChangeType(ExpandEnvironmentVariables(value), targettype);
 		}
-
-		/// <summary>
-		/// Parses a duration value
-		/// </summary>
-		/// <param name="value">The value to parse</param>
-		/// <returns>The parsed value</returns>
-		public static TimeSpan ParseDuration(string value)
-		{
-            if (string.IsNullOrWhiteSpace(value))
-                throw new ArgumentException("Empty string is not a valid duration", nameof(value));
-
-            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var r))
-                return TimeSpan.FromSeconds(r);
-
-            if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var n))
-            	return n;
-
-            var res = new TimeSpan(0);
-			var len = 0;
-            foreach (var m in new Regex("(?<number>[-|+]?[0-9]+)(?<suffix>[wdhms])", RegexOptions.IgnoreCase).Matches(value).Cast<Match>())
-			{
-				if (!m.Success)
-					break;
-				len += m.Length;
-
-				var number = int.Parse(m.Groups["number"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture);
-				switch (m.Groups["suffix"].Value.ToLowerInvariant()[0])
-				{
-					case 'w':
-						res += TimeSpan.FromDays(number * 7);
-						break;
-                    case 'd':
-                        res += TimeSpan.FromDays(number);
-                        break;
-                    case 'h':
-                        res += TimeSpan.FromHours(number);
-                        break;
-                    case 'm':
-                        res += TimeSpan.FromMinutes(number);
-                        break;
-                    case 's':
-                        res += TimeSpan.FromSeconds(number);
-                        break;
-                    default:
-						throw new ArgumentException($"Invalid suffix: \"{m.Groups["suffix"].Value}\"", value);
-				}
-			}
-
-			if (len != value.Length)
-                throw new ArgumentException($"String is not a valid duration: \"{value}\"", nameof(value));
-
-			return res;
-        }
-
-		/// <summary>
-		/// Parses a potential size string
-		/// </summary>
-		/// <param name="value">The string to parse</param>
-		/// <returns>The size</returns>
-		public static long ParseSize(string value)
-		{
-			if (string.IsNullOrWhiteSpace(value))
-				throw new ArgumentException("Empty string is not a valid number", nameof(value));
-
-            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var r))
-                return r;
-
-            var m = new Regex("(?<number>[0-9,.]+)\\s*(?<suffix>[ptgmk]i?b)?", RegexOptions.IgnoreCase).Match(value);
-			if (!m.Success || m.Length != value.Length)
-                throw new ArgumentException($"String is not a valid number or size: \"{value}\"", nameof(value));
-
-            var suffix = m.Groups["suffix"].Success ? m.Groups["suffix"].Value.ToLowerInvariant()[0] : 'b';
-            var number = float.Parse(m.Groups["number"].Value, System.Globalization.CultureInfo.InvariantCulture);
-			switch (suffix)
-			{
-				case 'p':
-					return (long)(number * Math.Pow(1024, 5));
-                case 't':
-                    return (long)(number * Math.Pow(1024, 4));
-                case 'g':
-                    return (long)(number * Math.Pow(1024, 3));
-                case 'm':
-                    return (long)(number * Math.Pow(1024, 2));
-                case 'k':
-                    return (long)(number * Math.Pow(1024, 1));
-                case 'b':
-					// No suffix or 'b' must be a valid integer number
-                    return long.Parse(m.Groups["number"].Value, System.Globalization.CultureInfo.InvariantCulture);
-                default:
-					throw new ArgumentException($"Invalid suffix: \"{suffix}\"", nameof(value));
-			}
-        }
 
 		/// <summary>
 		/// Create an instance of an object, using constructor arguments and properties
@@ -284,7 +199,7 @@ namespace Ceen.Httpd.Cli
 		/// <summary>
 		/// Resolves the type given the class and assembly names.
 		/// </summary>
-		/// <returns>The resolved type.</returns>
+		/// <returns>The resolved type, or <c>null</c>.</returns>
 		/// <param name="classname">The name of the class to create.</param>
 		private static Type ResolveType(string classname)
 		{
@@ -293,11 +208,65 @@ namespace Ceen.Httpd.Cli
 					??
 				AppDomain.CurrentDomain.GetAssemblies()
 					.Select(x => x.GetType(classname))
-					.FirstOrDefault(x => x != null);
+					.FirstOrDefault(x => x != null)
+					??
+				ResolveBuiltInTypes(classname);
 
 			if (itemtype == null)
 				throw new Exception($"Failed to find the class named {classname}");
 			return itemtype;
+		}
+
+		/// <summary>
+		/// Helper class to support parsing typenames for built-in types without requiring their full name
+		/// </summary>
+		/// <param name="classname">The name of the type to find</param>
+		/// <returns>The resolved type, or <c>null</c>.</returns>
+		private static Type ResolveBuiltInTypes(string classname)
+		{
+			if (string.IsNullOrWhiteSpace(classname))
+				return null;
+			classname = classname.Trim().ToLowerInvariant();
+			if (classname.StartsWith("system."))
+				classname = classname.Substring("system.".Length);
+
+			switch(classname)
+			{
+				case "int":
+				case "integer":
+				case "int32":
+					return typeof(int);
+				case "uint":
+				case "uint32":
+					return typeof(uint);
+				case "long":
+				case "int64":
+					return typeof(int);
+				case "ulong":
+				case "uint64":
+					return typeof(int);
+				case "str":
+				case "string":
+					return typeof(string);
+				case "float":
+				case "float32":
+				case "single":
+					return typeof(float);
+				case "float64":
+				case "double":
+					return typeof(float);
+				case "bool":
+				case "boolean":
+					return typeof(bool);
+				case "date":
+				case "datetime":
+					return typeof(DateTime);
+				case "time":
+				case "timespan":
+					return typeof(TimeSpan);
+			}
+
+			return null;				
 		}
 
 		/// <summary>
@@ -385,6 +354,55 @@ namespace Ceen.Httpd.Cli
 							lastitemprops = route.Options;
 						}
 					}
+					else if (string.Equals(cmd, "wireroute", StringComparison.OrdinalIgnoreCase))
+					{
+						if (args.Length != 2)
+							throw new Exception($"Wrong number of arguments in line {lineindex}: {line}");
+						var route = new WiredRouteDefinition()
+						{
+							Classname = args.Skip(1).First()
+						};
+
+						cfg.Routes.Add(route);
+						lastitemprops = route.Options;
+					}
+					else if (string.Equals(cmd, "wirecontroller", StringComparison.OrdinalIgnoreCase))
+					{
+						if (args.Length != 3)
+							throw new Exception($"Wrong number of arguments in line {lineindex}: {line}");
+
+						var route = new WiredRouteDefinition()
+						{
+							RoutePrefix = args.Skip(1).First(),
+							Classname = args.Skip(2).First(),
+						};
+
+						cfg.Routes.Add(route);
+
+						// We cannot set props on the wired instance
+						lastitemprops = null;
+					}
+					else if (string.Equals(cmd, "wire", StringComparison.OrdinalIgnoreCase))
+					{
+						if (args.Length < 4)
+							throw new Exception($"Wrong number of arguments in line {lineindex}: {line}");
+
+						var route = new WiredRouteDefinition()
+						{
+							Verbs = args.Skip(1).First(),
+							RoutePrefix = args.Skip(2).First(),
+							Classname = args.Skip(3).First(),
+							ConstructorArguments = args.Skip(4).ToList()
+						};
+
+						if (route.Verbs.Length == 0)
+							throw new Exception($"Need at least one verb for the route in line {lineindex}: {line}");
+
+						cfg.Routes.Add(route);
+
+						// We cannot set props on the wired instance
+						lastitemprops = null;
+					}
 					else if (string.Equals(cmd, "handler", StringComparison.OrdinalIgnoreCase))
 					{
 						if (args.Length < 3)
@@ -414,7 +432,22 @@ namespace Ceen.Httpd.Cli
 						cfg.Modules.Add(module);
 						lastitemprops = module.Options;
 					}
-					else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
+                    else if (string.Equals(cmd, "postprocessor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (args.Length < 2)
+                            throw new Exception($"Too few arguments in line {lineindex}: {line}");
+
+                        var postprocessor = new PostProcessorDefinition()
+                        {
+                            Classname = args.Skip(1).First(),
+                            ConstructorArguments = args.Skip(2).ToList()
+                        };
+
+                        cfg.PostProcessors.Add(postprocessor);
+                        lastitemprops = postprocessor.Options;
+                    }
+
+                    else if (string.Equals(cmd, "logger", StringComparison.OrdinalIgnoreCase))
 					{
 						if (args.Length < 2)
 							throw new Exception($"Too few arguments in line {lineindex}: {line}");
@@ -535,26 +568,6 @@ namespace Ceen.Httpd.Cli
 		}
 
 		/// <summary>
-		/// Parse an IP Address, supporting &quot;any&quot;, &quot;*&quot;, &quot;local&quot;, and &quot;loopback&quot;
-		/// </summary>
-		/// <returns>The IP Address.</returns>
-		/// <param name="address">The adress to parse.</param>
-		public static IPAddress ParseIPAddress(string address)
-		{
-			var enabled = !string.IsNullOrWhiteSpace(address);
-			var addr = IPAddress.Loopback;
-
-			if (new string[] { "any", "*" }.Contains(address, StringComparer.OrdinalIgnoreCase))
-				addr = IPAddress.Any;
-			else if (new string[] { "local", "loopback" }.Contains(address, StringComparer.OrdinalIgnoreCase))
-				addr = IPAddress.Loopback;
-			else if (enabled)
-				addr = IPAddress.Parse(address);
-
-			return addr;
-		}
-
-		/// <summary>
 		/// Creates the server config instance, but does not attempt to load assemblies
 		/// </summary>
 		/// <returns>The server config.</returns>
@@ -572,7 +585,6 @@ namespace Ceen.Httpd.Cli
 				throw new Exception($"Invalid value for https port: {config.HttpsPort}");
 
 			var cfg = new ServerConfig();
-
 			if (enablehttps && !string.IsNullOrWhiteSpace(config.CertificatePath))
 				cfg.LoadCertificate(config.CertificatePath, config.CertificatePassword);
 
@@ -588,7 +600,6 @@ namespace Ceen.Httpd.Cli
 							if (!resp.Headers.ContainsKey(e.Key))
 								resp.AddHeader(e.Key, e.Value);
 				};
-
 			}
 			else if (config.DefaultHeaders != null && config.DefaultHeaders.Count != 0)
 			{
@@ -611,8 +622,43 @@ namespace Ceen.Httpd.Cli
 		public static ServerConfig ValidateConfig(CLIServerConfiguration config)
 		{
 			var cfg = CreateServerConfig(config);
+			
+			// Set up the module context
+			var ctx = LoaderContext.StartContext();
+			cfg.LoaderContext = ctx;
 
-			if (config.AutoLoadAssemblies)
+            // Expose our configuration to allow modules to call back, 
+			// beware that these values should never be reported to the client
+			// as there might be proxies in front which will make them useless
+			// to clients not running on the local machine
+			if (config.ListenHttp)
+			{
+				var parsedaddr = ParseUtil.ParseEndPoint(config.HttpAddress, config.HttpPort);
+				if (parsedaddr is IPEndPoint ipe)
+				{
+					var ip = ipe.Address == IPAddress.Any ? "127.0.0.1" : ipe.Address.ToString();
+            		Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", "http://" + ip + ":" + ipe.Port);
+				}
+				// else
+				// {
+            	// 	Environment.SetEnvironmentVariable("CEEN_SELF_HTTP_URL", config.HttpAddress);
+				// }
+			}
+            if (config.ListenHttps)
+			{
+				var parsedaddr = ParseUtil.ParseEndPoint(config.HttpsAddress, config.HttpsPort);
+				if (parsedaddr is IPEndPoint ipe)
+				{
+					var ip = ipe.Address == IPAddress.Any ? "127.0.0.1" : ipe.Address.ToString();
+            		Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", "http://" + ip + ":" + ipe.Port);
+				}
+				// else
+				// {
+            	// 	Environment.SetEnvironmentVariable("CEEN_SELF_HTTPS_URL", config.HttpsAddress);					
+				// }
+			}
+
+            if (config.AutoLoadAssemblies)
 			{
 				// Workaround for unittests not providing EntryAssembly
 				var callingasm = Assembly.GetEntryAssembly();
@@ -646,7 +692,11 @@ namespace Ceen.Httpd.Cli
 					var inst = CreateInstance(logger.Classname, logger.ConstructorArguments, typeof(ILogger));
 					if (logger.Options != null)
 						SetProperties(inst, logger.Options);
-					cfg.AddLogger((ILogger)inst);
+
+                    if (inst is IWithSetup mse)
+                        mse.AfterConfigure();
+
+                    cfg.AddLogger((ILogger)inst);
 				}
 			}
 
@@ -661,7 +711,7 @@ namespace Ceen.Httpd.Cli
 					if (module.Options != null)
 						SetProperties(handler, module.Options);
 
-                    if (module is IModuleWithSetup mse)
+                    if (handler is IWithSetup mse)
                         mse.AfterConfigure();
 
 
@@ -669,12 +719,73 @@ namespace Ceen.Httpd.Cli
 				}
 			}
 
-			if (config.Routes != null)
+            if (config.PostProcessors != null)
+            {
+                foreach (var postProcessor in config.PostProcessors)
+                {
+                    var inst = CreateInstance(postProcessor.Classname, postProcessor.ConstructorArguments, typeof(IPostProcessor));
+                    if (postProcessor.Options != null)
+                        SetProperties(inst, postProcessor.Options);
+
+                    if (inst is IWithSetup mse)
+                        mse.AfterConfigure();
+
+                    cfg.AddPostProcessor((IPostProcessor)inst);
+                }
+            }
+
+            if (config.Routes != null)
 			{
+				Ceen.Mvc.ManualRoutingController wirecontroller = null;
+				Ceen.Mvc.ControllerRouterConfig wirecontrollerconfig = null;
+
 				foreach (var route in config.Routes)
 				{
+					// If we have a wired controller, and a non-wire item
+					// add it now to ensure the order is maintained
+					if (wirecontroller != null && !(route is WiredRouteDefinition))
+					{
+						cfg.AddRoute(wirecontroller.ToRoute(wirecontrollerconfig));
+						wirecontroller = null;
+					}
+
+					// Check for wireups
+					if (route is WiredRouteDefinition wired)
+					{
+						// Make a new manual router, if none is present or if we add one
+						if (wirecontroller == null || (wired.RoutePrefix == null ))
+						{
+							// Add any previous wireup to the routes
+							if (wirecontroller != null)
+								cfg.AddRoute(wirecontroller.ToRoute(wirecontrollerconfig));
+
+							wirecontrollerconfig = new Ceen.Mvc.ControllerRouterConfig();
+							if (route.Options != null)
+								SetProperties(wirecontrollerconfig, route.Options);
+							wirecontroller = new Ceen.Mvc.ManualRoutingController();
+						}
+
+						if (wired.Verbs == null)
+						{
+							var itemtype = ResolveType(wired.Classname);
+							wirecontroller.WireController(itemtype, wired.RoutePrefix, wirecontrollerconfig);
+						}
+						else
+						{						
+							var ix = wired.Classname.LastIndexOf('.');
+							var classname = wired.Classname.Substring(0, ix);
+							var methodname = wired.Classname.Substring(ix + 1);
+
+							var itemtype = ResolveType(classname);
+							var argumenttypes = wired.ConstructorArguments.Select(x => ResolveType(x)).ToArray();
+							if (argumenttypes.Any(x => x == null))
+								throw new Exception($"Cannot resolve type argument {argumenttypes.Select((a, b) => a == null ? wired.ConstructorArguments[b] : null).Where(x => x != null).First()}");
+
+							wirecontroller.Wire(itemtype, wired.Verbs + " " + wired.RoutePrefix, methodname, argumenttypes);
+						}
+					}
 					// Check if this is a module
-					if (route.RoutePrefix != null)
+					else if (route.RoutePrefix != null)
 					{
 						object handler;
 						var moduletype = ResolveType(route.Classname);
@@ -743,7 +854,7 @@ namespace Ceen.Httpd.Cli
 						if (route.Options != null)
 							SetProperties(handler, route.Options);
 
-                        if (handler is IHttpModuleWithSetup mse)
+                        if (handler is IWithSetup mse)
                             mse.AfterConfigure();
 
 						if (string.IsNullOrWhiteSpace(route.RoutePrefix))
@@ -751,11 +862,12 @@ namespace Ceen.Httpd.Cli
 						else
 							cfg.AddRoute(route.RoutePrefix, (IHttpModule)handler);
 					}
+					// Otherwise it is automatic routing of an assembly
 					else
 					{
 						var assembly = Assembly.Load(route.Assembly);
 						if (assembly == null)
-							throw new Exception($"Failed to find load assembly {route.Assembly}");
+							throw new Exception($"Failed to load assembly {route.Assembly}");
 
 						Type defaulttype = null;
 						if (!string.IsNullOrWhiteSpace(route.Classname))
@@ -771,9 +883,14 @@ namespace Ceen.Httpd.Cli
 
                         cfg.AddRoute(new Ceen.Mvc.ControllerRouter(rt, assembly));
 					}
-				}
+				}				
+				
+				// If we have a wired controller, add it
+				if (wirecontroller != null)
+					cfg.AddRoute(wirecontroller.ToRoute(wirecontrollerconfig));
 			}
 
+			ctx.Freeze();
 			return cfg;
 		}
 

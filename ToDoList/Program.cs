@@ -11,7 +11,7 @@ namespace ToDoList
 
 		public static int Main(string[] args)
 		{
-			log4net.Config.XmlConfigurator.Configure();
+			log4net.Config.XmlConfigurator.Configure(log4net.LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly()));
 			Directory.SetCurrentDirectory(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location));
 
 			// Check if the webroot is already defined

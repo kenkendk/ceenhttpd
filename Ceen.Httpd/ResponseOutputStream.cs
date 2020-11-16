@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
+using Ceen.Common;
 
 namespace Ceen.Httpd
 {
@@ -15,6 +16,7 @@ namespace Ceen.Httpd
 		/// The stream into which data should be written
 		/// </summary>
 		private Stream m_parent;
+
 		/// <summary>
 		/// The response object that this stream is attached to
 		/// </summary>
@@ -24,10 +26,12 @@ namespace Ceen.Httpd
 		/// The optionally buffered content
 		/// </summary>
 		private MemoryStream m_buffer = null;
+
 		/// <summary>
 		/// A value indicating if a write should simply be sent to the underlying stream
 		/// </summary>
 		private bool m_passThrough = false;
+
 		/// <summary>
 		/// The number of bytes written
 		/// </summary>
@@ -96,10 +100,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		/// <returns>The async.</returns>
 		/// <param name="cancellationToken">The cancellation token.</param>
-        public override async Task FlushAsync(CancellationToken cancellationToken)
+		public override async Task FlushAsync(CancellationToken cancellationToken)
 		{
-            await SetLengthAndFlushAsync(false);
-            await m_parent.FlushAsync(cancellationToken);
+			await SetLengthAndFlushAsync(false, cancellationToken);
+			await m_parent.FlushAsync(cancellationToken);
 		}
 
 		/// <summary>
@@ -107,7 +111,7 @@ namespace Ceen.Httpd
 		/// </summary>
 		public override void Flush()
 		{
-            FlushAsync(default(CancellationToken)).Wait();
+			SyncAwaiter.WaitSync(() => FlushAsync(CancellationToken.None));
 		}
 
 		/// <summary>
@@ -155,8 +159,10 @@ namespace Ceen.Httpd
 
 			if (!m_passThrough)
 			{
-				if (m_response.HasSentHeaders || m_response.ContentLength >= 0 || ((m_buffer == null ? 0 : m_buffer.Length) + count) > MAX_RESPONSE_BUFFER)
+				if (m_response.HasSentHeaders || m_response.ContentLength >= 0 || m_buffer?.Length + count > MAX_RESPONSE_BUFFER)
+				{
 					m_passThrough = true;
+				}
 				else
 				{
 					if (m_buffer == null)
@@ -164,14 +170,12 @@ namespace Ceen.Httpd
 
 					await m_buffer.WriteAsync(buffer, offset, count, cancellationToken);
 					m_written += count;
-
-					if (m_buffer.Length < MAX_RESPONSE_BUFFER)
-						return;
+					return;
 				}
 
-                // If we get here, we dump what we have
-                await SetLengthAndFlushAsync(false);
-            }
+				// If we get here, we dump what we have
+				await SetLengthAndFlushAsync(false, cancellationToken);
+			}
 
 			await m_parent.WriteAsync(buffer, offset, count, cancellationToken);
 			m_written += count;
@@ -185,77 +189,79 @@ namespace Ceen.Httpd
 		/// <param name="count">The number of bytes to write.</param>
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-			WriteAsync(buffer, offset, count).Wait();
+            SyncAwaiter.WaitSync(() => WriteAsync(buffer, offset, count));
 		}
 
 		/// <summary>
 		/// Gets a value indicating whether this instance can be read.
 		/// </summary>
 		/// <value><c>true</c> if this instance can read; otherwise, <c>false</c>.</value>
-		public override bool CanRead
-		{
-			get
-			{
-				return false;
-			}
-		}
+		public override bool CanRead => false;
 
 		/// <summary>
 		/// Gets a value indicating whether this instance can seek.
 		/// </summary>
 		/// <value><c>true</c> if this instance can seek; otherwise, <c>false</c>.</value>
-		public override bool CanSeek
-		{
-			get
-			{
-				return false;
-			}
-		}
+		public override bool CanSeek => false;
 
 		/// <summary>
 		/// Gets a value indicating whether this instance can be written.
 		/// </summary>
 		/// <value><c>true</c> if this instance can write; otherwise, <c>false</c>.</value>
-		public override bool CanWrite
-		{
-			get
-			{
-				return m_parent.CanWrite;
-			}
-		}
+		public override bool CanWrite => m_parent.CanWrite;
 
 		/// <summary>
 		/// Gets the length of the stream.
 		/// </summary>
 		/// <value>The length.</value>
-		public override long Length
+		public override long Length => m_written;
+
+		/// <summary>
+		/// Gets or sets the position.
+		/// </summary>
+		/// <returns>The position.</returns>
+		public override long Position
 		{
-			get
-			{
-				return m_written;
-			}
+			get => m_written;
+			set => throw new NotImplementedException();
 		}
 
-        /// <summary>
-        /// Gets or sets the position.
-        /// </summary>
-        /// <returns>The position.</returns>
-        public override long Position
-        {
-            get => m_written;
-            set => throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Dispose the specified disposing.
-        /// </summary>
-        /// <param name="disposing">If set to <c>true</c> disposing.</param>
-        protected override void Dispose(bool disposing)
+		/// <summary>
+		/// Dispose the specified disposing.
+		/// </summary>
+		/// <param name="disposing">If set to <c>true</c> disposing.</param>
+		protected override void Dispose(bool disposing)
 		{
-            FlushAsync(default(CancellationToken)).Wait();
+            if (disposing)
+			{
+                Flush();
+                m_isDisposed = true;
+            }
+		}
+
+		/// <summary>
+		/// Unbuffers the contents of this stream and puts it into the target stream
+		/// </summary>
+		/// <param name="target">The stream to unbuffer to</param>
+		public void Unbuffer(Stream target) 
+		{
+			if (target == null)
+				throw new ArgumentNullException(nameof(target));
+
+			if (m_passThrough)
+				throw new InvalidOperationException("Cannot unbuffer when the stream is no longer buffering");
+			
+			// Copy the current buffer reference
+			var buf = m_buffer;
+
+			// Mark this instance as not buffering
+			Clear();
+
+			// Copy to the target, which may start a new buffer on this instance
+			if (buf != null)
+				buf.CopyTo(target);
 		}
 
 		#endregion
 	}
 }
-

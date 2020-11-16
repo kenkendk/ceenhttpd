@@ -117,16 +117,20 @@ namespace Ceen.Httpd.Cli.Runner
 
             Program.DebugConsoleOutput("Setting up crash handlers.");
 
+            // Bind variables
+            var self_http = m_http_runner;
+            var self_https = m_https_runner;
+
             // Set up a crash handler to capture crash in log
-            var dummy = m_http_runner?.RunnerTask.ContinueWith(x =>
+            var dummy = self_http?.RunnerTask.ContinueWith(x =>
             {
-                if (!m_http_runner.ShouldStop && InstanceCrashed != null)
+                if (!self_http.ShouldStop && InstanceCrashed != null)
                     InstanceCrashed(cfg.HttpAddress, false, x.IsFaulted ? x.Exception : new Exception("Unexpected stop"));
             });
             // Set up a crash handler to capture crash in log
-            dummy = m_https_runner?.RunnerTask.ContinueWith(x =>
+            dummy = self_https?.RunnerTask.ContinueWith(x =>
             {
-                if (!m_https_runner.ShouldStop && InstanceCrashed != null)
+                if (!self_https.ShouldStop && InstanceCrashed != null)
                     InstanceCrashed(cfg.HttpsAddress, true, x.IsFaulted ? x.Exception : new Exception("Unexpected stop"));
             });
 
@@ -179,7 +183,7 @@ namespace Ceen.Httpd.Cli.Runner
                     await runner.RestartAsync(newaddr, newport, usessl, config);
                 }
                 else
-                {
+                {                    
                     // If any of these change, we need to restart the listen socket
                     if (runner.Address != newaddr || runner.Port != newport)
                     {

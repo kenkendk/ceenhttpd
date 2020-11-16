@@ -24,6 +24,17 @@ namespace Ceen.Httpd
 		public IStorageCreator Storage { get; private set; }
 
 		/// <summary>
+		/// Gets the loaded module info
+		/// </summary>
+		/// <value></value>
+		public ILoadedModuleInfo LoadedModules { get => m_config; }
+
+		/// <summary>
+		/// The runner executing the request
+		/// </summary>
+		private readonly ServerConfig m_config;
+
+		/// <summary>
 		/// Gets or sets the session storage.
 		/// Note that this can be null if there is no session module loaded.
 		/// </summary>
@@ -37,7 +48,7 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// The delegate used to forward exceptions to the loggers 
 		/// </summary>
-		internal Func<Exception, Task> LogHandlerDelegate { get; set;}
+		internal Func<LogLevel, string, Exception, Task> LogHandlerDelegate { get; set;}
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.HttpContext"/> class.
@@ -45,18 +56,22 @@ namespace Ceen.Httpd
 		/// <param name="request">The HTTP request.</param>
 		/// <param name="response">The HTTP response.</param>
 		/// <param name="storage">The storage instance</param>
-		public HttpContext(HttpRequest request, HttpResponse response, IStorageCreator storage)
+		/// <param name="config">The server config</params>
+		public HttpContext(HttpRequest request, HttpResponse response, IStorageCreator storage, ServerConfig config)
 		{
 			this.Request = request;
 			this.Response = response;
 			this.Storage = storage;
+			this.m_config = config;
 		}
 
         /// <summary>
-        /// Logs an exception
+        /// Logs a message
         /// </summary>
+        /// <param name="level">The level to log</param>
+        /// <param name="message">The message to log</param>
         /// <param name="ex">The exception to log</param>
         /// <returns>An awaitable task</returns>
-        public Task LogExceptionAsync(Exception ex) => LogHandlerDelegate?.Invoke(ex) ?? Task.FromResult(true);
+        public Task LogMessageAsync(LogLevel level, string message, Exception ex) => LogHandlerDelegate?.Invoke(level, message, ex) ?? Task.FromResult(true);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Ceen.Httpd
@@ -13,10 +14,12 @@ namespace Ceen.Httpd
 		/// The underlying stream
 		/// </summary>
 		private readonly BufferedStreamReader m_parent;
+
 		/// <summary>
 		/// The delimiter items
 		/// </summary>
 		private readonly byte[] m_delimiter;
+
 		/// <summary>
 		/// The number of bytes read
 		/// </summary>
@@ -26,14 +29,11 @@ namespace Ceen.Httpd
 		/// The buffer
 		/// </summary>
 		private byte[] m_buf;
+
 		/// <summary>
 		/// The number of bytes in the buffer
 		/// </summary>
 		private int m_buffersize;
-		/// <summary>
-		/// The last offset where we searched for the delimiter
-		/// </summary>
-		private int m_lastlookoffset;
 
 		/// <summary>
 		/// A flag indicating that the stream has been read
@@ -44,18 +44,16 @@ namespace Ceen.Httpd
 		/// The maximum idle time
 		/// </summary>
 		private readonly TimeSpan m_idletime;
+
 		/// <summary>
 		/// The timeout task
 		/// </summary>
 		private readonly Task m_timeouttask;
+
 		/// <summary>
 		/// The stop task
 		/// </summary>
 		private readonly Task m_stoptask;
-		/// <summary>
-		/// The cancellation token
-		/// </summary>
-		private System.Threading.CancellationTokenSource m_cs;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="Ceen.Httpd.DelimitedSubStream"/> class.
@@ -72,7 +70,6 @@ namespace Ceen.Httpd
 			m_idletime = idletime;
 			m_timeouttask = timeouttask;
 			m_stoptask = stoptask;
-			m_cs = new System.Threading.CancellationTokenSource();
 			m_buf = new byte[Math.Max(8 * 1024, delimiter.Length * 2)];
 		}
 
@@ -83,23 +80,24 @@ namespace Ceen.Httpd
 		/// <returns>The delimiter match.</returns>
 		private int FindDelimiterMatch()
 		{
-			var ix = Array.IndexOf(m_buf, m_delimiter[0], m_lastlookoffset, m_buffersize - m_lastlookoffset);
+			var lastlookoffset = 0;
+			var ix = Array.IndexOf(m_buf, m_delimiter[0], lastlookoffset, m_buffersize - lastlookoffset);
 			if (ix < 0)
 				return -1;
 
 			do
 			{
 				bool match = true;
-				for(var i = 1; match && i < Math.Min(m_delimiter.Length, ix - m_buffersize); i++)
-					match = m_buf[ix + i] != m_delimiter[i];
-					
+				var counts = Math.Min(m_delimiter.Length, m_buffersize - ix);
+				for (var i = 1; match && i < counts; i++)
+					match = m_buf[ix + i] == m_delimiter[i];
+
 				if (match)
 					return ix;
 
-				m_lastlookoffset = ix + 1;
-				ix = Array.IndexOf(m_buf, m_delimiter[0], m_lastlookoffset, m_buffersize - m_lastlookoffset);
-			}
-			while(ix > 0);
+                lastlookoffset = ix + 1;
+				ix = Array.IndexOf(m_buf, m_delimiter[0], lastlookoffset, m_buffersize - lastlookoffset);
+			} while (ix > 0);
 
 			return -1;
 		}
@@ -120,40 +118,67 @@ namespace Ceen.Httpd
 			if (count > m_buf.Length)
 				Array.Resize(ref m_buf, count + 1024);
 
-			var rtask = m_parent.ReadAsync(m_buf, m_buffersize, Math.Min(count, m_buf.Length - m_buffersize), m_cs.Token);
-			var rt = await Task.WhenAny(Task.Delay(m_idletime), m_timeouttask, m_stoptask, rtask);
+			Task<int> rtask;
+			Task rt;
+
+			using (var cs = new CancellationTokenSource(m_idletime))
+			using (cancellationToken.Register(() => cs.Cancel()))
+			{
+				rtask = m_parent.ReadAsync(m_buf, m_buffersize, Math.Max(m_delimiter.Length - m_buffersize, Math.Min(count, m_buf.Length - m_buffersize)), cs.Token);
+				rt = await Task.WhenAny(m_timeouttask, m_stoptask, rtask);
+			}
+
 			if (rt != rtask)
 			{
-				m_cs.Cancel();
 				if (rt == m_stoptask)
 					throw new TaskCanceledException();
 				else
 					throw new HttpException(HttpStatusCode.RequestTimeout);
 			}
 
-			var r = await rtask;
+			var r = rtask.Result;
 			m_buffersize += r;
 			if (r == 0)
 				return r;
+			
+			// Return as much as possible
+			var bytes = Math.Min(count, m_buffersize);
 
-			var ix = FindDelimiterMatch();
-			var res = Math.Max(0, ix);
-			if (res != 0)
-				Array.Copy(m_buf, 0, buffer, offset, res);
+			// Check for the delimiter
+            var ix = FindDelimiterMatch();
 
-			if (m_buffersize - ix >= m_delimiter.Length)
+            // If we found a (partial) delimiter match,
+            // only return bytes leading up to the marker
+            if (ix >= 0)
+				bytes = Math.Min(count, ix);
+
+			// Copy bytes to the reader
+			if (bytes != 0)
+			{
+            	Array.Copy(m_buf, 0, buffer, offset, bytes);
+			}
+
+			// Store what we read ahead in the buffer
+			if (bytes != m_buffersize)
+				Array.Copy(m_buf, ix, m_buf, 0, m_buffersize - ix);
+
+			// Adjust with the bytes taken
+            m_buffersize -= bytes;
+
+            // If we found the delimiter in full, we are done
+            if (ix > 0 && m_buffersize >= m_delimiter.Length)
 			{
 				m_completed = true;
-				m_parent.AddToBuffer(m_buf, ix + m_delimiter.Length, m_buffersize - ix - m_delimiter.Length);
-			}
-			else
-			{
-				Array.Copy(m_buf, ix, m_buf, 0, m_buffersize - ix);
-				m_buffersize -= ix;
+				// Drop the delimiter from the buffer
+				m_buffersize -= m_delimiter.Length;
+				// If we have more, stuff it back into the parent's buffer
+				if (m_buffersize != 0)
+					m_parent.UnreadBytesIntoBuffer(m_buf, m_delimiter.Length, m_buffersize);
+				m_buffersize = 0;
 			}
 
-			m_read += res;
-			return res;			
+			m_read += bytes;
+			return bytes;
 		}
 
         #region implemented abstract members of Stream
@@ -176,4 +201,3 @@ namespace Ceen.Httpd
         #endregion
     }
 }
-

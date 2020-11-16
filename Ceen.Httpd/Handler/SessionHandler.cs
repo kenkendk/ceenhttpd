@@ -26,6 +26,12 @@ namespace Ceen.Httpd.Handler
 		/// </summary>
 		public bool SessionCookieSecure { get; set; } = false;
 
+        /// <summary>
+        /// Gets or sets the value for the cookie &quot;samesite&quot; attribute.
+        /// The default is &quot;Strict&quot; meaning that the cookie will not be shared with other sites.
+        /// </summary>
+        public string SessionCookieSameSite { get; set; } = "Strict";
+
 		/// <summary>
 		/// Handles the request
 		/// </summary>
@@ -36,7 +42,7 @@ namespace Ceen.Httpd.Handler
 			if (context.Session != null)
 				return false;
 			
-			var sessiontoken = context.Request.Cookies[CookieName];
+			var sessiontoken = context.Request.SessionID = context.Request.Cookies[CookieName];
 
 			if (!string.IsNullOrWhiteSpace(sessiontoken))
 			{
@@ -47,8 +53,8 @@ namespace Ceen.Httpd.Handler
 			}
 
 			// Create new storage
-			sessiontoken = Guid.NewGuid().ToString();
-			context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true);
+			sessiontoken = context.Request.SessionID = Guid.NewGuid().ToString();
+			context.Response.AddCookie(CookieName, sessiontoken, secure: SessionCookieSecure, httponly: true, samesite: SessionCookieSameSite);
 			context.Session = await context.Storage.GetStorageAsync(STORAGE_MODULE_NAME, sessiontoken, (int)ExpirationSeconds.TotalSeconds, true);
 
 			return false;

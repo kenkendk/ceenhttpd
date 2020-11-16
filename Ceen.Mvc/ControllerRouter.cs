@@ -19,6 +19,7 @@ namespace Ceen
 		/// <returns>The route.</returns>
 		/// <param name="assembly">The assembly to use.</param>
 		/// <param name="config">An optional config.</param>
+		/// <returns>The router</returns>
 		public static Ceen.Mvc.ControllerRouter ToRoute(this Assembly assembly, Ceen.Mvc.ControllerRouterConfig config = null)
 		{
 			return new Mvc.ControllerRouter(config ?? new Mvc.ControllerRouterConfig(), assembly);
@@ -30,6 +31,7 @@ namespace Ceen
 		/// <returns>The route.</returns>
 		/// <param name="assemblies">The assemblies to use.</param>
 		/// <param name="config">An optional config.</param>
+		/// <returns>The router</returns>
 		public static Ceen.Mvc.ControllerRouter ToRoute(this IEnumerable<Assembly> assemblies, Ceen.Mvc.ControllerRouterConfig config = null)
 		{
 			return new Mvc.ControllerRouter(config ?? new Mvc.ControllerRouterConfig(), assemblies);
@@ -41,11 +43,51 @@ namespace Ceen
 		/// <returns>The route.</returns>
 		/// <param name="types">The types to use.</param>
 		/// <param name="config">An optional config.</param>
+		/// <returns>The router</returns>
 		public static Ceen.Mvc.ControllerRouter ToRoute(this IEnumerable<Type> types, Ceen.Mvc.ControllerRouterConfig config = null)
 		{
 			return new Mvc.ControllerRouter(config ?? new Mvc.ControllerRouterConfig(), types);
 		}
-		
+
+		/// <summary>
+		/// Creates a route instance from a list of types
+		/// </summary>
+		/// <returns>The route.</returns>
+		/// <param name="instances">The declared instances to use.</param>
+		/// <param name="config">An optional config.</param>
+		/// <returns>The router</returns>
+		public static Ceen.Mvc.ControllerRouter ToRoute(this IEnumerable<Ceen.Mvc.Controller> instances, Ceen.Mvc.ControllerRouterConfig config = null)
+			=> new Mvc.ControllerRouter(
+				config ?? new Mvc.ControllerRouterConfig(), 
+				instances
+			);
+
+		/// <summary>
+		/// Creates a route instance from a list of routes
+		/// </summary>
+		/// <param name="routes">The routes to use</param>
+		/// <param name="config">The config to use</param>
+		/// <returns>The router</returns>
+		public static Ceen.Mvc.ControllerRouter ToRoute(this IEnumerable<Ceen.Mvc.PartialParsedRoute> routes, Ceen.Mvc.ControllerRouterConfig config = null)
+			=> new Mvc.ControllerRouter(
+				config ?? new Mvc.ControllerRouterConfig(), 
+				new Ceen.Mvc.ManualRoutingController(
+					routes
+				)
+			);
+
+		/// <summary>
+		/// Creates a route instance for a manual routing controller
+		/// </summary>
+		/// <param name="self">The manual routing controller</param>
+		/// <param name="config">The config to use</param>
+		/// <returns>The controller</returns>
+		public static Ceen.Mvc.ControllerRouter ToRoute(this Ceen.Mvc.ManualRoutingController self, Ceen.Mvc.ControllerRouterConfig config = null)
+			=> new Mvc.ControllerRouter(
+				config ?? new Mvc.ControllerRouterConfig(),
+				self
+			);
+
 	}
 }
 
@@ -180,6 +222,59 @@ namespace Ceen.Mvc
 		}
 
 		/// <summary>
+		/// Searches the type inheritance tree until it finds the desired attribute.
+		/// This approach allows a derived class to override attributes, but defaults to inheriting.
+		/// </summary>
+		/// <param name="self">The type to examine</param>
+		/// <typeparam name="T">The attribute type to find</typeparam>
+		/// <returns>The attributes found</returns>
+		public static IEnumerable<T> SearchCustomAttributes<T>(this Type self)
+			where T : Attribute
+		{
+			if (self == null)
+				throw new ArgumentNullException(nameof(self));
+			
+			do
+			{
+				var res = self.GetCustomAttributes(typeof(T), false);
+				if (res != null && res.Length > 0)
+					return res.Cast<T>();
+
+				self = self.BaseType;
+			} while(self != null);
+
+			return new T[0];
+		}
+
+		/// <summary>
+		/// Searches the type inheritance tree until it finds the desired attribute.
+		/// This approach allows a derived class to override attributes, but defaults to inheriting.
+		/// </summary>
+		/// <param name="self">The type to examine</param>
+		/// <typeparam name="T">The attribute type to find</typeparam>
+		/// <returns>The attributes found</returns>
+		public static IEnumerable<T> SearchCustomAttributes<T>(this MethodInfo self)
+			where T : Attribute
+		{
+			if (self == null)
+				throw new ArgumentNullException(nameof(self));
+			
+			do
+			{
+				var res = self.GetCustomAttributes(typeof(T), false);
+				if (res != null && res.Length > 0)
+					return res.Cast<T>();
+
+				var next = self.GetBaseDefinition();
+				if (self == next)
+					break;
+				self = next;
+			} while(self != null);
+
+			return new T[0];
+		}		
+
+		/// <summary>
 		/// Gets the name of an item
 		/// </summary>
 		/// <returns>The item name.</returns>
@@ -187,7 +282,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		public static string GetItemName(this Type self, ControllerRouterConfig config)
 		{
-			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			var nameattr = self.SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 			// Extract an assigned name
 			if (nameattr != null)
 				return nameattr.Name;
@@ -230,7 +325,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		public static string GetItemName(this MethodInfo self, ControllerRouterConfig config)
 		{
-			var nameattr = self.GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+			var nameattr = self.SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 			// Extract an assigned name
 			if (nameattr != null)
 				return nameattr.Name;
@@ -241,6 +336,37 @@ namespace Ceen.Mvc
 
 			return name;
 		}
+	}
+
+	/// <summary>
+	/// Represents the parsed route before binding any variables
+	/// </summary>
+	public class PartialParsedRoute
+	{
+		/// <summary>
+		/// The controller instance to use
+		/// </summary>
+		public Controller Controller;
+		/// <summary>
+		/// The path fragment on the controller
+		/// </summary>
+		public string ControllerPath;
+		/// <summary>
+		/// The path fragment on the interface
+		/// </summary>
+		public string InterfacePath;
+		/// <summary>
+		/// The path fragment on the method
+		/// </summary>
+		public string MethodPath;
+		/// <summary>
+		/// The method to invoke
+		/// </summary>
+		public MethodInfo Method;
+		/// <summary>
+		/// The verbs accepted by the method
+		/// </summary>
+		public string[] Verbs;
 	}
 
 	/// <summary>
@@ -274,7 +400,7 @@ namespace Ceen.Mvc
 		/// <param name="config">The configuration to use</param>
 		/// <param name="assemblies">The assemblies to scan for controllers.</param>
 		public ControllerRouter(ControllerRouterConfig config, IEnumerable<Assembly> assemblies)
-			: this(config, assemblies.SelectMany(x => x.GetTypes()).Where(x => x != null && typeof(Controller).IsAssignableFrom(x)))
+			: this(config, assemblies.SelectMany(x => x.GetTypes()).Where(x => x != null && typeof(Controller).IsAssignableFrom(x) && !x.IsAbstract && !x.IsGenericTypeDefinition))
 		{
 		}
 
@@ -312,22 +438,76 @@ namespace Ceen.Mvc
 
 			types = types.Where(x => x != null).Distinct().ToArray();
 			if (types.Count() == 0)
-				throw new ArgumentException($"No controller entries to load from \"{types}\"");
+				throw new ArgumentException($"Attempted to load routes from an assembly, or set of types with no routes", nameof(types));
 
-			var wrong = types.Where(x => !typeof(Controller).IsAssignableFrom(x)).FirstOrDefault();
+			var wrong = types.FirstOrDefault(x => !typeof(Controller).IsAssignableFrom(x));
 			if (wrong != null)
 				throw new ArgumentException($"The type \"{wrong.FullName}\" does not derive from {typeof(Controller).FullName}");
 
-			m_routeparser = BuildParse(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
+            wrong = types.FirstOrDefault(x => x.IsAbstract || x.IsGenericTypeDefinition);
+            if (wrong != null)
+                throw new ArgumentException($"The type \"{wrong.FullName}\" cannot be instantiated");
+
+            m_routeparser = BuildParse(types.Select(x => (Controller)Activator.CreateInstance(x)).ToArray(), m_config);
 		}
 
-		private static RouteParser BuildParse(IEnumerable<Controller> controllers, ControllerRouterConfig config)
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ControllerRouter"/> class.
+		/// </summary>
+		/// <param name="config">The configuration to use</param>
+		/// <param name="instances">The instances to use.</param>
+		public ControllerRouter(ControllerRouterConfig config, params Controller[] instances)
+			: this(config, (instances ?? new Controller[0]).AsEnumerable())
 		{
-			var controller_routes =
-				controllers.SelectMany(x =>
+		}
+
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="T:Ceen.Mvc.ControllerRouter"/> class.
+		/// </summary>
+		/// <param name="config">The configuration to use</param>
+		/// <param name="instances">The instances to use.</param>
+		public ControllerRouter(ControllerRouterConfig config, IEnumerable<Ceen.Mvc.Controller> instances)
+		{
+			if (instances == null || instances.Any(x => x == null))
+				throw new ArgumentNullException($"{instances}");
+			if (config == null)
+				throw new ArgumentNullException($"{config}");
+
+			// Make sure the caller cannot edit the config afterwards
+			m_config = config.Clone();
+
+			var variables = new RouteParser(m_config.Template, !m_config.CaseSensitive, null).Variables;
+
+			if (variables.Count(x => x.Key == m_config.ControllerGroupName) != 1)
+				throw new ArgumentException($"The template must contain exactly 1 named group called {m_config.ControllerGroupName}");
+			if (variables.Count(x => x.Key == m_config.ActionGroupName) != 1)
+				throw new ArgumentException($"The template must contain exactly 1 named group called {m_config.ActionGroupName}");
+
+			if (instances.Count() == 0)
+				throw new ArgumentException($"No instances were added as routes", nameof(instances));
+
+			var duplicates = instances.GroupBy(x => x.GetType()).Where(x => x.Count() > 1);
+			if (duplicates.Any())
+				throw new ArgumentException($"The type \"{duplicates.First().Key}\" has {duplicates.First().Count()} instances");
+
+            m_routeparser = BuildParse(instances, m_config);
+		}		
+
+		/// <summary>
+		/// Creates partial routes for all controllers in the sequence
+		/// </summary>
+		/// <param name="controllers">The controllers to create partial routes for</param>
+		/// <param name="config">The configuration to use</param>
+		/// <returns>The partial routes</returns>
+		public static PartialParsedRoute[] ParseControllers(IEnumerable<Controller> controllers, ControllerRouterConfig config)
+		{
+			var controller_routes = controllers
+				.Where(x => !(x is ManualRoutingController))
+				.SelectMany(x =>
 				{
 					string name;
-					var nameattr = x.GetType().GetCustomAttributes(typeof(NameAttribute), false).Cast<NameAttribute>().FirstOrDefault();
+					var nameattr = x.GetType().SearchCustomAttributes<NameAttribute>().Cast<NameAttribute>().FirstOrDefault();
 					// Extract controller name
 					if (nameattr != null)
 						name = nameattr.Name;
@@ -343,11 +523,11 @@ namespace Ceen.Mvc
 							name = name.ToLowerInvariant();
 					}
 
-					var routes = x.GetType().GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+					var routes = x.GetType().SearchCustomAttributes<RouteAttribute>().Cast<RouteAttribute>().Select(y => y.Route);
 					
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
-					routes = new[] { string.Empty };
+						routes = new[] { string.Empty };
 
 					return routes.Distinct().Select(y => new
 					{
@@ -384,7 +564,14 @@ namespace Ceen.Mvc
 					return
 						x.Controller.GetType()
 							.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-							.Where(y => y.ReturnType == typeof(void) || typeof(IResult).IsAssignableFrom(y.ReturnType) || typeof(Task).IsAssignableFrom(y.ReturnType))
+							// Only target the methods that return something useful
+							.Where(y => 
+								y.ReturnType == typeof(void) 
+								|| typeof(IResult).IsAssignableFrom(y.ReturnType) 
+								|| typeof(Task).IsAssignableFrom(y.ReturnType)
+							)
+							// Remove properties and others
+							.Where(y => !y.IsSpecialName)
 							.Select(y => new
 							{
 								Controller = x.Controller,
@@ -395,26 +582,42 @@ namespace Ceen.Mvc
 				}
             ).ToArray();
 
-			var target_routes =
+			return
 				target_method_routes.SelectMany(x =>
 				{
-					var routes = x.Method.GetCustomAttributes(typeof(RouteAttribute), false).Cast<RouteAttribute>().Select(y => y.Route);
+					var routes = x.Method.SearchCustomAttributes<RouteAttribute>().Cast<RouteAttribute>().Select(y => y.Route);
 
 					// Add default route, if there are no route attributes
 					if (routes.Count() == 0)
 						routes = new[] { string.Empty };
 
-					return routes.Select(y => new
+					// Get any accepted verbs
+					var verbs = x.Method.SearchCustomAttributes<HttpVerbFilterAttribute>().Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant()).ToArray();
+
+					return routes.Select(y => new PartialParsedRoute()
 					{
 						Controller = x.Controller,
-						ControllerRoute = x.ControllerRoute,
+						ControllerPath = x.ControllerRoute,
 						InterfacePath = x.InterfacePath,
 						Method = x.Method,
-						MethodRoute = y						
-					});
-					
+						MethodPath = y,		
+						Verbs = verbs
+					});				
 				}
-			).ToArray();
+			)
+			.ToArray();
+		}
+
+		private static RouteParser BuildParse(IEnumerable<Controller> controllers, ControllerRouterConfig config)
+		{
+			var target_routes =
+				ParseControllers(controllers, config)
+
+				// Attach custom controller routes
+				.Concat(
+					controllers.OfType<ManualRoutingController>().SelectMany(x => x.Routes)
+				)
+				.ToArray();
 
 			// Now we have the cartesian product of all route/controller/action pairs, then build the target strings
 			var tmp = new RouteParser(config.Template, !config.CaseSensitive, null);
@@ -424,8 +627,11 @@ namespace Ceen.Mvc
 			var target_strings =
 				target_routes.SelectMany(x =>
 				{
-					var methodverbs = x.Method.GetCustomAttributes(typeof(HttpVerbFilterAttribute), false).Cast<HttpVerbFilterAttribute>().Select(b => b.Verb.ToUpperInvariant());
-					var entry = new RouteEntry(x.Controller, x.Method, methodverbs.ToArray(), null);
+					// Provide a hook point for the dynamic routing option
+					if (x.Controller is IIDynamicConfiguredController idc)
+						x = idc.PatchRoute(x);
+
+					var entry = new RouteEntry(x.Controller, x.Method, x.Verbs, null);
 
 					var path = new RouteParser("/", !config.CaseSensitive, entry);
 
@@ -437,7 +643,7 @@ namespace Ceen.Mvc
 							path = path.Append(x.InterfacePath, !config.CaseSensitive, entry);
 					}
 
-					var ct = string.IsNullOrWhiteSpace(x.ControllerRoute) ? config.Template : x.ControllerRoute;
+					var ct = string.IsNullOrWhiteSpace(x.ControllerPath) ? config.Template : x.ControllerPath;
 
 					if (!string.IsNullOrWhiteSpace(ct))
 					{
@@ -451,7 +657,7 @@ namespace Ceen.Mvc
 						}
 					}
 
-					var mt = x.MethodRoute;
+					var mt = x.MethodPath;
 					if (!string.IsNullOrWhiteSpace(mt))
 					{
 						if (mt.StartsWith("/", StringComparison.Ordinal))
@@ -486,9 +692,9 @@ namespace Ceen.Mvc
 					.SelectMany(y => actionnames.Select(
 						z => path
 							.Bind(config.ControllerGroupName, y, !config.CaseSensitive, true)
-							.Bind(config.ActionGroupName, z, !config.CaseSensitive, true)
+							.Bind(config.ActionGroupName, z, !config.CaseSensitive, true)							
 							.PrunePath()
-							.ReplaceTarget(x.Controller, x.Method, methodverbs.ToArray())
+							.ReplaceTarget(x.Controller, x.Method, x.Verbs)
 							)
 		                );
 				}
@@ -563,12 +769,16 @@ namespace Ceen.Mvc
 		private async Task HandleWithMethod(IHttpContext context, MethodEntry method, Controller controller, Dictionary<string, string> urlmatch)
 		{
 			// Make sure dependencies are met
-			context.Request.RequireHandler(controller.GetType().GetCustomAttributes<RequireHandlerAttribute>());
-			context.Request.RequireHandler(method.Method.GetCustomAttributes<RequireHandlerAttribute>());
+			if (controller != null)
+				context.Request.RequireHandler(controller.GetType().SearchCustomAttributes<RequireHandlerAttribute>());
+			context.Request.RequireHandler(method.Method.SearchCustomAttributes<RequireHandlerAttribute>());
 			
 			// Apply each argument in turn
 			var values = new object[method.ArgumentCount];
             var hasreadbody = false;
+
+			foreach (var m in urlmatch)
+				context.Request.RequestState[m.Key] = m.Value;
 
 			for (var ix = 0; ix < values.Length; ix++)
 			{
@@ -596,7 +806,8 @@ namespace Ceen.Mvc
                 {
                     // We can have at most one body param
                     hasreadbody = true;
-                    ApplyArgument(method.Method, e, await RequestUtility.ReadAllAsStringAsync(context.Request.Body, RequestUtility.GetEncodingForContentType(context.Request.ContentType), context.Request.TimeoutCancellationToken), values);
+                    var str = await RequestUtility.ReadAllAsStringAsync(context.Request.Body, RequestUtility.GetEncodingForContentType(context.Request.ContentType), context.Request.TimeoutCancellationToken);
+                    ApplyArgument(method.Method, e, str, values);
                 }
 				else if (e.Required)
 					throw new HttpException(HttpStatusCode.BadRequest, $"Missing mandatory parameter {e.Name}");
@@ -604,6 +815,10 @@ namespace Ceen.Mvc
 					values[e.ArgumentIndex] = e.Parameter.DefaultValue;
 				else
 					values[e.ArgumentIndex] = e.Parameter.ParameterType.IsValueType ? Activator.CreateInstance(e.Parameter.ParameterType) : null;
+
+				// Provide the bound variables to the processing module
+				if (!e.IsContextParameter)
+					context.Request.RequestState[e.Name] = values[e.ArgumentIndex];
 			}
 
 			var res = method.Method.Invoke(controller, values);
@@ -634,10 +849,12 @@ namespace Ceen.Mvc
 			var argtype = method.GetParameters()[entry.ArgumentIndex].ParameterType;
 			try
 			{
-                if (argtype.IsPrimitive || argtype.IsEnum || argtype == typeof(string))
+				if (argtype.IsEnum)
+					values[entry.ArgumentIndex] = Enum.Parse(argtype, value, true);
+                else if (argtype.IsPrimitive || argtype == typeof(string))
                     values[entry.ArgumentIndex] = Convert.ChangeType(value, argtype);
                 else
-                    Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
+                    values[entry.ArgumentIndex] = Newtonsoft.Json.JsonConvert.DeserializeObject(value, argtype);
 			}
 			catch (Exception)
 			{

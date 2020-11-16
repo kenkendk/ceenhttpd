@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <ReleaseVersion>0.9.7</ReleaseVersion>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <ReleaseVersion>0.9.9</ReleaseVersion>
   </PropertyGroup>
 
 </Project>

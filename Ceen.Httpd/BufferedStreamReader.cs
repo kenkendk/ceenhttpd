@@ -9,7 +9,7 @@ namespace Ceen.Httpd
 	/// Helper class that reads a stream,
 	/// but also provides a buffer to allow peek/read-ahead
 	/// It contains a special method to read data until the first 
-	/// CR LF CR LF entry (end o HTTP header), and leaves the rest of
+	/// CR LF CR LF entry (end of HTTP header), and leaves the rest of
 	/// the stream untouched.
 	/// </summary>
 	public class BufferedStreamReader : Stream
@@ -90,7 +90,6 @@ namespace Ceen.Httpd
 			var totalread = 0;
 			var lastlookoffset = 0;
 			var lastlinestart = 0;
-			var cs = new CancellationTokenSource();
 
 			// Repeat the parsing until we time out or get an empty line
 			while (true)
@@ -98,14 +97,18 @@ namespace Ceen.Httpd
 				if (totalread == maxheadersize)
 					throw new HttpException(HttpStatusCode.RequestHeaderFieldsTooLarge);
 
-				var rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else if (totalread == 0)
@@ -114,7 +117,7 @@ namespace Ceen.Httpd
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				totalread += r;
 				bufsize += r;
 
@@ -150,7 +153,7 @@ namespace Ceen.Httpd
 
 							// If we have more data, "unread it"
 							if (bufsize - bufoffset != 0)
-								AddToBuffer(buf, bufoffset, bufsize - bufoffset);
+								UnreadBytesIntoBuffer(buf, bufoffset, bufsize - bufoffset);
 
 							return;
 						}
@@ -224,25 +227,27 @@ namespace Ceen.Httpd
 		/// <param name="stoptask">The task that signals stop for the server</param>
 		internal async Task RepeatReadAsync(byte[] buffer, int offset, int count, TimeSpan idletimeout, Task timeouttask, Task stoptask)
 		{
-			var cs = new CancellationTokenSource();
-
 			while (count > 0)
 			{
-				var rtask = ReadAsync(buffer, offset, count, cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buffer, offset, count, cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				offset += r;
 				count -= r;
 				if (r == 0)
@@ -263,28 +268,31 @@ namespace Ceen.Httpd
 		{
 			var buf = new byte[buffersize];
 			var offset = 0;
-			var cs = new CancellationTokenSource();
 
 			// Avoid the stream if it all fits in a single package
 			MemoryStream ms = null;
 
 			while (maxcount > 0)
 			{
-				var rtask = ReadAsync(buf, offset, Math.Min(buf.Length - offset, maxcount), cs.Token);
-				var rt = await Task.WhenAny(Task.Delay(idletimeout), stoptask, timeouttask, rtask);
+                Task<int> rtask;
+                Task rt;
 
-				// Timeout or stop has happened
+                using (var cs = new CancellationTokenSource(idletimeout))
+                {
+                    rtask = ReadAsync(buf, offset, Math.Min(buf.Length - offset, maxcount), cs.Token);
+                    rt = await Task.WhenAny( stoptask, timeouttask, rtask);
+                }
+
+                // Timeout or stop has happened
 				if (rt != rtask)
 				{
-					cs.Cancel();
-
 					if (rt == stoptask)
 						throw new TaskCanceledException();
 					else
 						throw new HttpException(HttpStatusCode.RequestTimeout); 
 				}
 
-				var r = await rtask;
+				var r = rtask.Result;
 				offset += r;
 				maxcount -= r;
 				if (r == 0)
@@ -320,18 +328,52 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Adds bytes to the internal buffer.
+		/// Appends bytes to the internal buffer.
 		/// </summary>
 		/// <param name="data">The data to add.</param>
 		/// <param name="offset">The data offset.</param>
 		/// <param name="count">The number of bytes.</param>
-		internal void AddToBuffer(byte[] data, int offset, int count)
+		internal void UnreadBytesIntoBuffer(byte[] data, int offset, int count)
 		{
-			if (m_buffer.Length - m_buffercount < count)
-				Array.Resize(ref m_buffer, m_buffer.Length + count);
-			Array.Copy(data, offset, m_buffer, m_bufferoffset, count);
-			m_buffercount += count;
-            m_remainingbytes += count;
+			// If we have no buffered data, just add the new data to the buffer
+			if (m_buffercount == 0)
+			{
+				// Make sure there is space
+                if (m_buffer.Length < count)
+                    Array.Resize(ref m_buffer, count);
+				// Copy in the data
+                Array.Copy(data, offset, m_buffer, 0, count);
+				// Adjust the counters
+				m_buffercount = count;
+				m_bufferoffset = 0;
+				m_remainingbytes += count;
+            }
+            // We need to pre-pend the data
+            else
+			{
+				// If we can add the data before the current cursor, we do it
+				if (m_bufferoffset < count)
+				{
+					Array.Copy(data, offset, m_buffer, m_bufferoffset - count, count);
+					m_bufferoffset -= count;
+					m_buffercount += count;
+					m_remainingbytes += count;
+				}
+				else
+				{
+					// Make sure we have space for it
+					if (m_buffer.Length < count + m_buffercount)
+                        Array.Resize(ref m_buffer, m_buffer.Length + count);
+
+					// Move the current data so the new data fits before it
+					Array.Copy(m_buffer, m_bufferoffset, m_buffer, count, count);
+					// Then copy the new data behind it
+					Array.Copy(data, offset, m_buffer, 0, count);
+					m_bufferoffset = 0;
+					m_buffercount += count;
+                    m_remainingbytes += count;
+                }				
+			}
 		}
 
 		/// <summary>

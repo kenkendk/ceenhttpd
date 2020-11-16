@@ -70,7 +70,7 @@ namespace Ceen.Database
     }
 
     /// <summary>
-    /// Marker class to make item primary key
+    /// Attribute to mark item as primary key
     /// </summary>
     public class PrimaryKeyAttribute : Attribute
     {
@@ -80,6 +80,20 @@ namespace Ceen.Database
     /// A column ignore marker
     /// </summary>
     public class IgnoreAttribute : Attribute
+    {
+    }
+
+    /// <summary>
+    /// Marker attribute for setting a property or field as a creation timestamp
+    /// </summary>
+    public class CreatedTimestampAttribute : Attribute
+    {
+    }
+
+    /// <summary>
+    /// Marker attribute for setting a property or field as a change timestamp
+    /// </summary>
+    public class ChangedTimestampAttribute : Attribute
     {
     }
 }

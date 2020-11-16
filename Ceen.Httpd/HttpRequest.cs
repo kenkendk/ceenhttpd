@@ -12,8 +12,17 @@ namespace Ceen.Httpd
     /// <summary>
     /// Representation of the values in a HTTP request
     /// </summary>
-    internal class HttpRequest : IHttpRequest
+    internal class HttpRequest : IHttpRequest, IDisposable
     {
+        /// <summary>
+        /// The string indicating HTTP version 1.1
+        /// </summary>
+        public const string HTTP_VERSION_1_1 = "HTTP/1.1";
+        /// <summary>
+        /// The string indicating HTTP version 1.0
+        /// </summary>
+        public const string HTTP_VERSION_1_0 = "HTTP/1.0";
+
         /// <summary>
         /// Gets the HTTP Request line as sent by the client
         /// </summary>
@@ -21,70 +30,66 @@ namespace Ceen.Httpd
         /// <summary>
         /// The HTTP method or Verb
         /// </summary>
-        /// <value>The method.</value>
         public string Method { get; private set; }
         /// <summary>
         /// The path of the query, not including the query string
         /// </summary>
-        /// <value>The path.</value>
         public string Path { get; internal set; }
         /// <summary>
         /// The original path of the request, before internal path rewriting
         /// </summary>
-        /// <value>The path.</value>
         public string OriginalPath { get; internal set; }
         /// <summary>
         /// The query string
         /// </summary>
-        /// <value>The query string, including the leading question mark.</value>
         public string RawQueryString { get; private set; }
         /// <summary>
         /// Gets a parsed representation of the query string.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The parsed query string.</value>
         public IDictionary<string, string> QueryString { get; private set; }
         /// <summary>
         /// Gets the headers found in the request.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The headers.</value>
         public IDictionary<string, string> Headers { get; private set; }
         /// <summary>
         /// Gets the form data, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The form values.</value>
         public IDictionary<string, string> Form { get; private set; }
         /// <summary>
         /// Gets the cookies supplied, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The cookie values.</value>
         public IDictionary<string, string> Cookies { get; private set; }
         /// <summary>
         /// Gets the posted files, if any.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The files.</value>
         public IList<IMultipartItem> Files { get; private set; }
         /// <summary>
         /// Gets the headers found in the request.
         /// Duplicate values are not represented, instead only the latest is stored
         /// </summary>
-        /// <value>The headers.</value>
         public IDictionary<string, object> RequestState { get; private set; }
         /// <summary>
         /// Gets the http version string.
         /// </summary>
-        /// <value>The http version.</value>
         public string HttpVersion { get; private set; }
-        /// <summary>
-        /// Gets or sets a user identifier attached to the request.
-        /// This can be set by handlers processing the request to simplify dealing with logged in users.
-        /// Handlers should only set this is the user is authenticated.
-        /// </summary>
+		/// <summary>
+		/// Gets or sets a user identifier attached to the request.
+		/// This can be set by handlers processing the request to simplify dealing with logged in users.
+		/// Handlers should only set this is the user is authenticated.
+		/// This value can be logged.
+		/// </summary>
         public string UserID { get; set; }
+        /// <summary>
+        /// Gets or sets a session tracking ID.
+        /// This value can be logged and used to group requests from a single session
+        /// better than simply grouping by IP address
+        /// </summary>
+        public string SessionID { get; set; }
         /// <summary>
         /// Gets a value indicating what connection security is used.
         /// </summary>
@@ -100,7 +105,7 @@ namespace Ceen.Httpd
         /// <summary>
         /// The taskid used for logging and tracing the request
         /// </summary>
-        public string LogTaskID { get; private set; }
+        public string LogConnectionID { get; private set; }
         /// <summary>
         /// The taskid used for logging and tracing the request
         /// </summary>
@@ -178,6 +183,17 @@ namespace Ceen.Httpd
             }
         }
 
+		/// <summary>
+		/// Gets the HTTP request hostname, can be null for a HTTP/1.0 request
+		/// </summary>
+        public string Hostname
+        {
+            get
+            {
+                return Headers["Host"];
+            }
+        }        
+
         /// <summary>
         /// Gets the HTTP Content-Length header value
         /// </summary>
@@ -198,19 +214,19 @@ namespace Ceen.Httpd
         /// Initializes a new instance of the <see cref="Ceen.Httpd.HttpRequest"/> class.
         /// </summary>
         /// <param name="remoteEndpoint">The remote endpoint.</param>
-        /// <param name="logtaskid">The logging ID for the task</param>
+        /// <param name="logconnectionid">The logging ID for the task</param>
         /// <param name="clientCert">The client SSL certificate.</param>
         /// <param name="sslProtocol">The SSL protocol used</param>
         /// <param name="logrequestid">The ID of the request for logging purposes</param>
         /// <param name="connected">The method providing the remote client connected state</param>
-        public HttpRequest(System.Net.EndPoint remoteEndpoint, string logtaskid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol, Func<bool> connected)
+        public HttpRequest(System.Net.EndPoint remoteEndpoint, string logconnectionid, string logrequestid, X509Certificate clientCert, SslProtocols sslProtocol, Func<bool> connected)
         {
             m_cancelRequest = new CancellationTokenSource();
             m_connectedMethod = connected;
             RemoteEndPoint = remoteEndpoint;
             ClientCertificate = clientCert;
             SslProtocol = sslProtocol;
-            LogTaskID = logtaskid;
+            LogConnectionID = logconnectionid;
             LogRequestID = logrequestid;
             Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
             QueryString = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase).WithDefaultValue(null);
@@ -233,7 +249,7 @@ namespace Ceen.Httpd
                 if (components.Length != 3)
                     throw new HttpException(HttpStatusCode.BadRequest);
 
-                if (components[2] != "HTTP/1.1" && components[2] != "HTTP/1.0")
+                if (components[2] != HTTP_VERSION_1_1 && components[2] != HTTP_VERSION_1_0)
                     throw new HttpException(HttpStatusCode.HTTPVersionNotSupported);
 
                 if (string.IsNullOrWhiteSpace(components[0]) || string.IsNullOrWhiteSpace(components[1]))
@@ -307,9 +323,11 @@ namespace Ceen.Httpd
                 if (string.IsNullOrWhiteSpace(boundary))
                     throw new HttpException(HttpStatusCode.BadRequest);
 
-                var itemboundary = System.Text.Encoding.ASCII.GetBytes("--" + boundary);
-                var tmp = await reader.RepeatReadAsync(itemboundary.Length, idletime, timeouttask, stoptask);
-                if (!Enumerable.SequenceEqual(itemboundary, tmp))
+                // Since we have read the headers, we have consumed the initial CRLF
+                // so we adjust the initial boundary reading to skip the CRLF
+                var itemboundary = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary);
+                var tmp = await reader.RepeatReadAsync(itemboundary.Length - 2, idletime, timeouttask, stoptask);
+                if (!Enumerable.SequenceEqual(itemboundary.Skip(2), tmp))
                     throw new HttpException(HttpStatusCode.BadRequest);
 
                 await reader.RepeatReadAsync(trail, 0, 2, idletime, timeouttask, stoptask);
@@ -344,7 +362,7 @@ namespace Ceen.Httpd
 
 
                 if (trail[0] != '-' || trail[1] != '-')
-                    throw new HttpException(HttpStatusCode.BadRequest);
+                     throw new HttpException(HttpStatusCode.BadRequest);
 
                 await reader.RepeatReadAsync(trail, 0, 2, idletime, timeouttask, stoptask);
                 if (trail[0] != '\r' || trail[1] != '\n')
@@ -366,8 +384,6 @@ namespace Ceen.Httpd
         /// <param name="stoptask">A task that signals server stop.</param>
         internal async Task ParseFormData(BufferedStreamReader reader, ServerConfig config, TimeSpan idletime, Task timeouttask, Task stoptask)
         {
-            var cs = new CancellationTokenSource();
-
             if (string.Equals("application/x-www-form-urlencoded", this.ContentType))
             {
                 if (this.ContentLength != 0)
@@ -406,17 +422,16 @@ namespace Ceen.Httpd
                             using (var sr = new StreamReader(stream, RequestUtility.GetEncodingForCharset(charset)))
                             {
                                 var rtask = sr.ReadToEndAsync();
-                                var rt = await Task.WhenAny(Task.Delay(idletime), timeouttask, stoptask, rtask);
+                                var rt = await Task.WhenAny(timeouttask, stoptask, rtask);
                                 if (rt != rtask)
                                 {
-                                    cs.Cancel();
                                     if (rt == stoptask)
                                         throw new TaskCanceledException();
                                     else
                                         throw new HttpException(HttpStatusCode.RequestTimeout);
                                 }
 
-                                this.Form[name] = await rtask;
+                                this.Form[name] = rtask.Result;
                             }
                         }
                         else
@@ -428,19 +443,24 @@ namespace Ceen.Httpd
                                 Data = new MemoryStream()
                             };
 
-                            var rtask = stream.CopyToAsync(me.Data, 8 * 1024, cs.Token);
+                            Task rtask;
+                            Task rt;
 
-                            var rt = await Task.WhenAny(Task.Delay(idletime), timeouttask, stoptask, rtask);
+                            using (var cs = new CancellationTokenSource(idletime))
+                            {
+                                rtask = stream.CopyToAsync(me.Data, 8 * 1024, cs.Token);
+                                rt = await Task.WhenAny(timeouttask, stoptask, rtask);
+                            }
+
                             if (rt != rtask)
                             {
-                                cs.Cancel();
                                 if (rt == stoptask)
                                     throw new TaskCanceledException();
                                 else
                                     throw new HttpException(HttpStatusCode.RequestTimeout);
                             }
 
-                            await rtask;
+                            rtask.GetAwaiter().GetResult();
                             me.Data.Position = 0;
 
                             this.Files.Add(me);
@@ -483,6 +503,14 @@ namespace Ceen.Httpd
 
             if (this.ContentLength > config.MaxPostSize)
                 throw new HttpException(HttpStatusCode.PayloadTooLarge);
+            
+            // Disable HTTP/1.0 unless explictly allowed
+            if (!config.AllowLegacyHttp && this.HttpVersion == HTTP_VERSION_1_0)
+                throw new HttpException(HttpStatusCode.HTTPVersionNotSupported);
+
+            // Enforce HTTP/1.1 requiring a header
+            if (this.HttpVersion != HTTP_VERSION_1_0 && string.IsNullOrWhiteSpace(this.Headers["Host"]))
+                throw new HttpException(HttpStatusCode.BadRequest, "Host header missing");                
 
             if (config.AllowHttpMethodOverride)
             {
@@ -589,10 +617,15 @@ namespace Ceen.Httpd
                 Task
                     .Delay(m_processingtimeout, m_processingtimeoutcancellation.Token)
                     .ContinueWith(
-                        _ => m_cancelRequest.Cancel(), 
+                        _ => m_cancelRequest.Cancel(),
                         TaskContinuationOptions.OnlyOnRanToCompletion
                     );
             }
+        }
+
+        public void Dispose()
+        {
+            m_processingtimeoutcancellation.Dispose();
         }
     }
 }

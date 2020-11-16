@@ -106,11 +106,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
     public class SpawnedServer : Ceen.Httpd.HttpServer.InterProcessBridge, ISpawnedServer
     {
         /// <summary>
-        /// The method used to create a socket from the handle
-        /// </summary>
-        //private readonly Func<long, Socket> m_createSocket;
-
-        /// <summary>
         /// The epoll handler instance
         /// </summary>
         private readonly SockRock.ISocketHandler m_pollhandler;
@@ -123,23 +118,6 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="storage">Storage.</param>
         public SpawnedServer(bool usessl, string configfile, IStorageCreator storage)
         {
-            //// Mono version
-            //var safeSocketHandleType = Type.GetType("System.Net.Sockets.SafeSocketHandle");
-            //var safeSocketHandleConstructor = safeSocketHandleType?.GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(IntPtr), typeof(bool) }, null);
-            //var socketConstructorSafeSocketHandle = safeSocketHandleType == null ? null : typeof(System.Net.Sockets.Socket).GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { typeof(AddressFamily), typeof(SocketType), typeof(ProtocolType), safeSocketHandleType }, null);
-
-            //// .Net Core version
-            //var safeCloseSocketType = Type.GetType("System.Net.Sockets.SafeCloseSocket");
-            //var safeCloseSocketConstructor = safeCloseSocketType?.GetMethod("CreateSocket", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static, null, new Type[] { typeof(IntPtr) }, null);
-            //var socketConstructorSafeCloseSocket = safeCloseSocketType == null ? null : typeof(System.Net.Sockets.Socket).GetConstructor(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, new Type[] { safeCloseSocketType }, null);
-
-            //if (safeSocketHandleConstructor != null && socketConstructorSafeSocketHandle != null)
-            //    m_createSocket = (handle) => (Socket)Activator.CreateInstance(typeof(Socket), AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp, Activator.CreateInstance(safeSocketHandleType, new IntPtr(handle), false));
-            //else if (safeCloseSocketConstructor != null && socketConstructorSafeCloseSocket != null)
-            //    m_createSocket = (handle) => (Socket)Activator.CreateInstance(typeof(Socket), safeCloseSocketConstructor.Invoke(null, new object[] { new IntPtr(handle) }));
-            //else
-                //throw new Exception("Unable to find a method to create sockets from handles ....");
-
             var config = ConfigParser.ValidateConfig(ConfigParser.ParseTextFile(configfile));
             config.Storage = storage ?? new MemoryStorageCreator();
 
@@ -158,6 +136,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                     throw new PlatformNotSupportedException("Unable to create kqueue or epoll instance", new AggregateException(e1, e2));
                 }
             }
+
+            m_pollhandler.WaitForShutdownAsync.ContinueWith(x => { 
+                Program.ConsoleOutput("The poll handler crashed, stopping this instance");
+                this.Stop(TimeSpan.FromSeconds(-5));                
+            }, TaskContinuationOptions.NotOnRanToCompletion);
 
             base.Setup(usessl, config);
         }
@@ -195,8 +178,11 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         /// <param name="waittime">The grace period before the active connections are killed</param>
         public void Stop(TimeSpan waittime)
         {
+            Program.DebugConsoleOutput("Base stop");
             base.Stop();
+            Program.DebugConsoleOutput("Poll handler stop");
             m_pollhandler.Stop(waittime);
+            Program.DebugConsoleOutput("Stop complete");
         }
     }
 
@@ -295,6 +281,14 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
 
             // Prepare the handle
             var rchandle = socket.Handle.ToInt32();
+            // Signal to stop processing
+            var serverShutdown = new TaskCompletionSource<bool>();
+
+            // If the server stops for some reason, make sure we do not hang on the socket
+            server.StopTask.ContinueWith(async _ => {
+                await Task.Delay(500);
+                serverShutdown.TrySetResult(true);
+            });
             
             try
             {
@@ -309,7 +303,18 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                         {
                             // Get the next request from the socket
                             Program.DebugConsoleOutput("{0} Getting file handle", System.Diagnostics.Process.GetCurrentProcess().Id);
-                            var req = SockRock.ScmRightsImplementation.recv_fds(rchandle);
+                            var treq =  await Task.WhenAny(                            
+                                Task.Run(() => SockRock.ScmRightsImplementation.recv_fds(rchandle)),
+                                serverShutdown.Task
+                            );
+
+                            if (treq == serverShutdown.Task)
+                            {
+                                Program.DebugConsoleOutput("{0} Server stopped", System.Diagnostics.Process.GetCurrentProcess().Id);
+                                break;
+                            }
+
+                            var req = await (Task<Tuple<int[], byte[]>>)treq;
                             if (req == null)
                             {
                                 Program.DebugConsoleOutput("{0} Socket closed", System.Diagnostics.Process.GetCurrentProcess().Id);

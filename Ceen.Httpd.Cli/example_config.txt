@@ -220,6 +220,55 @@
 #set Debug false
 
 
+# If you prefer a less automatic wiring, you can manually specify all the routes
+# Create a new wire-up controller (optional, a default version is always created)
+# Using `wireroute` allows you to set non-default values for the controller
+
+# wireroute
+#set ControllerGroupName "controller"
+
+# Then add each route, each type will be created once.
+# Multiple routes can be mapped to the same method
+# NOTE: for overloaded methods, the parameter types must be specified
+# NOTE: it is not possible to set options on the controllers
+#wire GET /api/v1/help MyNamespace.MyClass.HelpMethod
+#wire * /api/v1/test MyNamespace.MyClass.TestMethod
+#wire GET|PUT|POST|HEAD /api/v1/profile MyNamespace.MyClass.ProfileMethod
+
+# Route arguments are supported and will be mapped to method arguments
+# First line shows how to specifies the types, selecting which overload to use
+#wire GET /api/v1/item/{id} MyNamespace.MyClass.ItemMethod Ceen.IHttpContext int
+#wire GET /api/v1/item/{id}/detail MyNamespace.MyClass.DetailMethod
+
+# Controllers can be mapped to a pathprefix, 
+# ignoring their interface path and controller name
+# NOTE: it is not possible to set options on the controllers
+#wirecontroller /api/v1/item MyNamespace.MyClass
+#wirecontroller /api/v1/users MyNamespace.MyClass
+
+#
+# CORS support
+#
+
+# The CORSHandler makes it easy to add Cross Origin Resource Sharing support to the API
+
+# Start by adding the handler early in the config file, and let let it handle the API calls
+#handler "/api/*" Ceen.Httpd.Handler.CORSHandler
+
+# Then set the allowed methods
+#set AllowedMethods "GET, PUT, DELETE, POST, PATCH"
+
+# For a production setup, limit the allowed origins
+# default is using "*", meaning allow all origins
+#set AllowedOrigins "example.com,www.example.com,*.example.com"
+
+# Optionally set the headers allowed for CORS requests
+#set AllowedHeaders "Content-Type,My-Custom-Header"
+
+# Optionally report some extra headers for CORS requests
+#set ExtraHeaders "X-Served-By: my-cool-server, Access-Control-Extra: 1234"
+
+
 #
 # Login and XSRF handling
 #

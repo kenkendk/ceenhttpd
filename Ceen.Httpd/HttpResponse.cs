@@ -186,6 +186,10 @@ namespace Ceen.Httpd
 		/// </summary>
 		private ResponseOutputStream m_outstream;
 		/// <summary>
+		/// The wrapped output stream
+		/// </summary>
+		private Stream m_wrappedoutstream;
+		/// <summary>
 		/// The internal storage for the response headers
 		/// </summary>
 		private Dictionary<string, string> m_headers;
@@ -239,6 +243,7 @@ namespace Ceen.Httpd
 
 			m_headers = new Dictionary<string, string>();
 			m_outstream = new ResponseOutputStream(m_stream, this);
+			m_wrappedoutstream = m_outstream;
 			m_hasSentHeaders = false;
 
 			AddDefaultHeaders();
@@ -278,9 +283,7 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Content-Type", out v);
-
+				m_headers.TryGetValue("Content-Type", out var v);
 				return v;
 			}
 			set
@@ -297,11 +300,9 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Content-Length", out v);
+				m_headers.TryGetValue("Content-Length", out var v);
 
-				long vv;
-				if (!long.TryParse(v, out vv))
+				if (!long.TryParse(v, out var vv))
 					return -1;
 				
 				return vv;
@@ -320,9 +321,7 @@ namespace Ceen.Httpd
 		{
 			get
 			{
-				string v;
-				m_headers.TryGetValue("Connection", out v);
-
+				m_headers.TryGetValue("Connection", out var v);
 				return string.Equals("keep-alive", v, StringComparison.OrdinalIgnoreCase);
 			}
 			set
@@ -356,6 +355,11 @@ namespace Ceen.Httpd
 		{
 			if (!m_hasSentHeaders)
 			{
+				// Allow post-processor hook-ins
+				if (m_serverconfig.PostProcessors != null)
+					foreach(var p in m_serverconfig.PostProcessors)
+						await p.HandleAsync(this.Context);
+
 				if (string.IsNullOrWhiteSpace(this.StatusMessage))
 					this.StatusMessage = HttpStatusMessages.DefaultMessage(this.StatusCode);
 
@@ -373,10 +377,10 @@ namespace Ceen.Httpd
 					var sb = new StringBuilder();
 					sb.Append("Set-Cookie: ");
 					sb.Append(cookie.Name);
-					if (!string.IsNullOrWhiteSpace(cookie.Value))
+                    sb.Append("=");
+					
+                    if (!string.IsNullOrWhiteSpace(cookie.Value))
 					{
-						sb.Append("=");
-
 						// URL encoding not required, but common practice
 						sb.Append(Uri.EscapeDataString(cookie.Value));
 					}
@@ -412,9 +416,13 @@ namespace Ceen.Httpd
 		/// Flushes all headers and sets the length to the amount of data currently buffered in the output
 		/// </summary>
 		/// <returns>The and set length async.</returns>
-		internal Task FlushAndSetLengthAsync()
+		internal async Task FlushAndSetLengthAsync()
 		{
-			return m_outstream.SetLengthAndFlushAsync(true);
+			// Make sure any 
+			if (m_wrappedoutstream != m_outstream)
+				await m_wrappedoutstream.FlushAsync();
+
+			await m_outstream.SetLengthAndFlushAsync(true);
 		}
 
 		/// <summary>
@@ -440,7 +448,7 @@ namespace Ceen.Httpd
 				ContentType = contenttype;
 			if (!HasSentHeaders)
 				ContentLength = data.Length - data.Position;
-			return data.CopyToAsync(m_outstream);
+			return data.CopyToAsync(m_wrappedoutstream);
 		}
 
 		/// <summary>
@@ -455,7 +463,7 @@ namespace Ceen.Httpd
 				ContentType = contenttype;
 			if (!HasSentHeaders)
 				ContentLength = data.Length;
-			return m_outstream.WriteAsync(data, 0, data.Length);
+			return m_wrappedoutstream.WriteAsync(data, 0, data.Length);
 		}
 
 		/// <summary>
@@ -543,7 +551,28 @@ namespace Ceen.Httpd
 		/// <returns>The response stream.</returns>
 		public Stream GetResponseStream()
 		{
-			return m_outstream;
+			return m_wrappedoutstream;
+		}
+
+		/// <summary>
+		/// Changes the output stream to a wrapped stream
+		/// </summary>
+		/// <param name="stream">The stream that wraps the current output</param>
+		public void SetOutputWrapperStream(Stream stream)
+		{
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
+            
+			if (m_hasSentHeaders)
+				throw new InvalidOperationException("Cannot wrap the output stream after the headers have been sent");
+			
+			if (m_wrappedoutstream != m_outstream)
+				throw new InvalidOperationException("Cannot re-wrap a wrapped output stream");
+
+			// Copy any currently buffered content into the new wrapper
+			m_outstream.Unbuffer(stream);
+			m_wrappedoutstream = stream;
+
 		}
 
 		/// <summary>
@@ -558,7 +587,8 @@ namespace Ceen.Httpd
 		/// <param name="maxage">The optional maximum age.</param>
 		/// <param name="secure">A flag for making the cookie available over SSL only.</param>
 		/// <param name="httponly">A flag indicating if the cookie should be hidden from the scripting environment.</param>
-		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false)
+		/// <param name="samesite">The samesite attribute for the cookie</param>
+		public IResponseCookie AddCookie(string name, string value, string path = null, string domain = null, DateTime? expires = null, long maxage = -1, bool secure = false, bool httponly = false, string samesite = null)
 		{
 			var cookie = new ResponseCookie(name, value) 
 			{
@@ -567,7 +597,8 @@ namespace Ceen.Httpd
 				Expires = expires,
 				MaxAge = maxage,
 				Secure = secure,
-				HttpOnly = httponly
+				HttpOnly = httponly,
+				SameSite = samesite
 			};
 			this.Cookies.Add(cookie);
 
@@ -580,10 +611,15 @@ namespace Ceen.Httpd
 		public bool IsRedirectingInternally { get { return !string.IsNullOrWhiteSpace(m_internalredirectpath); } }
 
 		/// <summary>
-		/// Performs an internal redirect
+		/// The context this response belongs to
 		/// </summary>
-		/// <param name="path">The new path to use.</param>
-		public void InternalRedirect(string path)
+        internal HttpContext Context { get; set; }
+
+        /// <summary>
+        /// Performs an internal redirect
+        /// </summary>
+        /// <param name="path">The new path to use.</param>
+        public void InternalRedirect(string path)
 		{
 			if (HasSentHeaders)
 				throw new Exception("Cannot redirect after headers have been sent");

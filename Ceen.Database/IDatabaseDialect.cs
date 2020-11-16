@@ -1,16 +1,26 @@
 ﻿using System;
 using System.Reflection;
+using System.Collections.Generic;
 
 namespace Ceen.Database
 {
+    /// <summary>
+    /// Abstraction of methods used to make vendor agnostic type-safe queries to a database
+    /// </summary>
     public interface IDatabaseDialect
     {
+        /// <summary>
+        /// Flag indicating if the database connection supports multithreaded access
+        /// </summary>
+        /// <value></value>
+        bool IsMultiThreadSafe { get; }
+
         /// <summary>
         /// Gets the SQL type for a given property
         /// </summary>
         /// <returns>The sql column type.</returns>
-        /// <param name="property">The property being examined.</param>
-        string GetSqlColumnType(PropertyInfo property);
+        /// <param name="member">The member being examined.</param>
+        Tuple<string, AutoGenerateAction> GetSqlColumnType(MemberInfo member);
 
         /// <summary>
         /// Hook point for escaping a name
@@ -27,18 +37,11 @@ namespace Ceen.Database
         string GetName(Type type);
 
         /// <summary>
-        /// Gets the name for a class
+        /// Gets the name for a class member
         /// </summary>
         /// <returns>The name.</returns>
-        /// <param name="property">The class to get the name from.</param>
-        string GetName(PropertyInfo property);
-
-        /// <summary>
-        /// Creates the type map with a custom table name.
-        /// </summary>
-        /// <param name="name">The custom table name to use.</param>
-        /// <typeparam name="type">The type to build the map for.</typeparam>
-        void CreateTypeMap<T>(string name);
+        /// <param name="member">The item to get the name from.</param>
+        string GetName(MemberInfo member);
 
         /// <summary>
         /// Creates the type map with a custom table name.
@@ -69,18 +72,11 @@ namespace Ceen.Database
         string CreateTableSql(Type recordtype, bool ifNotExists = true);
 
         /// <summary>
-        /// Creates the select command for the given type.
+        /// Returns a delete-table sql statement
         /// </summary>
-        /// <returns>The select command.</returns>
-        /// <param name="type">The type to generate the command for.</param>
-        string CreateSelectCommand(Type type);
-
-        /// <summary>
-        /// Creates a command for inserting a record
-        /// </summary>
-        /// <returns>The insert command.</returns>
-        /// <param name="type">The type to generate the command for.</param>
-        string CreateInsertCommand(Type type);
+        /// <param name="recordtype">The datatype to delete from the table.</param>
+        /// <param name="ifExists">Only delete table if it exists</param>
+        string DeleteTableSql(Type recordtype, bool ifExists = true);
 
         /// <summary>
         /// Creates a command that checks if a table exists
@@ -90,11 +86,50 @@ namespace Ceen.Database
         string CreateTableExistsCommand(Type type);
 
         /// <summary>
+        /// Creates a command that returns the names of the columns in a table
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <returns>The table column select command</returns>
+        string CreateSelectTableColumnsSql(Type type);
+
+        /// <summary>
+        /// Creates a command that adds columns to a table
+        /// </summary>
+        /// <param name="type">The type to generate the command for.</param>
+        /// <param name="columns">The columns to add</param>
+        /// <returns>The command that adds columns</returns>
+        string CreateAddColumnSql(Type type, IEnumerable<ColumnMapping> columns);
+
+        /// <summary>
         /// Returns a where fragment that limits the query
         /// </summary>
         /// <param name="offset">The optional offset to use</param>
         /// <param name="limit">The maximum number of items to use</param>
         /// <returns>The limit fragment</returns>
-        string Limit(int limit, int? offset = null);
+        string Limit(long limit, long? offset = null);
+
+        /// <summary>
+        /// Renders an SQL where clause from a query element
+        /// </summary>
+        /// <param name="type">The type to generate the clause for.</param>
+        /// <param name="element">The element to use</param>
+        /// <returns>The SQL where clause</returns>
+        KeyValuePair<string, object[]> RenderWhereClause(Type type, QueryElement element);
+
+        /// <summary>
+        /// Returns an OrderBy fragment
+        /// </summary>
+        /// <param name="type">The type to generate the clause for.</param>
+        /// <param name="order">The order to render</param>
+        /// <returns>The SQL order-by fragment</returns>
+        string OrderBy(Type type, QueryOrder order);
+
+        /// <summary>
+        /// Renders a full query clause
+        /// </summary>
+        /// <param name="query">The query to render</param>
+        /// <param name="finalize">Flag indicating if the complete method should be called on the query</param>
+        /// <returns>The sql statement</returns>
+        KeyValuePair<string, object[]> RenderStatement(Query query, bool finalize = true);
     }
 }

@@ -4,7 +4,7 @@ using Ceen.Database;
 namespace Ceen.Security.Login
 {
 	/// <summary>
-	/// Helper class to
+	/// Helper class for static methods on tokens
 	/// </summary>
 	public static partial class Utility
 	{

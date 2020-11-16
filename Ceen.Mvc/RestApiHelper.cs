@@ -21,7 +21,7 @@ namespace Ceen.Mvc
 	/// <summary>
 	/// A basic class for providing pagination context
 	/// </summary>
-	public class PageInformation<T> : ResponseEnvelope
+	public class PageInformation : ResponseEnvelope
 	{
 		/// <summary>
 		/// The current page
@@ -48,7 +48,7 @@ namespace Ceen.Mvc
 		/// The actual items
 		/// </summary>
 		[JsonProperty("items")]
-		public IEnumerable<T> Items;
+		public Array Items;
 	}
 
 	/// <summary>
@@ -109,7 +109,7 @@ namespace Ceen.Mvc
 		/// <param name="page">The page to return.</param>
 		/// <param name="results">The number of results per page.</param>
 		/// <param name="query">An optional query expression</param>
-		protected abstract Task<PageInformation<TData>> ListItemsAsync(int page, int results, string query);
+		protected abstract Task<PageInformation> ListItemsAsync(int page, int results, string query);
 
 		/// <summary>
 		/// Callback method to selectively grant or deny access to a given operation.
@@ -124,7 +124,7 @@ namespace Ceen.Mvc
 		[Name("index")]
 		/// <summary>
 		/// Handles a POST request, using the &quot;index&quot; name,
-		/// because we want two different functions to handle
+		/// because we want different functions to handle
 		/// PUT, POST and GET, and they cannot all be called &quot;Index&quot;.
 		/// </summary>
 		/// <param name="context">The http context.</param>

@@ -1,16 +1,17 @@
 ﻿using System;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Authentication;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace Ceen.Httpd
 {
 	/// <summary>
 	/// Configuration of a server instance
 	/// </summary>
-	public class ServerConfig
+	public class ServerConfig : ILoadedModuleInfo
 	{
 		/// <summary>
 		/// The socket backlog.
@@ -56,6 +57,11 @@ namespace Ceen.Httpd
 		public bool AllowHttpMethodOverride { get; set; } = true;
 
 		/// <summary>
+		/// A flag indicating if requests with HTTP/1.0 are allowed
+		/// </summary>
+		public bool AllowLegacyHttp { get; set; } = false;
+
+		/// <summary>
 		/// A value indicating the name of the header, 
 		/// the proxy uses to communicate the source IP of the request.
 		/// Commonly this is set to &quot;X-Real-IP&quot; or &quot;X-Forwarded-For&quot;
@@ -96,16 +102,20 @@ namespace Ceen.Httpd
 		/// The loaded module instance
 		/// </summary>
 		public IList<IModule> Modules { get; set; }
-		/// <summary>
-		/// A callback method for injecting headers into the responses
-		/// </summary>
-		public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
+        /// <summary>
+        /// The loaded post-processor instances
+        /// </summary>
+        public IList<IPostProcessor> PostProcessors { get; set; }
+        /// <summary>
+        /// A callback method for injecting headers into the responses
+        /// </summary>
+        public Action<IHttpResponse> AddDefaultResponseHeaders { get; set; }
 
 		/// <summary>
 		/// Gets or sets the default name of the server reported in response headers.
 		/// </summary>
 		/// <value>The default name of the server.</value>
-		public string DefaultServerName { get; set; } = SERVER_NAME;
+		public string DefaultServerName { get; set; }
 			
 		/// <summary>
 		/// The server certificate if used for serving SSL requests
@@ -135,18 +145,15 @@ namespace Ceen.Httpd
 		public IStorageCreator Storage { get; set; }
 
 		/// <summary>
-		/// A cached copy of the server name and version,
-		/// for use in the output headers.
+		/// The loader context for this instance
 		/// </summary>
-		public static readonly string SERVER_NAME;
-
+		public IDisposable LoaderContext;
+		
 		/// <summary>
 		/// Static initializer for the <see cref="T:Ceen.Httpd.ServerConfig"/> class.
 		/// </summary>
 		static ServerConfig()
 		{
-			var version = typeof(ServerConfig).Assembly.GetName().Version;
-			SERVER_NAME = string.Format("ceenhttpd/{0}.{1}", version.Major, version.Minor);
 		}
 
 		/// <summary>
@@ -154,6 +161,9 @@ namespace Ceen.Httpd
 		/// </summary>
 		public ServerConfig()
 		{
+			var version = typeof(ServerConfig).Assembly.GetName().Version;
+			DefaultServerName = string.Format("ceenhttpd/{0}.{1}", version.Major, version.Minor);
+
 			AddDefaultResponseHeaders = DefaultHeaders;
 		}
 
@@ -280,6 +290,65 @@ namespace Ceen.Httpd
 			Modules.Add(module);
 			return this;
 		}
-	}
+
+        /// <summary>
+        /// Adds a post-processor instance to the server
+        /// </summary>
+        /// <returns>The server configuration.</returns>
+        /// <param name="postprocessor">The post-processor to add.</param>
+        public ServerConfig AddPostProcessor(IPostProcessor postprocessor)
+        {
+            if (postprocessor == null)
+                throw new ArgumentNullException(nameof(postprocessor));
+            if (PostProcessors == null)
+                PostProcessors = new List<IPostProcessor>();
+
+            PostProcessors.Add(postprocessor);
+            return this;
+        }
+
+		/// <summary>
+		/// Calls all shutdown modules
+		/// </summary>
+		/// <returns>A combined task</returns>
+		public async Task ShutdownAsync()
+		{
+			var res = Ceen.Context
+				.GetItemsOfType<IWithShutdown>(this)
+				.Select(x => x.ShutdownAsync())
+				.ToArray();
+
+			if (res.Length != 0)
+				await Task.WhenAll(res);
+			
+			if (LoaderContext != null)
+				LoaderContext.Dispose();
+		}
+
+
+        /// <summary>
+        /// The handlers loaded by the router
+        /// </summary>
+        IEnumerable<KeyValuePair<string, IHttpModule>> ILoadedModuleInfo.Handlers 
+			=> (Router as Router)?.Rules.Select(x => new KeyValuePair<string, IHttpModule>(x.Key?.ToString(), x.Value));
+
+        /// <summary>
+        /// The logger instances
+        /// </summary>
+        IEnumerable<ILogger> ILoadedModuleInfo.Loggers 
+			=> Loggers;
+
+        /// <summary>
+        /// The loaded modules
+        /// </summary>
+        IEnumerable<IModule> ILoadedModuleInfo.Modules 
+			=> Modules;
+
+        /// <summary>
+        /// The loaded post-processors
+        /// </summary>
+        IEnumerable<IPostProcessor> ILoadedModuleInfo.PostProcessors 
+			=> PostProcessors;
+    }
 }
 

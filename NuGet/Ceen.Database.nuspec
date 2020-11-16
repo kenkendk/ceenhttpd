@@ -10,14 +10,14 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Database and ORM support for Ceen.Httpd</description>
-    <releaseNotes>Version bump</releaseNotes>
-    <copyright>Copyright Kenneth Skovhede 2019</copyright>
+    <releaseNotes>Added support for deleting tables</releaseNotes>
+    <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>
         <dependency id="Ceen.Httpd" version="0.9.3" />
     </dependencies>
   </metadata>
   <files>
-    <file src="Ceen.Database.dll" target="lib/netstandard2.0" />
+    <file src="Ceen.Database.dll" target="lib/netstandard2.1" />
   </files>
 </package>

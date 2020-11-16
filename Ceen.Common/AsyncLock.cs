@@ -170,12 +170,25 @@ namespace Ceen
 				return await action();
 		}
 
-		/// <summary>
-		/// Aquires the exclusive lock, and awaits until it is available
-		/// </summary>
-		/// <param name="token">The cancellation token</param>
-		/// <returns>The async.</returns>
-		public Task<Releaser> LockAsync(CancellationToken token = default(CancellationToken))
+        /// <summary>
+        /// Runs an action with the lock active
+        /// </summary>
+        /// <returns>The lock async.</returns>
+        /// <param name="action">The action to execute.</param>
+        /// <param name="token">The cancellation token.</param>
+        /// <typeparam name="T">The type of the return data</typeparam>
+        public async Task<T> LockedAsync<T>(Func<T> action, CancellationToken token = default(CancellationToken))
+        {
+            using (await LockAsync(token))
+                return action();
+        }
+
+        /// <summary>
+        /// Aquires the exclusive lock, and awaits until it is available
+        /// </summary>
+        /// <param name="token">The cancellation token</param>
+        /// <returns>The async.</returns>
+        public Task<Releaser> LockAsync(CancellationToken token = default(CancellationToken))
 		{
 			var wait = m_semaphore.WaitAsync(token);
 

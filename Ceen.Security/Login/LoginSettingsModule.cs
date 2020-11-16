@@ -16,12 +16,12 @@ namespace Ceen.Security.Login
 		/// </summary>
 		static LoginSettingsModule()
 		{
-			_basesettings[nameof(XSRFErrorStatusMessage)] = 403;
-			_basesettings[nameof(XSRFErrorStatusCode)] = "XSRF token invalid or missing";
+			_basesettings[nameof(XSRFErrorStatusCode)] = 403;
+			_basesettings[nameof(XSRFErrorStatusMessage)] = "XSRF token invalid or missing";
 			_basesettings[nameof(XSRFErrorRedirectUrl)] = null;
 
-			_basesettings[nameof(HijackErrorStatusMessage)] = 403;
-			_basesettings[nameof(HijackErrorStatusCode)] = "Login token hijacking detected, someone else has used your identity";
+			_basesettings[nameof(HijackErrorStatusCode)] = 403;
+			_basesettings[nameof(HijackErrorStatusMessage)] = "Login token hijacking detected, someone else has used your identity";
 			_basesettings[nameof(HijackErrorRedirectUrl)] = null;
 
 			_basesettings[nameof(LoginErrorStatusCode)] = 403;
@@ -49,9 +49,12 @@ namespace Ceen.Security.Login
 
 			_basesettings[nameof(AllowBasicAuth)] = true;
 
+			_basesettings[nameof(AuthSessionCookieSameSite)] = "Strict";
+			_basesettings[nameof(XSRFCookieSameSite)] = "Strict";
+
 			_basesettings[nameof(ShortTermStorage)] = null;
 			_basesettings[nameof(LongTermStorage)] = null;
-			_basesettings[nameof(Authentication)] = null;
+			_basesettings[nameof(Authentication)] = null;			
 		}
 
 		/// <summary>
@@ -161,6 +164,18 @@ namespace Ceen.Security.Login
 		/// Gets or sets the name of the authentication cookie to look for.
 		/// </summary>
 		public string XSRFCookieName { get { return GetValue<string>(); } set { SetValue(value); } }
+
+        /// <summary>
+        /// Gets or sets the value for the cookie &quot;samesite&quot; attribute.
+        /// The default is &quot;Strict&quot; meaning that the cookie will not be shared with other sites.
+        /// </summary>
+        public string AuthSessionCookieSameSite { get { return GetValue<string>(); } set { SetValue(value); } }
+
+        /// <summary>
+        /// Gets or sets the value for the cookie &quot;samesite&quot; attribute.
+        /// The default is &quot;Strict&quot; meaning that the cookie will not be shared with other sites.
+        /// </summary>
+        public string XSRFCookieSameSite { get { return GetValue<string>(); } set { SetValue(value); } }
 
 		/// <summary>
 		/// Gets or sets the path component for the cookies.
@@ -288,10 +303,10 @@ namespace Ceen.Security.Login
 				await ShortTermStorage.UpdateSessionExpirationAsync(session);
 
 				if (!string.IsNullOrWhiteSpace(session.XSRFToken))
-					context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl);
+					context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl, samesite: XSRFCookieSameSite);
 				
 				if (!string.IsNullOrWhiteSpace(session.Cookie))
-					context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
+					context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl, samesite: AuthSessionCookieSameSite);
 			}
 		}
 
@@ -314,8 +329,14 @@ namespace Ceen.Security.Login
 				if (!string.IsNullOrWhiteSpace(xsrf))
 				{
 					var prev = await ShortTermStorage.GetSessionFromXSRFAsync(xsrf);
-					if (!Utility.IsNullOrExpired(prev) && prev.UserID == userid && !string.IsNullOrWhiteSpace(userid))
-						session = prev;
+					if (prev != null)
+					{
+                        // Remove the previous entry to avoid conflicts
+                        await ShortTermStorage.DropSessionAsync(prev);
+						
+						// Re-use the XSRF token
+						session.XSRFToken = prev.XSRFToken;
+                    }
 				}
 			}
 
@@ -328,7 +349,7 @@ namespace Ceen.Security.Login
 			if (UseXSRFTokens)
 			{
 				session.XSRFToken = session.XSRFToken ?? PRNG.GetRandomString(32);
-				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl);
+				context.Response.AddCookie(XSRFCookieName, session.XSRFToken, expires: session.Expires, httponly: false, path: CookiePath, secure: usingssl, samesite: XSRFCookieSameSite);
 			}
 
 			if (UseLongTermCookieStorage && LongTermStorage != null && (!string.IsNullOrWhiteSpace(series) || withlongterm))
@@ -346,12 +367,14 @@ namespace Ceen.Security.Login
 				};
 
 				await LongTermStorage.AddOrUpdateLongTermLoginAsync(st);
-				context.Response.AddCookie(AuthCookieName, cookie.ToString(), expires: st.Expires, httponly: true, path: CookiePath, secure: usingssl);
+				context.Response.AddCookie(AuthCookieName, cookie.ToString(), expires: st.Expires, httponly: true, path: CookiePath, secure: usingssl, samesite: AuthSessionCookieSameSite);
 			}
 
 			session.Cookie = PRNG.GetRandomString(32);
-			context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl);
+			context.Response.AddCookie(AuthSessionCookieName, session.Cookie, expires: session.Expires, httponly: true, path: CookiePath, secure: usingssl, samesite: AuthSessionCookieSameSite);
 
+			if (ShortTermStorage == null)
+				Console.WriteLine("Missing short term storage module, make sure you load Ceen.Security.Login.DatabaseStorageModule or manually set a storage module");
 			await ShortTermStorage.AddSessionAsync(session);
 
 			SetLoginSuccess(context);

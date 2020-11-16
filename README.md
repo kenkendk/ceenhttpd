@@ -35,7 +35,7 @@ Standalone version, Ceen.Httpd.Cli:
 Missing features:
 
   - No template engine: use [T4](https://msdn.microsoft.com/en-us/library/bb126445.aspx) or your favorite
-  - No application-level logging support: use [log4net](https://logging.apache.org/log4net/)
+  - Full application-level logging support: use [log4net](https://logging.apache.org/log4net/)
   - Advanced database queries: use [Dapper](https://github.com/StackExchange/Dapper)
 
 Installation
@@ -158,7 +158,7 @@ public class ApiExampleController : Controller, IApiV1
     [HttpGet]
     public IResult Index(IHttpContext context)
     {
-        return OK();
+        return OK;
     }
 
     public IResult Index(int id)
@@ -169,7 +169,7 @@ public class ApiExampleController : Controller, IApiV1
     [Route("{id}/detail")]
     public IResult Detail(int id)
     {
-        return Status(HttpStatusCode.NoContent);
+        return Status(NoContent, "I have no content :(");
     }
 }
 
@@ -227,7 +227,7 @@ public class ApiExampleController : Controller, IApiV1
     [HttpGet]
     public IResult Index(IHttpContext context)
     {
-        return OK();
+        return OK;
     }
 
     public IResult Index(int id)
@@ -238,7 +238,7 @@ public class ApiExampleController : Controller, IApiV1
     [Route("{id}/detail")]
     public IResult Detail(int id)
     {
-        return Status(HttpStatusCode.NoContent);
+        return Status(NoContent, "I have no content :(");
     }
 }
 ```

@@ -6,7 +6,7 @@ namespace Ceen.Httpd.Logging
 	/// <summary>
 	/// Outputs Common Log Format to STDOUT
 	/// </summary>
-	public class CLFStdOut : CLFLogger
+	public sealed class CLFStdOut : CLFLogger
 	{
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Logging.CFLStdOut"/> class.
@@ -20,7 +20,7 @@ namespace Ceen.Httpd.Logging
 	/// <summary>
 	/// Outputs Common Log Format to STDERR
 	/// </summary>
-	public class CLFStdErr : CLFLogger
+	public sealed class CLFStdErr : CLFLogger
 	{
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Logging.CFLStdErr"/> class.
@@ -34,7 +34,7 @@ namespace Ceen.Httpd.Logging
 	/// <summary>
 	/// Logger that outputs exception messages to stdout
 	/// </summary>
-	public class StdErrErrors : FunctionLogger
+	public sealed class StdErrErrors : IMessageLogger
 	{
 		/// <summary>
 		/// A static cached instance of the StdErr stream
@@ -49,57 +49,73 @@ namespace Ceen.Httpd.Logging
 			_stderr = new System.IO.StreamWriter(Console.OpenStandardError(), System.Text.Encoding.UTF8, 1024, true);
 			_stderr.AutoFlush = true;
 		}
-		
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Logging.StdErrErrors"/> class.
-		/// </summary>
-		public StdErrErrors()
-			: base(HandleMsg)
-		{
-		}
 
-		/// <summary>
-		/// Handles the log message.
-		/// </summary>
-		/// <returns><c>true</c></returns>
-		/// <param name="context">The http context.</param>
-		/// <param name="exception">The exception.</param>
-		/// <param name="started">The time the request started.</param>
-		/// <param name="duration">The request duration.</param>
-		static Task HandleMsg(IHttpContext context, Exception exception, DateTime started, TimeSpan duration)
-		{
-			if (exception != null)
-				_stderr.WriteLine(exception);
+        /// <summary>
+        /// Logs a message
+        /// </summary>
+        /// <param name="context">The execution context.</param>
+        /// <param name="ex">The exception being logged, may be null.</param>
+        /// <param name="loglevel">The log level</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="when">The time the log data was received</param>
+        /// <returns>An awaitable task</returns>
+        public Task LogMessageAsync(IHttpContext context, Exception ex, LogLevel loglevel, string message, DateTime when)
+        {
+            if (ex != null)
+                _stderr.WriteLine(ex);
 			return Task.FromResult(true);
-		}
-	}
+        }
+
+        /// <summary>
+        /// Logs a completed request.
+        /// </summary>
+        /// <returns>An awaitable task.</returns>
+        /// <param name="context">The execution context.</param>
+        /// <param name="ex">The exception being logged, may be null.</param>
+        /// <param name="started">The time the request started.</param>
+        /// <param name="duration">The request duration.</param>
+        public Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+        {
+            if (ex != null)
+                _stderr.WriteLine(ex);
+            return Task.FromResult(true);
+        }
+    }
 
 	/// <summary>
 	/// Logger that outputs exception messages to stdout
 	/// </summary>
-	public class StdOutErrors : FunctionLogger
+	public sealed class StdOutErrors : IMessageLogger
 	{
-		/// <summary>
-		/// Initializes a new instance of the <see cref="T:Ceen.Httpd.Logging.StdErrErrors"/> class.
-		/// </summary>
-		public StdOutErrors()
-			: base(HandleMsg)
-		{
-		}
+        /// <summary>
+        /// Logs a message
+        /// </summary>
+        /// <param name="context">The execution context.</param>
+        /// <param name="ex">The exception being logged, may be null.</param>
+        /// <param name="loglevel">The log level</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="when">The time the log data was received</param>
+        /// <returns>An awaitable task</returns>
+        public Task LogMessageAsync(IHttpContext context, Exception ex, LogLevel loglevel, string message, DateTime when)
+        {
+            if (ex != null)
+                Console.WriteLine(ex);
+            return Task.FromResult(true);
+        }
 
-		/// <summary>
-		/// Handles the log message.
-		/// </summary>
-		/// <returns><c>true</c></returns>
-		/// <param name="context">The http context.</param>
-		/// <param name="exception">The exception.</param>
-		/// <param name="started">The time the request started.</param>
-		/// <param name="duration">The request duration.</param>
-		static Task HandleMsg(IHttpContext context, Exception exception, DateTime started, TimeSpan duration)
-		{
-			if (exception != null)
-				Console.WriteLine(exception);
-			return Task.FromResult(true);
-		}
-	}
+        /// <summary>
+        /// Logs a completed request.
+        /// </summary>
+        /// <returns>An awaitable task.</returns>
+        /// <param name="context">The execution context.</param>
+        /// <param name="ex">The exception being logged, may be null.</param>
+        /// <param name="started">The time the request started.</param>
+        /// <param name="duration">The request duration.</param>
+        public Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+        {
+            if (ex != null)
+                Console.WriteLine(ex);
+            return Task.FromResult(true);
+        }
+    }
 }

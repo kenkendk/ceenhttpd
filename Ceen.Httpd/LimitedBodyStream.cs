@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Ceen.Httpd
@@ -23,10 +24,6 @@ namespace Ceen.Httpd
         /// The stop task
         /// </summary>
         private readonly Task m_stoptask;
-        /// <summary>
-        /// The cancellation token
-        /// </summary>
-        private readonly System.Threading.CancellationTokenSource m_cs;
 
         /// <summary>
         /// The number of bytes to read
@@ -62,7 +59,6 @@ namespace Ceen.Httpd
             m_timeouttask = timeouttask;
             m_stoptask = stoptask;
             m_passthrough = totalbytes < 0;
-            m_cs = new System.Threading.CancellationTokenSource();
         }
 
         /// <summary>
@@ -80,35 +76,43 @@ namespace Ceen.Httpd
 
             if (m_passthrough)
             {
-                rtask = m_parent.ReadAsync(buffer, offset, count, cancellationToken);
-                rt = await Task.WhenAny(Task.Delay(m_idletime), m_timeouttask, m_stoptask, rtask);
+                using (var cs = new CancellationTokenSource(m_idletime))
+                using (cancellationToken.Register(() => cs.Cancel()))
+                {
+                    rtask = m_parent.ReadAsync(buffer, offset, count, cs.Token);
+                    rt = await Task.WhenAny(m_timeouttask, m_stoptask, rtask);
+                }
+
                 if (rt != rtask)
                 {
-                    m_cs.Cancel();
                     if (rt == m_stoptask)
                         throw new TaskCanceledException();
                     else
                         throw new HttpException(HttpStatusCode.RequestTimeout);
                 }
 
-                return await rtask;
+                return rtask.Result;
             }
 
             if (m_bytesleft <= 0)
                 return 0;
 
-            rtask = m_parent.ReadAsync(buffer, offset, (int)Math.Min(count, m_bytesleft), m_cs.Token);
-            rt = await Task.WhenAny(Task.Delay(m_idletime), m_timeouttask, m_stoptask, rtask);
+            using (var cs = new CancellationTokenSource(m_idletime))
+            using (cancellationToken.Register(() => cs.Cancel()))
+            {
+                rtask = m_parent.ReadAsync(buffer, offset, (int) Math.Min(count, m_bytesleft), cs.Token);
+                rt = await Task.WhenAny(m_timeouttask, m_stoptask, rtask);
+            }
+
             if (rt != rtask)
             {
-                m_cs.Cancel();
                 if (rt == m_stoptask)
                     throw new TaskCanceledException();
                 else
                     throw new HttpException(HttpStatusCode.RequestTimeout);
             }
 
-            var r = await rtask;
+            var r = rtask.Result;
             if (r == 0)
                 return r;
 
@@ -134,6 +138,23 @@ namespace Ceen.Httpd
         {
             get => m_bytesread;
             set => throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Helper method to consume the body of the request
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns><c>true</c> if the bytes could be discarded, <c>false</c> otherwise</returns>
+        public async Task<bool> DiscardAllAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            if (m_passthrough)
+                return false;
+
+            var buf = new byte[1024 * 8];
+            while(m_bytesleft > 0)
+                await ReadAsync(buf, 0, buf.Length, cancellationToken);
+
+            return true;
         }
         #endregion
     }

@@ -140,6 +140,23 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
+		/// Gets or sets the cookie SameSite attribute.
+		/// Expected values are &quot;None&Quot;, &quot;Strict&quot;, or &quot;Lax&quot;.
+		/// </summary>
+		/// <value>The samesite value</value>
+		public string SameSite
+		{
+			get { return Settings["SameSite"]; }
+			set
+			{
+				if (value == null)
+					Settings.Remove("SameSite");
+				else
+					Settings["SameSite"] = value;
+			}
+		}
+
+		/// <summary>
 		/// Initializes a new instance of the <see cref="Ceen.Httpd.ResponseCookie"/> class.
 		/// </summary>
 		/// <param name="name">The cookie name.</param>

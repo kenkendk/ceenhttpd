@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
-    <ReleaseVersion>0.9.7</ReleaseVersion>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <ReleaseVersion>0.9.9</ReleaseVersion>
   </PropertyGroup>
 
   <ItemGroup>

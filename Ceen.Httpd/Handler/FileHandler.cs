@@ -352,6 +352,16 @@ namespace Ceen.Httpd.Handler
         }
 
         /// <summary>
+        /// Workaround for <see name="System.Security.Cryptography.HashAlgorithm.Create" /> not being correctly supported in .Net core
+        /// </summary>
+        /// <param name="id">The algorithm name</param>
+        /// <returns>The hash algorithm instance</returns>
+        private static System.Security.Cryptography.HashAlgorithm CreateFromId(string id)
+        {
+            return System.Security.Cryptography.CryptoConfig.CreateFromName(id) as System.Security.Cryptography.HashAlgorithm;
+        }
+
+        /// <summary>
         /// Computes the ETag value for a given resources
         /// </summary>
         /// <returns>The ETag value.</returns>
@@ -359,7 +369,7 @@ namespace Ceen.Httpd.Handler
         public virtual async Task<string> ComputeETag(Stream sourcedata)
         {
             var buffer = new byte[8 * 1024];
-            using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : System.Security.Cryptography.HashAlgorithm.Create(EtagAlgorithm))
+            using (var hasher = string.IsNullOrWhiteSpace(EtagAlgorithm) ? System.Security.Cryptography.MD5.Create() : CreateFromId(EtagAlgorithm))
             {
                 if (m_etagsalt != null)
                     hasher.TransformBlock(m_etagsalt, 0, m_etagsalt.Length, m_etagsalt, 0);
@@ -558,7 +568,7 @@ namespace Ceen.Httpd.Handler
                             return SetInvalidRangeHeader(context, bytecount);
                     }
 
-                    if (etagkey != null)
+                    if (etagkey != null && etag == null)
                     {
                         fs.Position = 0;
                         etag = await ComputeETag(fs);
@@ -591,7 +601,10 @@ namespace Ceen.Httpd.Handler
                     context.Response.StatusCode = HttpStatusCode.OK;
                     context.Response.AddHeader("Last-Modified", lastmodified.ToString("R", CultureInfo.InvariantCulture));
                     context.Response.AddHeader("Accept-Ranges", "bytes");
-                    context.Response.SetExpires(CacheSeconds);
+                    
+                    // If the VFS or something else handles cache headers, do not overwrite them here
+                    if (!context.Response.Headers.ContainsKey("Cache-Control") && !context.Response.Headers.ContainsKey("Expires"))
+                        context.Response.SetExpires(CacheSeconds);
 
                     DateTime modifiedsincedate;
                     DateTime.TryParseExact(context.Request.Headers["If-Modified-Since"], CultureInfo.CurrentCulture.DateTimeFormat.RFC1123Pattern, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out modifiedsincedate);
@@ -646,7 +659,7 @@ namespace Ceen.Httpd.Handler
             catch (Exception ex)
             {
                 // Log the error
-                await context.LogExceptionAsync(ex);
+                await context.LogMessageAsync(LogLevel.Error, $"Failed to process file: {path}", ex);
 
                 // If this happens when we try to open the file, report as permission problem
                 if (permissionissue)

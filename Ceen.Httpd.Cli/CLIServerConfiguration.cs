@@ -41,17 +41,37 @@ namespace Ceen.Httpd.Cli
 	}
 
 	/// <summary>
-	/// A logger of a logger to attach
+	/// A definition of a CLI defined route
+	/// </summary>
+	[Serializable]
+	public class WiredRouteDefinition : RouteDefinition
+	{
+		/// <summary>
+		/// The verbs allowed for the path
+		/// </summary>
+		public string Verbs { get; set; }
+	}	
+
+	/// <summary>
+	/// A definition of a logger to attach
 	/// </summary>
 	[Serializable]
 	public class LoggerDefinition : ModuleDefinition
 	{
 	}
 
-	/// <summary>
-	/// Configuration holder for CLI-style server configuration
-	/// </summary>
-	[Serializable]
+    /// <summary>
+    /// A definition of a post-processor to attach
+    /// </summary>
+    [Serializable]
+    public class PostProcessorDefinition : ModuleDefinition
+    {
+    }
+
+    /// <summary>
+    /// Configuration holder for CLI-style server configuration
+    /// </summary>
+    [Serializable]
 	public class CLIServerConfiguration
 	{
 		/// <summary>
@@ -154,10 +174,15 @@ namespace Ceen.Httpd.Cli
 		/// </summary>
 		public List<ModuleDefinition> Modules { get; set; } = new List<ModuleDefinition>();
 
-		/// <summary>
-		/// Gets the list of loggers to attach
-		/// </summary>
-		public List<LoggerDefinition> Loggers { get; set; } = new List<LoggerDefinition>();
+        /// <summary>
+        /// Gets the defined routes
+        /// </summary>
+        public List<PostProcessorDefinition> PostProcessors { get; set; } = new List<PostProcessorDefinition>();
+
+        /// <summary>
+        /// Gets the list of loggers to attach
+        /// </summary>
+        public List<LoggerDefinition> Loggers { get; set; } = new List<LoggerDefinition>();
 
 		/// <summary>
 		/// Gets or sets a value indicating if the default mime types are ignored

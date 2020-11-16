@@ -12,9 +12,9 @@ namespace ToDoList
 		{
 		}
 
-		protected override void SetupCommands()
+		public override void AfterConfigure()
 		{
-			base.SetupCommands();
+			base.AfterConfigure();
 
 			using (var cmd = m_connection.CreateCommand())
 			{

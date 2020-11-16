@@ -5,9 +5,78 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
 
 namespace Ceen
 {
+    /// <summary>
+    /// The parsed language tag
+    /// </summary>
+    public class LanguageTag
+    {
+        /// <summary>
+        /// The primary language
+        /// </summary>
+        public readonly string Primary;
+        /// <summary>
+        /// The subtag (i.e. region)
+        /// </summary>
+        public readonly string Subtag;
+        /// <summary>
+        /// The quality (priority)
+        /// </summary>
+        public readonly float Quality;
+
+        /// <summary>
+        /// The invariant language
+        /// </summary>
+        public static readonly LanguageTag Invariant = new LanguageTag("", "", 0);
+
+        /// <summary>
+        /// The english language
+        /// </summary>
+        public static readonly LanguageTag English = new LanguageTag("en", "", 0);
+
+        /// <summary>
+        /// Constructs a new language tag
+        /// </summary>
+        /// <param name="primary">The primary language</param>
+        /// <param name="subtag">The subtag</param>
+        /// <param name="quality">The quality</param>
+        public LanguageTag(string primary, string subtag, float quality)
+        {
+            Primary = primary;
+            Subtag = subtag;
+            Quality = quality;
+        }
+
+        /// <summary>
+        /// The IANA style name (aka ietf name, etc)
+        /// </summary>
+        public string IANAName => Primary + (string.IsNullOrWhiteSpace(Subtag) ? string.Empty : ("-" + Subtag));
+
+        /// <summary>
+        /// Attempts to parse the locale and returns a cultureinfo matching it
+        /// </summary>
+        /// <param name="@default">The default culture info to return</param>
+        /// <returns><paramref name="@default" /> if not culture was matched</returns>
+        public CultureInfo TryParse(bool allowOnlyMajor = true, CultureInfo @default = null)
+        {
+            try { return new CultureInfo(IANAName); }
+            catch { }
+
+            if (allowOnlyMajor && !string.IsNullOrWhiteSpace(Subtag))
+                try { return new CultureInfo(Primary); }
+                catch { }
+
+            return @default;
+        }
+    }
+
+    /// <summary>
+    /// Helper methods for performing various common operations
+    /// on a request instance
+    /// </summary>
     public static class RequestUtility
     {
 		/// <summary>
@@ -56,6 +125,84 @@ namespace Ceen
             return GetEncodingForContentType(request.ContentType);
 		}
 
+		/// <summary>
+		/// Regular expression for parsing the Accept-Language header
+		/// </summary>
+		private static System.Text.RegularExpressions.Regex LANGUAGE_MATCHER = 
+			new System.Text.RegularExpressions.Regex(
+                @"\s*(?<primary>[A-z]+)(-(?<subtag>[A-z-_]+))?(;(q=(?<quality>[0-9\.]+)))?\s*,?"
+			);
+
+		/// <summary>
+		/// The number style for parsing the language quality specifier
+		/// </summary>
+		private const System.Globalization.NumberStyles QUALITY_NUMBER_STYLE =
+            System.Globalization.NumberStyles.AllowLeadingSign |
+            System.Globalization.NumberStyles.AllowDecimalPoint |
+            System.Globalization.NumberStyles.AllowLeadingWhite |
+            System.Globalization.NumberStyles.AllowTrailingWhite;
+
+		/// <summary>
+		/// Gets the prefered language that the user accepts, which is also in the list of supported items.
+		/// Returns null if no languages are accepted.
+		/// Expects fully qualified language names (i.e. &quot;en-US&quot;)
+		/// </summary>
+		/// <param name="request">The request to examine</param>
+		/// <param name="supportedLanguages">The list of supported languages</param>
+		/// <returns>The prefered language or null</returns>
+		public static LanguageTag GetAcceptLanguage(this IHttpRequest request, params string[] supportedLanguages)
+		{
+			var lookup = supportedLanguages.ToLookup(x => x, StringComparer.InvariantCultureIgnoreCase);
+			return GetAcceptLanguages(request).FirstOrDefault(x => lookup.Contains(x.IANAName));
+		}
+
+        /// <summary>
+        /// Gets the prefered language that the user accepts, which is also in the list of supported items.
+        /// Returns null if no languages are accepted.
+		/// Expects only major languages (i.e. expects &quot;en&quot; NOT &quot;en-US&quot;) in the supported languages.
+        /// </summary>
+        /// <param name="request">The request to examine</param>
+        /// <param name="supportedLanguages">The list of supported languages</param>
+        /// <returns>The prefered language or null</returns>
+        public static LanguageTag GetAcceptMajorLanguage(this IHttpRequest request, params string[] supportedLanguages)
+        {
+            var lookup = supportedLanguages.ToLookup(x => x, StringComparer.InvariantCultureIgnoreCase);
+            return GetAcceptLanguages(request)
+				.FirstOrDefault(x => lookup.Contains(x.Primary));
+        }
+
+        /// <summary>
+        /// Returns an ordered priority list of accepted languages.
+        /// </summary>
+        /// <param name="request">The request to examine</param>
+        /// <returns>The ordered list of accepted languages</returns>
+        public static IOrderedEnumerable<LanguageTag> GetAcceptLanguages(this IHttpRequest request)
+		{
+			return LANGUAGE_MATCHER
+				// Match the string
+				.Matches(request.Headers["Accept-Language"] ?? string.Empty)
+				// Old IEnumerable to Linq
+				.Cast<System.Text.RegularExpressions.Match>()
+				// Parse each match
+				.Select(x => {
+					var quality = 1f;
+					if (x.Groups["quality"].Success && float.TryParse(x.Groups["quality"].Value, QUALITY_NUMBER_STYLE, System.Globalization.CultureInfo.InvariantCulture, out var q))
+						quality = q;
+
+					return new LanguageTag(
+						x.Groups["primary"].Value,
+						x.Groups["subtag"].Success ? x.Groups["subtag"].Value : string.Empty,
+						quality
+					);
+				})
+				// Filter out those with quality zero or less
+				.Where(x => x.Quality > 0)
+				// Order by quality
+				.OrderByDescending(x => x.Quality)
+				// But with same quality, we prefer those with a sub-tag
+				.ThenBy(x => string.IsNullOrWhiteSpace(x.Subtag));
+		}
+
         /// <summary>
         /// Returns a value indicating if the request is a multi-part request
         /// </summary>
@@ -76,6 +223,22 @@ namespace Ceen
             return IsContentType(contenttype, "multipart/form-data");
 		}
 
+        /// <summary>
+        /// Returns a value indicating if the content type is of a certain type
+        /// </summary>
+        /// <param name="request">The request to evaluate the content type for</param>
+        /// <param name="test">The type to test for</param>
+        /// <returns><c>true</c> if the content-type matches the test type; <c>false</c> otherwise</returns>
+        public static bool IsContentType(this IHttpRequest request, string test)
+            => IsContentType(request.ContentType, test);
+
+
+        /// <summary>
+        /// Returns a value indicating if the content type is of a certain type
+        /// </summary>
+        /// <param name="contenttype">The content-type string</param>
+        /// <param name="test">The type to test for</param>
+        /// <returns><c>true</c> if the content-type matches the test type; <c>false</c> otherwise</returns>
         public static bool IsContentType(string contenttype, string test)
         {
             if (string.IsNullOrWhiteSpace(contenttype))
@@ -83,15 +246,23 @@ namespace Ceen
 
             var firstdelim = contenttype.IndexOfAny(new char[] { ';', ' ', ',' });
             if (firstdelim < 0)
-                firstdelim = contenttype.Length - 1;
+                firstdelim = contenttype.Length;
 
             return string.Equals(contenttype.Substring(0, firstdelim), test, StringComparison.OrdinalIgnoreCase);
         }
 
 		/// <summary>
-		/// Returns a value indicating if the request is a multi-part request
+		/// Returns a value indicating if the content type is indicating Json data
 		/// </summary>
-		/// <returns><c>true</c>, if multi-part was used, <c>false</c> otherwise.</returns>
+		/// <returns><c>true</c>, if the content type is json, <c>false</c> otherwise.</returns>
+		/// <param name="request">The request instance.</param>
+		public static bool IsJsonRequest(this IHttpRequest request)
+            => IsJsonRequest(request.ContentType);
+
+		/// <summary>
+		/// Returns a value indicating if the content type is indicating Json data
+		/// </summary>
+		/// <returns><c>true</c>, if the content type is json, <c>false</c> otherwise.</returns>
 		/// <param name="contenttype">The request contenttype to examine.</param>
 		public static bool IsJsonRequest(string contenttype)
 		{
@@ -169,5 +340,113 @@ namespace Ceen
 				return encoding.GetString(ms.ToArray());
 			}
 		}
-	}
+
+		/// <summary>
+		/// Logs an exception error
+		/// </summary>
+		/// <param name="context">The context to log with</param>
+		/// <param name="ex">The exception to log</param>
+		/// <returns>An awaitable task</returns>
+        public static Task LogErrorAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Error, null, ex);
+        }
+
+        /// <summary>
+        /// Logs an error message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogErrorAsync(this IHttpContext context, string message, Exception ex = null)
+		{
+			return context.LogMessageAsync(LogLevel.Error, message, ex);
+		}
+
+        /// <summary>
+        /// Logs an exception warning
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogWarningAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Warning, null, ex);
+        }
+
+        /// <summary>
+        /// Logs a warning message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogWarningAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Warning, message, ex);
+        }
+
+        /// <summary>
+        /// Logs an exception for information use
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogInformationAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Information, null, ex);
+        }
+
+        /// <summary>
+        /// Logs an informaiton message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogInformationAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Information, message, ex);
+        }
+
+        /// <summary>
+        /// Logs an exception for debugging
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="ex">The exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogDebugAsync(this IHttpContext context, Exception ex)
+        {
+            return context.LogMessageAsync(LogLevel.Debug, null, ex);
+        }
+
+        /// <summary>
+        /// Logs a debug message
+        /// </summary>
+        /// <param name="context">The context to log with</param>
+        /// <param name="message">The message to log</param>
+        /// <param name="ex">The optional exception to log</param>
+        /// <returns>An awaitable task</returns>
+        public static Task LogDebugAsync(this IHttpContext context, string message, Exception ex = null)
+        {
+            return context.LogMessageAsync(LogLevel.Debug, message, ex);
+        }
+
+        /// <summary>
+        /// Gets the remote IP from the request as a string (or null)
+        /// </summary>
+        /// <param name="self">The request instance</param>
+        /// <returns>The remote IP</returns>
+        public static string GetRemoteIP(this Ceen.IHttpRequest self)
+            => (self.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString();
+
+        /// <summary>
+        /// Gets the remote IP from the request as a string (or null)
+        /// </summary>
+        /// <param name="self">The context instance</param>
+        /// <returns>The remote IP</returns>
+        public static string GetRemoteIP(this Ceen.IHttpContext self)
+            => GetRemoteIP(self?.Request);
+    }
 }

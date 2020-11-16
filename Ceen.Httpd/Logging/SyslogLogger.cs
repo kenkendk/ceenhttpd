@@ -93,7 +93,7 @@ namespace Ceen.Httpd.Logging
 		/// <param name="ex">The exception.</param>
 		/// <param name="started">Timestamp for when the request started.</param>
 		/// <param name="duration">Duration of the request processing.</param>
-		public override Task LogRequest(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
+		public override Task LogRequestCompletedAsync(IHttpContext context, Exception ex, DateTime started, TimeSpan duration)
 		{
 			return Task.Run(() =>
 			{
