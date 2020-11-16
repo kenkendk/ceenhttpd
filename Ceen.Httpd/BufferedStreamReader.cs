@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Threading;
 
 namespace Ceen.Httpd
@@ -90,6 +89,7 @@ namespace Ceen.Httpd
 			var bufsize = 0;
 			var totalread = 0;
 			var lastlookoffset = 0;
+			var lastlinestart = 0;
 
 			// Repeat the parsing until we time out or get an empty line
 			while (true)
@@ -134,10 +134,17 @@ namespace Ceen.Httpd
 				var ix = Array.IndexOf(buf, CR, lastlookoffset, bufsize - lastlookoffset);
 				while (ix >= 0 && ix < bufsize - 1)
 				{
+					// char hit a split with blocks
+					if (ix == bufsize - 1)
+					{
+						lastlookoffset = ix;
+						break;
+					}
+
 					// Check if the next byte is LF
 					if (buf[ix + 1] == LF)
 					{
-						var datalen = ix - bufoffset;
+						var datalen = ix - lastlinestart;
 
 						// Check if the line is empty
 						if (datalen == 0)
@@ -152,14 +159,14 @@ namespace Ceen.Httpd
 						}
 						else
 						{
-							linehandler(System.Text.Encoding.ASCII.GetString(buf, bufoffset, datalen));
-							bufoffset = ix + 2;
-							lastlookoffset = bufoffset;
+							linehandler(System.Text.Encoding.ASCII.GetString(buf, lastlinestart, datalen));
+							lastlinestart = ix + 2;
+							lastlookoffset = lastlinestart;
 						}
 					}
 					else
 					{
-						// False hit, or char hit a split with blocks
+						//False hit
 						lastlookoffset = ix + 1;
 					}
 
@@ -169,12 +176,13 @@ namespace Ceen.Httpd
 
 				// Move trailing bytes to the start of the buffer to reduce space use
 				// and make sure we do not search more than once for the CRLF
-				bufsize = bufsize - bufoffset;
-				if (bufsize != 0)
-					Array.Copy(buf, bufoffset, buf, 0, bufsize);
+				bufsize = bufsize - lastlinestart;
+				if (lastlinestart > 0 && bufsize > 0)
+					Array.Copy(buf, lastlinestart, buf, 0, bufsize);
 
-				bufoffset = 0;
-				lastlookoffset = Math.Max(0, bufsize - 1);
+				bufoffset = bufsize;
+				lastlookoffset = lastlookoffset - lastlinestart;
+				lastlinestart = 0;
 			}
 		}
 
