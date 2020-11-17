@@ -101,7 +101,7 @@ namespace Ceen.Httpd
 
                 using (var cs = new CancellationTokenSource(idletimeout))
                 {
-                    rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
+                    rtask = ReadAsync(buf, bufsize, Math.Min(buf.Length - bufsize, maxheadersize - totalread), cs.Token);
                     rt = await Task.WhenAny( stoptask, timeouttask, rtask);
                 }
 
@@ -129,16 +129,14 @@ namespace Ceen.Httpd
 						throw new HttpException(HttpStatusCode.BadRequest);
 				}
 
-				// Last buf char maybe '\r'
-				bufoffset = Math.Max(0, bufoffset - 1);
 				// Look for first CR
-				var ix = Array.IndexOf(buf, CR, bufoffset, bufsize - bufoffset);
+				var ix = Array.IndexOf(buf, CR, lastlookoffset, bufsize - lastlookoffset);
 				while (ix >= 0 && ix < bufsize - 1)
 				{
 					// Check if the next byte is LF
 					if (buf[ix + 1] == LF)
 					{
-						var datalen = ix - lastlookoffset;
+						var datalen = ix - bufoffset;
 
 						// Check if the line is empty
 						if (datalen == 0)
@@ -153,29 +151,29 @@ namespace Ceen.Httpd
 						}
 						else
 						{
-							linehandler(System.Text.Encoding.ASCII.GetString(buf, lastlookoffset, datalen));
+							linehandler(System.Text.Encoding.ASCII.GetString(buf, bufoffset, datalen));
 							bufoffset = ix + 2;
 							lastlookoffset = bufoffset;
 						}
 					}
 					else
 					{
-						//False hit
-						bufoffset = ix + 1;
+						// False hit, or char hit a split with blocks
+						lastlookoffset = ix + 1;
 					}
 
 					// Get the next entry
-					ix = Array.IndexOf(buf, CR, bufoffset, bufsize - bufoffset);
+					ix = Array.IndexOf(buf, CR, lastlookoffset, bufsize - lastlookoffset);
 				}
 
 				// Move trailing bytes to the start of the buffer to reduce space use
 				// and make sure we do not search more than once for the CRLF
-				bufsize = bufsize - lastlookoffset;
-				if (lastlookoffset > 0 && bufsize > 0)
-					Array.Copy(buf, lastlookoffset, buf, 0, bufsize);
+				bufsize = bufsize - bufoffset;
+				if (bufoffset > 0 && bufsize > 0)
+					Array.Copy(buf, bufoffset, buf, 0, bufsize);
 
-				bufoffset = bufsize;
-				lastlookoffset = 0;
+				bufoffset = 0;
+				lastlookoffset = Math.Max(0, bufsize - 1);
 			}
 		}
 
