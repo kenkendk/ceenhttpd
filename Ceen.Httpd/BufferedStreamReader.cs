@@ -89,7 +89,6 @@ namespace Ceen.Httpd
 			var bufsize = 0;
 			var totalread = 0;
 			var lastlookoffset = 0;
-			var lastlinestart = 0;
 
 			// Repeat the parsing until we time out or get an empty line
 			while (true)
@@ -130,21 +129,16 @@ namespace Ceen.Httpd
 						throw new HttpException(HttpStatusCode.BadRequest);
 				}
 
+				// Last buf char maybe '\r'
+				bufoffset = Math.Max(0, bufoffset - 1);
 				// Look for first CR
-				var ix = Array.IndexOf(buf, CR, lastlookoffset, bufsize - lastlookoffset);
+				var ix = Array.IndexOf(buf, CR, bufoffset, bufsize - bufoffset);
 				while (ix >= 0 && ix < bufsize - 1)
 				{
-					// char hit a split with blocks
-					if (ix == bufsize - 1)
-					{
-						lastlookoffset = ix;
-						break;
-					}
-
 					// Check if the next byte is LF
 					if (buf[ix + 1] == LF)
 					{
-						var datalen = ix - lastlinestart;
+						var datalen = ix - lastlookoffset;
 
 						// Check if the line is empty
 						if (datalen == 0)
@@ -159,30 +153,29 @@ namespace Ceen.Httpd
 						}
 						else
 						{
-							linehandler(System.Text.Encoding.ASCII.GetString(buf, lastlinestart, datalen));
-							lastlinestart = ix + 2;
-							lastlookoffset = lastlinestart;
+							linehandler(System.Text.Encoding.ASCII.GetString(buf, lastlookoffset, datalen));
+							bufoffset = ix + 2;
+							lastlookoffset = bufoffset;
 						}
 					}
 					else
 					{
 						//False hit
-						lastlookoffset = ix + 1;
+						bufoffset = ix + 1;
 					}
 
 					// Get the next entry
-					ix = Array.IndexOf(buf, CR, lastlookoffset, bufsize - lastlookoffset);
+					ix = Array.IndexOf(buf, CR, bufoffset, bufsize - bufoffset);
 				}
 
 				// Move trailing bytes to the start of the buffer to reduce space use
 				// and make sure we do not search more than once for the CRLF
-				bufsize = bufsize - lastlinestart;
-				if (lastlinestart > 0 && bufsize > 0)
-					Array.Copy(buf, lastlinestart, buf, 0, bufsize);
+				bufsize = bufsize - lastlookoffset;
+				if (lastlookoffset > 0 && bufsize > 0)
+					Array.Copy(buf, lastlookoffset, buf, 0, bufsize);
 
 				bufoffset = bufsize;
-				lastlookoffset = lastlookoffset - lastlinestart;
-				lastlinestart = 0;
+				lastlookoffset = 0;
 			}
 		}
 
