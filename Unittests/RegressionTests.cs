@@ -29,7 +29,10 @@ namespace Unittests
         public void TestIssue23()
         {
             using (var server = new ServerRunner(
-                new Ceen.Httpd.ServerConfig() { }
+                new Ceen.Httpd.ServerConfig() {
+                    // 10MiB headers for testing
+                    MaxRequestHeaderSize = 1024 * 1024 * 10
+                }
                 .AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
                 .AddRoute(new RegressionDummyHandler()))
             )
