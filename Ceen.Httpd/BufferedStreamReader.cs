@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Threading;
 
 namespace Ceen.Httpd
@@ -102,7 +101,7 @@ namespace Ceen.Httpd
 
                 using (var cs = new CancellationTokenSource(idletimeout))
                 {
-                    rtask = ReadAsync(buf, bufoffset, Math.Min(buf.Length - bufoffset, maxheadersize - totalread), cs.Token);
+                    rtask = ReadAsync(buf, bufsize, Math.Min(buf.Length - bufsize, maxheadersize - totalread), cs.Token);
                     rt = await Task.WhenAny( stoptask, timeouttask, rtask);
                 }
 
@@ -170,7 +169,7 @@ namespace Ceen.Httpd
 				// Move trailing bytes to the start of the buffer to reduce space use
 				// and make sure we do not search more than once for the CRLF
 				bufsize = bufsize - bufoffset;
-				if (bufsize != 0)
+				if (bufoffset > 0 && bufsize > 0)
 					Array.Copy(buf, bufoffset, buf, 0, bufsize);
 
 				bufoffset = 0;
