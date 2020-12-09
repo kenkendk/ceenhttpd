@@ -58,6 +58,7 @@ Running a webserver for static content is easy:
 
 ```csharp
 using System;
+using System.Web;
 using Ceen.Httpd;
 using Ceen.Httpd.Handler;
 using Ceen.Httpd.Logging;
@@ -93,6 +94,7 @@ Dynamic content can be added with a simple handler:
 
 ```csharp
 using System;
+using System.Web;
 using Ceen.Httpd;
 using Ceen.Httpd.Handler;
 using Ceen.Httpd.Logging;
@@ -138,6 +140,7 @@ The Model-View-Controller part can simplify building REST APIs:
 
 ```csharp
 using System;
+using System.Web;
 using Ceen.Httpd;
 using Ceen.Httpd.Handler;
 using Ceen.Httpd.Logging;
