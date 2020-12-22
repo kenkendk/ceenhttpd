@@ -384,15 +384,16 @@ namespace Ceen.Httpd
         /// <param name="stoptask">A task that signals server stop.</param>
         internal async Task ParseFormData(BufferedStreamReader reader, ServerConfig config, TimeSpan idletime, Task timeouttask, Task stoptask)
         {
-            if (string.Equals("application/x-www-form-urlencoded", this.ContentType))
+            if (this.IsContentType("application/x-www-form-urlencoded"))
             {
                 if (this.ContentLength != 0)
                 {
                     if (this.ContentLength > config.MaxUrlEncodedFormSize)
                         throw new HttpException(HttpStatusCode.PayloadTooLarge);
 
+                    var enc = this.GetEncodingForContentType();
                     ParseQueryString(
-                        System.Text.Encoding.ASCII.GetString(
+                        enc.GetString(
                             this.ContentLength > 0
                             ? await reader.RepeatReadAsync(this.ContentLength, idletime, timeouttask, stoptask)
                             : await reader.ReadUntilCrlfAsync(config.MaxRequestLineSize, config.MaxUrlEncodedFormSize, idletime, timeouttask, stoptask)

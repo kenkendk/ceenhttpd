@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Text;
 using System.Reflection.Metadata;
 using System;
 using System.Threading.Tasks;
@@ -18,6 +20,16 @@ namespace Unittests
             return context.SetResponseOK();
 		}
     }
+
+    public class FormUnpackHandler : IHttpModule
+    {
+		public async Task<bool> HandleAsync(IHttpContext context)
+		{
+			context.Response.SetNonCacheable();
+			await context.Response.WriteAllJsonAsync(JsonConvert.SerializeObject(new { time = DateTime.Now.TimeOfDay, key = context.Request.Form["key"] }));
+            return context.SetResponseOK();
+		}
+    }    
 
 	[TestFixture()]
     public class RegressionTests
@@ -56,6 +68,44 @@ namespace Unittests
                 }
 
             }
-        }        
+        } 
+
+        // https://github.com/kenkendk/ceenhttpd/issue/25
+        // The issue was parsing content-type for form-urlencoded
+        [Test()]
+        public void TestIssue25()
+        {
+            using (var server = new ServerRunner(
+                new Ceen.Httpd.ServerConfig() {
+                    // 10MiB headers for testing
+                    MaxRequestHeaderSize = 1024 * 1024 * 10
+                }
+                .AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+                .AddRoute(new FormUnpackHandler()))
+            )
+            {
+                var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/reporttarget");
+                req.Method = "POST";
+                req.ContentType = "application/x-www-form-urlencoded; charset=UTF-8";
+                var data = Encoding.UTF8.GetBytes("key=1234");
+                using(var rq = req.GetRequestStream())
+                    rq.Write(data, 0, data.Length);
+
+                using (var res = (HttpWebResponse)req.GetResponse())
+                {
+                    if (res.StatusCode != System.Net.HttpStatusCode.OK)
+                        throw new Exception($"Bad status code: {res.StatusCode}");
+                    
+                    string result;
+                    using (var sr = new System.IO.StreamReader(res.GetResponseStream()))
+                        result = sr.ReadToEnd();
+
+                    var v = JsonConvert.DeserializeObject<Dictionary<string, string>>(result);
+                    if (!v.TryGetValue("key", out var k) || !string.Equals(k, "1234"))
+                        throw new Exception($"Failed to auto-parse header: {res.StatusCode}");
+                }
+
+            }
+        }                 
     }
 }

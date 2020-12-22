@@ -120,10 +120,16 @@ namespace Ceen
 		/// </summary>
 		/// <returns>The encoding for the charset.</returns>
 		/// <param name="request">The request instance.</param>
-		public static Encoding GetEncodingForCharset(this IHttpRequest request)
-		{
-            return GetEncodingForContentType(request.ContentType);
-		}
+		public static Encoding GetEncodingForCharset(this IHttpRequest request, string charset)
+            => GetEncodingForCharset(charset);
+
+		/// <summary>
+		/// Gets an encoding from the content-type string
+		/// </summary>
+		/// <returns>The encoding for the content-type.</returns>
+		/// <param name="request">The request instance.</param>
+		public static Encoding GetEncodingForContentType(this IHttpRequest request)
+            => GetEncodingForContentType(request.ContentType);
 
 		/// <summary>
 		/// Regular expression for parsing the Accept-Language header
