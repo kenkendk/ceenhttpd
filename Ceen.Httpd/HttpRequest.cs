@@ -304,10 +304,20 @@ namespace Ceen.Httpd
             foreach (var frag in fr.Split(new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = frag.Split(new char[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries);
-                target[Uri.UnescapeDataString(parts[0])] = parts.Length == 1 ? null : Uri.UnescapeDataString(parts[1]);
+                target[QueryStringSerializer.UnescapeDataString(parts[0])] = parts.Length == 1 ? null : QueryStringSerializer.UnescapeDataString(parts[1]);
             }
         }
 
+        /// <summary>
+        /// Parses the stream items, if sent as multipart encoded
+        /// </summary>
+        /// <param name="itemparser">The parser method</param>
+        /// <param name="reader">The stream to read from.</param>
+        /// <param name="config">The server configuration.</param>
+        /// <param name="idletime">The maximum idle time.</param>
+        /// <param name="timeouttask">A task that signals request timeout.</param>
+        /// <param name="stoptask">A task that signals server stop.</param>
+        /// <returns>An awaitable task</returns>
         private async Task ParseMultiPart(Func<IDictionary<string, string>, Stream, Task> itemparser, BufferedStreamReader reader, ServerConfig config, TimeSpan idletime, Task timeouttask, Task stoptask)
         {
             if ((this.ContentType ?? "").StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))

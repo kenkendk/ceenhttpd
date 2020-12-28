@@ -34,7 +34,7 @@ namespace Ceen.Security.Login
 		/// <param name="input">The escaped string.</param>
 		public static string UnescapeString(string input)
 		{
-			return Uri.UnescapeDataString(input);
+			return QueryStringSerializer.UnescapeDataString(input);
 		}
 
 		/// <summary>

@@ -8,6 +8,7 @@ using Ceen.Httpd;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using System.Net;
+using Ceen.Mvc;
 
 namespace Unittests
 {
@@ -30,6 +31,24 @@ namespace Unittests
             return context.SetResponseOK();
 		}
     }    
+
+    public class QueryStringReader : Controller
+    {
+        [HttpGet]
+        [HttpPost]
+        public IResult Index(string key)
+        {
+            return Json(new { 
+                time = DateTime.Now.TimeOfDay,
+                parsekey = key,
+                urlkey = Context.Request.QueryString["key"],
+                urlk_e_y = Context.Request.QueryString["k e y"],
+                formkey = Context.Request.Form["key"],
+                formk_e_y = Context.Request.Form["k e y"]
+            });
+        }
+    }    
+
 
 	[TestFixture()]
     public class RegressionTests
@@ -106,6 +125,75 @@ namespace Unittests
                 }
 
             }
-        }                 
+        }   
+
+        // https://github.com/kenkendk/ceenhttpd/issue/26
+        // The issue was handling + as space in urls
+        [Test()]
+        public void TestIssue26()
+        {
+            using (var server = new ServerRunner(
+                new Ceen.Httpd.ServerConfig() {
+                    // 10MiB headers for testing
+                    MaxRequestHeaderSize = 1024 * 1024 * 10
+                }
+                .AddLogger(new Ceen.Httpd.Logging.StdOutErrors())
+                .AddRoute(
+                    new Type[] { typeof(QueryStringReader) }
+                    .ToRoute(
+                        new ControllerRouterConfig()
+                        { Debug = true }
+                    )
+                )
+            ))
+            {
+                var req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/{nameof(QueryStringReader)}?key=1+2+3&k+e+y=1+1+1");
+                req.Method = "GET";
+
+                using (var res = (HttpWebResponse)req.GetResponse())
+                {
+                    if (res.StatusCode != System.Net.HttpStatusCode.OK)
+                        throw new Exception($"Bad status code: {res.StatusCode}");
+                    
+                    string result;
+                    using (var sr = new System.IO.StreamReader(res.GetResponseStream()))
+                        result = sr.ReadToEnd();
+
+                    var v = JsonConvert.DeserializeObject<Dictionary<string, string>>(result);
+                    if (!v.TryGetValue("parsekey", out var k) || !string.Equals(k, "1 2 3"))
+                        throw new Exception($"Failed to parse key as input: {res.StatusCode}");
+                    if (!v.TryGetValue("urlkey", out k) || !string.Equals(k, "1 2 3"))
+                        throw new Exception($"Failed to parse key in url: {res.StatusCode}");
+                    if (!v.TryGetValue("urlk_e_y", out k) || !string.Equals(k, "1 1 1"))
+                        throw new Exception($"Failed to parse k+e+y in url: {res.StatusCode}");
+                }
+
+                req = System.Net.WebRequest.CreateHttp($"http://127.0.0.1:{server.Port}/{nameof(QueryStringReader)}");
+                req.Method = "POST";
+                req.ContentType = "application/x-www-form-urlencoded; charset=UTF-8";
+                var data = Encoding.UTF8.GetBytes("key=1+2+3&k+e+y=1+1+1");
+                using(var rq = req.GetRequestStream())
+                    rq.Write(data, 0, data.Length);
+
+                using (var res = (HttpWebResponse)req.GetResponse())
+                {
+                    if (res.StatusCode != System.Net.HttpStatusCode.OK)
+                        throw new Exception($"Bad status code: {res.StatusCode}");
+                    
+                    string result;
+                    using (var sr = new System.IO.StreamReader(res.GetResponseStream()))
+                        result = sr.ReadToEnd();
+
+                    var v = JsonConvert.DeserializeObject<Dictionary<string, string>>(result);
+                    if (!v.TryGetValue("parsekey", out var k) || !string.Equals(k, "1 2 3"))
+                        throw new Exception($"Failed to parse key as form input: {res.StatusCode}");
+                    if (!v.TryGetValue("formkey", out k) || !string.Equals(k, "1 2 3"))
+                        throw new Exception($"Failed to parse key in form: {res.StatusCode}");
+                    if (!v.TryGetValue("formk_e_y", out k) || !string.Equals(k, "1 1 1"))
+                        throw new Exception($"Failed to parse k+e+y in form: {res.StatusCode}");
+                }
+
+            }
+        }                                       
     }
 }

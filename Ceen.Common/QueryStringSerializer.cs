@@ -11,6 +11,14 @@ namespace Ceen
 	public static class QueryStringSerializer
 	{
 		/// <summary>
+		/// Decodes querystring values with &quot;+&quot; values as spaces
+		/// </summary>
+		/// <param name="data">The encoded string to decode</param>
+		/// <returns>The decoded string</returns>
+		public static string UnescapeDataString(string data)
+			=> Uri.UnescapeDataString(data?.Replace('+', ' '));
+
+		/// <summary>
 		/// Builds a lookup table for a given type
 		/// </summary>
 		/// <param name="type">The type to get the lookup table for</param>
@@ -180,8 +188,8 @@ namespace Ceen
 				if (splitix <= 0)
 					continue;
 
-				var key = Uri.UnescapeDataString(el.Substring(0, splitix));
-				var value = Uri.UnescapeDataString(el.Substring(splitix + 1));
+				var key = QueryStringSerializer.UnescapeDataString(el.Substring(0, splitix));
+				var value = QueryStringSerializer.UnescapeDataString(el.Substring(splitix + 1));
 
 				MemberInfo member;
 				if (!_lookup.TryGetValue(key, out member))
