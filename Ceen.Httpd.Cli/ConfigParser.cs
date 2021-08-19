@@ -154,7 +154,7 @@ namespace Ceen.Httpd.Cli
 			constructorargs = constructorargs ?? new List<string>();
 
 			if (!targettype.IsAssignableFrom(itemtype))
-				throw new Exception($"Found class {itemtype.FullName} in assembly {itemtype.Assembly.FullName}, but it does not implement ${typeof(ILogger).FullName}");
+				throw new Exception($"Found class {itemtype.FullName} in assembly {itemtype.Assembly.FullName}, but it does not implement ${targettype.FullName}");
 
 			var cons = itemtype.GetConstructors().Where(x => x.GetParameters().Length == constructorargs.Count).ToArray();
 			if (cons.Length == 0)
