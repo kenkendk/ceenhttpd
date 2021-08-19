@@ -89,7 +89,7 @@ namespace Unittests
             }
         } 
 
-        // https://github.com/kenkendk/ceenhttpd/issue/25
+        // https://github.com/kenkendk/ceenhttpd/issues/25
         // The issue was parsing content-type for form-urlencoded
         [Test()]
         public void TestIssue25()
@@ -127,7 +127,7 @@ namespace Unittests
             }
         }   
 
-        // https://github.com/kenkendk/ceenhttpd/issue/26
+        // https://github.com/kenkendk/ceenhttpd/issues/26
         // The issue was handling + as space in urls
         [Test()]
         public void TestIssue26()
