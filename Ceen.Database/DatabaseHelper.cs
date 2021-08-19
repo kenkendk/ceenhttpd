@@ -48,9 +48,13 @@ namespace Ceen.Database
         }
 
         /// <summary>
-        /// Gets or sets the default dialect to use
+        /// A function that returns the default dialect for a given connection
         /// </summary>
-        public static IDatabaseDialect DefaultDialect = new DatabaseDialectSQLite();
+        public static Func<IDbConnection, IDatabaseDialect> DefaultDialect
+        {
+            get;
+            set;
+        } = _ => new DatabaseDialectSQLite();
 
         /// <summary>
         /// Gets the dialect assigned to a connection
@@ -73,7 +77,7 @@ namespace Ceen.Database
             lock (_dialectLock)
             {
                 if (!_dialect.TryGetValue(connection, out var res))
-                    _dialect.Add(connection, res = defaultOverride ?? DefaultDialect);
+                    _dialect.Add(connection, res = defaultOverride ?? DefaultDialect(connection));
 
                 return res;
             }
