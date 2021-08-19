@@ -644,13 +644,14 @@ namespace Ceen.Httpd.Handler
                     fs.Position = startoffset;
                     var remain = context.Response.ContentLength;
                     var buf = new byte[8 * 1024];
+                    var ct = context.Request.TimeoutCancellationToken;
 
-                    using (var os = context.Response.GetResponseStream())
+                    await using (var os = context.Response.GetResponseStream())
                     {
                         while (remain > 0)
                         {
                             var r = await fs.ReadAsync(buf, 0, (int)Math.Min(buf.Length, remain));
-                            await os.WriteAsync(buf, 0, r);
+                            await os.WriteAsync(buf, 0, r, ct);
                             remain -= r;
                         }
                     }

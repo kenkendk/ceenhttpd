@@ -77,9 +77,9 @@ namespace Ceen.Httpd.Handler
                     context.Response.Headers.Remove("Transfer-Encoding");
 
                 await context.Response.FlushHeadersAsync();
-                using (var r = context.Response.GetResponseStream())
-                using(var rr = res.GetResponseStream())
-                    await rr.CopyToAsync(r);
+                await using (var r = context.Response.GetResponseStream())
+                await using(var rr = res.GetResponseStream())
+                    await rr.CopyToAsync(r, context.Request.TimeoutCancellationToken);
             }
 
             return true;

@@ -245,10 +245,11 @@ namespace Ceen.Httpd.Handler
 
             var buf = new byte[8 * 1024];
             var written = 0L;
+            var ct = context.Request.TimeoutCancellationToken;
 
             // Start writing data to output
             using (var local = new FileStream(localpath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var os = context.Response.GetResponseStream())
+            await using (var os = context.Response.GetResponseStream())
             {
                 while (task != null)
                 {
@@ -260,7 +261,7 @@ namespace Ceen.Httpd.Handler
                         if (read == 0)
                             break;
 
-                        await os.WriteAsync(buf, 0, read);
+                        await os.WriteAsync(buf, 0, read, ct);
                         written += read;
                     }
 
