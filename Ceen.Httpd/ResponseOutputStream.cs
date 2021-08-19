@@ -240,6 +240,20 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
+		/// Asyncronously dispose resources held by the stream
+		/// </summary>
+		/// <returns>An awaitable task</returns>
+		protected virtual async ValueTask DisposeAsyncCore()
+		{
+			if (!m_isDisposed)
+			{
+				await FlushAsync();
+				m_isDisposed = true;
+			}
+		}		
+
+
+		/// <summary>
 		/// Unbuffers the contents of this stream and puts it into the target stream
 		/// </summary>
 		/// <param name="target">The stream to unbuffer to</param>
