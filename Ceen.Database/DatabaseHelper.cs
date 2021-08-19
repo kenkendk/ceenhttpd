@@ -549,6 +549,17 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Returns the number of records for the table
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <typeparam name="T">The table type</typeparam>
+        /// <returns>The count</returns>
+        public static long SelectCount<T>(this IDbConnection connection)
+            => SelectCount<T>(connection, new Empty());
+
+
+
+        /// <summary>
         /// Returns the number of records that match the query
         /// </summary>
         /// <param name="connection">The connection to use</param>
@@ -886,6 +897,21 @@ namespace Ceen.Database
                     .Limit(1)
                     .MatchPrimaryKeys(ids)
             ) > 0;
+        }
+
+        /// <summary>
+        /// Deletes items matching the where clause
+        /// </summary>
+        /// <param name="connection">The connection to use</param>
+        /// <param name="query">The query to use</param>
+        /// <returns>The number of items deleted</returns>
+        public static int Delete<T>(this IDbConnection connection, Query<T> query)
+        {
+            if (query.Parsed.Type != QueryType.Delete)
+                throw new InvalidOperationException($"Cannot use a query of type {query.Parsed.Type} for DELETE");
+            var q = connection.GetDialect().RenderStatement(query);
+            using (var cmd = connection.CreateCommandWithParameters(q.Key))
+                return cmd.ExecuteNonQuery(q.Value);
         }
 
         /// <summary>
