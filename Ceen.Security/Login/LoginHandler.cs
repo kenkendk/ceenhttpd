@@ -34,6 +34,9 @@ namespace Ceen.Security.Login
 		/// <param name="context">The requests context.</param>
 		public async Task<bool> HandleAsync(IHttpContext context)
 		{
+			if (context.Request.Method != "POST")
+				return context.SetResponseMethodNotAllowed();
+
 			var xsrf = context.Request.Headers[XSRFHeaderName];
 
 			if (RequireXSRFToken && string.IsNullOrWhiteSpace(xsrf))
