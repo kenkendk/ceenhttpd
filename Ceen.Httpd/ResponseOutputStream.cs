@@ -227,7 +227,7 @@ namespace Ceen.Httpd
 		}
 
 		/// <summary>
-		/// Dispose the current resources
+		/// Dispose the specified disposing.
 		/// </summary>
 		/// <param name="disposing">If set to <c>true</c> disposing.</param>
 		protected override void Dispose(bool disposing)
@@ -235,24 +235,9 @@ namespace Ceen.Httpd
             if (disposing)
 			{
                 Flush();
-				m_parent.Dispose();
                 m_isDisposed = true;
             }
 		}
-
-		/// <summary>
-		/// Asyncronously dispose resources held by the stream
-		/// </summary>
-		/// <returns>An awaitable task</returns>
-		protected virtual async ValueTask DisposeAsyncCore()
-		{
-			if (!m_isDisposed)
-			{
-				m_isDisposed = true;
-				await FlushAsync();
-				await m_parent.DisposeAsync();
-			}
-		}		
 
 		/// <summary>
 		/// Unbuffers the contents of this stream and puts it into the target stream
