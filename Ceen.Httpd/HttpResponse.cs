@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Threading;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -415,20 +416,29 @@ namespace Ceen.Httpd
 		/// <summary>
 		/// Flushes all headers and sets the length to the amount of data currently buffered in the output
 		/// </summary>
-		/// <returns>The and set length async.</returns>
-		internal async Task FlushAndSetLengthAsync()
+		/// <param name="token">The cancellation token to use</param>
+		/// <returns>An awaitable task</returns>
+		internal async Task FlushAndSetLengthAsync(CancellationToken token)
 		{
-			// Make sure any 
+			// Make sure any buffered data is flushed
 			if (m_wrappedoutstream != m_outstream)
-				await m_wrappedoutstream.FlushAsync();
+				await m_wrappedoutstream.FlushAsync(token);
 
-			await m_outstream.SetLengthAndFlushAsync(true);
+			await m_outstream.SetLengthAndFlushAsync(true, token);
 		}
+
+		/// <summary>
+		/// Flushes the underlying stream
+		/// </summary>
+		/// <param name="token">The cancellation token to use</param>
+		/// <returns>An awaitable task</returns>
+		internal Task FlushStreamAsync(CancellationToken token)
+			=> m_outstream.FlushAsync(token);
 
 		/// <summary>
 		/// Flush the contents after an error occurred.
 		/// </summary>
-		/// <returns>The as error async.</returns>
+		/// <returns>An awaitable task</returns>
 		internal async Task FlushAsErrorAsync()
 		{
 			if (!m_hasSentHeaders)

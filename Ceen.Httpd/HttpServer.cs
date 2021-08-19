@@ -853,7 +853,7 @@ namespace Ceen.Httpd
 			HttpResponse resp = null;
 			DateTime started = new DateTime();
 
-			using (var bs = new BufferedStreamReader(stream))
+			await using (var bs = new BufferedStreamReader(stream))
 			{
 				try
 				{
@@ -1000,7 +1000,8 @@ namespace Ceen.Httpd
                             resp.KeepAlive = false;
 
                         // If the handler has not flushed, we do it
-                        await resp.FlushAndSetLengthAsync();
+                        await resp.FlushAndSetLengthAsync(cur.TimeoutCancellationToken);
+						await resp.FlushStreamAsync(cur.TimeoutCancellationToken);
 
 						// Request completed without failures
                         await LogRequestCompletedMessageAsync(controller, context, null, started, DateTime.Now - started);
