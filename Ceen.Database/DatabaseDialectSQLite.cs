@@ -486,6 +486,9 @@ namespace Ceen.Database
                     // args.Add(items);
                     // return $"{RenderWhereClause(type, compare.LeftHandSide, args)} {compare.Operator} (?)";
                     
+                    // Render before, in case LHS needs to be in the args list
+                    var lhsstr = RenderWhereClause(type, compare.LeftHandSide, args);
+
                     // Workaround is to expand to comma separated list
                     var qs = new List<string>();
                     foreach (var n in items)
@@ -493,7 +496,8 @@ namespace Ceen.Database
                         args.Add(n);
                         qs.Add("?");
                     }
-                    return $"{RenderWhereClause(type, compare.LeftHandSide, args)} {compare.Operator} ({string.Join(",", qs)})";
+                    
+                    return $"{lhsstr} {compare.Operator} ({string.Join(",", qs)})";
                 }
 
                 // Extract the arguments, if they are arguments
