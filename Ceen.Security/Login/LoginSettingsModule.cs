@@ -474,7 +474,7 @@ namespace Ceen.Security.Login
 				{
 					try
 					{
-						var parts = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authstring));
+						var parts = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authstring.Substring("Basic ".Length)));
 						if (parts != null)
 						{
 							var ix = parts.IndexOf(':');
