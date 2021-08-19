@@ -121,6 +121,26 @@ namespace Ceen.Httpd
             return r;
         }
 
+		/// <summary>
+		/// Dispose resources held by the stream
+		/// </summary>
+		/// <param name="disposing">A flag indicating if the call is from the dispose() method</param>
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+				m_parent?.Dispose();
+		}
+
+		/// <summary>
+		/// Asyncronously dispose resources held by the stream
+		/// </summary>
+		/// <returns>An awaitable task</returns>
+		protected virtual async ValueTask DisposeAsyncCore()
+		{
+			if (m_parent != null)
+				await m_parent.DisposeAsync();
+		}        
+
         #region implemented abstract members of Stream
         public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).Result;
 

@@ -389,6 +389,29 @@ namespace Ceen.Httpd
 			return 0;
 		}
 
+		/// <summary>
+		/// Dispose resources held by the stream
+		/// </summary>
+		/// <param name="disposing">A flag indicating if the call is from the dispose() method</param>
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+				m_parent?.Dispose();
+			m_parent = null;
+		}
+
+		/// <summary>
+		/// Asyncronously dispose resources held by the stream
+		/// </summary>
+		/// <returns>An awaitable task</returns>
+		protected virtual async ValueTask DisposeAsyncCore()
+		{
+			var p = m_parent;
+			m_parent = null;
+			if (p != null)
+				await p.DisposeAsync();
+		}
+
 		#region implemented abstract members of Stream
 		/// <summary>
 		/// Flush this instance.
@@ -397,6 +420,15 @@ namespace Ceen.Httpd
 		{
 			m_parent.Flush();
 		}
+
+		/// <summary>
+		/// Flush this instance
+		/// </summary>
+		/// <param name="cancellationToken">A cancellation token</param>
+		/// <returns>An awaitable task</returns>
+		public override Task FlushAsync(CancellationToken cancellationToken)
+			=> m_parent.FlushAsync(cancellationToken);
+
         /// <summary>
         /// Seek the specified offset and origin.
         /// </summary>
