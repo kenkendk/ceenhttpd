@@ -276,6 +276,7 @@ namespace Ceen.Security.Login
 
 			if (m_connection != null)
 			{
+				m_connection.ReleaseDialect();
 				m_connection.Dispose();
 				m_connection = null;
 			}
