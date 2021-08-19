@@ -84,6 +84,17 @@ namespace Ceen.Database
         }
 
         /// <summary>
+        /// Removes the dialect associated with a connection, if any
+        /// </summary>
+        /// <param name="connection">The connection to de-associate with a dialect</param>
+        /// <returns><c>true</c> if a dialect was removed; <c>false</c> otherwise</returns>
+        public static bool ReleaseDialect(this IDbConnection connection)
+        {
+            lock (_dialectLock)
+                return _dialect.Remove(connection);
+        }
+
+        /// <summary>
         /// Parses a filterstring
         /// </summary>
         /// <param name="connection">The connection to get the dialect from</param>
