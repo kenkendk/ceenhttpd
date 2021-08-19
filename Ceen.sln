@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceen.Database", "Ceen.Datab
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceen.Extras", "Ceen.Extras\Ceen.Extras.csproj", "{F8D6D6B1-A333-4BF3-B4B4-0A9570DE971B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ceen.PaaS", "Ceen.PaaS\Ceen.PaaS.csproj", "{2051F687-F35F-435C-8010-152C2D974C21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -75,6 +77,10 @@ Global
 		{F8D6D6B1-A333-4BF3-B4B4-0A9570DE971B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F8D6D6B1-A333-4BF3-B4B4-0A9570DE971B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F8D6D6B1-A333-4BF3-B4B4-0A9570DE971B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2051F687-F35F-435C-8010-152C2D974C21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2051F687-F35F-435C-8010-152C2D974C21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2051F687-F35F-435C-8010-152C2D974C21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2051F687-F35F-435C-8010-152C2D974C21}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		version = 0.9.9
