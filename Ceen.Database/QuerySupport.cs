@@ -529,6 +529,31 @@ namespace Ceen.Database
                             return new Value(TimeSpan.FromDays((double)Convert.ChangeType(argv.Item, typeof(double))));
                     }
                 }
+                else if (callexpr.Method.DeclaringType.IsGenericType && callexpr.Method.DeclaringType.GetGenericTypeDefinition() == typeof(Dictionary<,>) && callexpr.Method.Name == nameof(Dictionary<int,int>.ContainsKey) && callexpr.Arguments.Count == 1)
+                {
+                    var collection = GetValue(callexpr.Object);
+                    if (collection is IEnumerable cenm && !(collection is string))
+                    {
+                        var seqex = 
+                            callexpr.Method.DeclaringType
+                            .GetProperty(nameof(Dictionary<int,int>.Keys))
+                            .GetValue(collection, null) as IEnumerable;
+
+                        var arg = FromLambda(callexpr.Arguments.First(), methodtarget);
+                        return In(arg, seqex.Cast<object>());
+                    }
+
+                }
+                else if (callexpr.Method.IsStatic && callexpr.Method.DeclaringType == typeof(System.Linq.Enumerable) && callexpr.Method.Name == nameof(System.Linq.Enumerable.Contains))
+                {
+                    var collection = GetValue(callexpr.Arguments.First());
+                    if (collection is IEnumerable cenm && !(collection is string))
+                    {
+                        var arg = FromLambda(callexpr.Arguments.Last(), methodtarget);
+                        return In(arg, cenm.Cast<object>());
+                    }
+
+                }
 
                 throw new Exception($"Method is not supported: {callexpr.Method}");
             }
