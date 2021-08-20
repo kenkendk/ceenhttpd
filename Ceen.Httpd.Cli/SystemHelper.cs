@@ -112,5 +112,16 @@ namespace Ceen.Httpd.Cli
         /// Gets a value indicating whether we are executing with .Net core
         /// </summary>
         public static bool IsNetCore => RuntimeInformation.FrameworkDescription.StartsWith(".NET Core", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Gets a value indicating whether we are executing with .Net5 or later
+        /// </summary>
+        public static bool IsNet5OrGreater => Environment.Version >= new Version(5,0);
+
+        /// <summary>
+        /// Flag indicating if a spawned process will need the &quot;dotnet&quot; program to launch
+        /// </summary>
+        public static bool ProcessStartRequiresDotnetPrefix => IsNetCore || IsNet5OrGreater;
+
     }
 }

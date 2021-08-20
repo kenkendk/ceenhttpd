@@ -68,6 +68,9 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
             m_storage = storage;
             m_token = token;
 
+            // Make sure we have an instance before continuing
+            Instance = new SpawnRemoteInstance(m_path, m_useSSL, m_storage, m_token);
+
             m_task = MonitorForRestartAsync();
         }
 
@@ -79,10 +82,14 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
         {
             while(!m_token.IsCancellationRequested)
             {
-                Instance = new SpawnRemoteInstance(m_path, m_useSSL, m_storage, m_token);
-
                 try { await Instance.Stopped; } 
                 catch { }
+
+                if (m_token.IsCancellationRequested)
+                    return;
+
+                Instance = new SpawnRemoteInstance(m_path, m_useSSL, m_storage, m_token);
+
             }
         }
 
@@ -462,10 +469,10 @@ namespace Ceen.Httpd.Cli.Runner.SubProcess
                     CreateNoWindow = true,
                 };
 
-                // Special handling for .Net core
-                if (SystemHelper.IsNetCore)
+                // Special handling for post-Mono versions
+                if (SystemHelper.ProcessStartRequiresDotnetPrefix)
                 {
-                    // With .Net Core we need some workarounds, in non-compiled mode
+                    // With non-Mono we need some workarounds, in non-compiled mode
                     if (string.Equals(System.IO.Path.GetExtension(exe), ".dll", StringComparison.OrdinalIgnoreCase))
                     {
                         pi.FileName = "dotnet";
