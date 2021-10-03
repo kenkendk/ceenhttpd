@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Threading;
+using System;
 using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
@@ -302,6 +303,15 @@ namespace Ceen.Httpd.Handler
         /// the request
         /// </summary>
         public bool PassThrough { get; set; } = false;
+
+        /// <summary>
+        /// The number of seconds to wait when writing a response chunk to the client
+        /// </summary>
+        public TimeSpan ActivityTimeoutSeconds { get; set; } = TimeSpan.FromSeconds(5);
+        /// <summary>
+        /// The size of chunks read from the VFS and sent to the client during transfers 
+        /// </summary>
+        public long TransferChunkSize { get; set; } = 8 * 1024;
 
         /// <summary>
         /// The virtual filesystem used for all requests
@@ -643,15 +653,18 @@ namespace Ceen.Httpd.Handler
 
                     fs.Position = startoffset;
                     var remain = context.Response.ContentLength;
-                    var buf = new byte[8 * 1024];
-                    var ct = context.Request.TimeoutCancellationToken;
+                    var buf = new byte[TransferChunkSize];
+                    
+                    // Since this is a transfer, we do not honor the processing timeout here
+                    //var ct = context.Request.TimeoutCancellationToken;
 
                     await using (var os = context.Response.GetResponseStream())
                     {
                         while (remain > 0)
                         {
                             var r = await fs.ReadAsync(buf, 0, (int)Math.Min(buf.Length, remain));
-                            await os.WriteAsync(buf, 0, r, ct);
+                            using(var ct = new CancellationTokenSource(ActivityTimeoutSeconds))
+                                await os.WriteAsync(buf, 0, r, ct.Token);
                             remain -= r;
                         }
                     }

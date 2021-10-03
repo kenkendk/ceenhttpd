@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Ceen.Httpd.Handler
@@ -245,7 +246,8 @@ namespace Ceen.Httpd.Handler
 
             var buf = new byte[8 * 1024];
             var written = 0L;
-            var ct = context.Request.TimeoutCancellationToken;
+            // Since this is a transfer, we do not honor the processing timeout here
+            //var ct = context.Request.TimeoutCancellationToken;
 
             // Start writing data to output
             using (var local = new FileStream(localpath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -261,7 +263,8 @@ namespace Ceen.Httpd.Handler
                         if (read == 0)
                             break;
 
-                        await os.WriteAsync(buf, 0, read, ct);
+                        using(var ct = new CancellationTokenSource(ActivityTimeoutSeconds))
+                            await os.WriteAsync(buf, 0, read, ct.Token);
                         written += read;
                     }
 
