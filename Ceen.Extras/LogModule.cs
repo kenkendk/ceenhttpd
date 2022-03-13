@@ -127,7 +127,7 @@ namespace Ceen.Extras
         /// <summary>
         /// The maximum number of days to keep logs around
         /// </summary>
-        private TimeSpan MAX_LOG_AGE { get; set; } = TimeSpan.FromDays(90);
+        public TimeSpan MAX_LOG_AGE { get; set; } = TimeSpan.FromDays(90);
 
         /// <summary>
         /// The last time a cleanup was performed
@@ -336,7 +336,7 @@ namespace Ceen.Extras
 
                             // Remove any line not attached to an entry
                             db.Delete<HttpLogEntryLine>(
-                                $"WHERE {db.QuotedColumnName<HttpLogEntryLine>(nameof(HttpLogEntryLine.ParentID))} " +
+                                $"{db.QuotedColumnName<HttpLogEntryLine>(nameof(HttpLogEntryLine.ParentID))} " +
                                 $"NOT IN (SELECT {db.QuotedColumnName<HttpLogEntry>(nameof(HttpLogEntry.ID))} FROM {db.QuotedTableName<HttpLogEntry>()})"
                             );
                         }
