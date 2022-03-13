@@ -76,6 +76,9 @@ namespace Ceen.Database
         {
             lock (_dialectLock)
             {
+                if (connection is TransactionConnection trc)
+                    connection = trc.Connection;
+                
                 if (!_dialect.TryGetValue(connection, out var res))
                     _dialect.Add(connection, res = defaultOverride ?? DefaultDialect(connection));
 
