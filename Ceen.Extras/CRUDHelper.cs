@@ -1,9 +1,12 @@
+using System.Reflection.Emit;
+using System.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ceen.Database;
 using Ceen.Mvc;
+using Newtonsoft.Json;
 
 namespace Ceen.Extras
 {
@@ -38,14 +41,17 @@ namespace Ceen.Extras
         /// <summary>
         /// The offset of these results
         /// </summary>
+        [JsonProperty("offset")]
         public long Offset;
         /// <summary>
         /// The total number of entries
         /// </summary>
+        [JsonProperty("total")]
         public long Total;
         /// <summary>
         /// The result data
         /// </summary>
+        [JsonProperty("result")]
         public Array Result;
 
         /// <summary>
@@ -63,7 +69,10 @@ namespace Ceen.Extras
         {
             Result = data;
             if (data != null)
-                Total = data.Length;
+            {
+                Offset = 0;
+                Total = data.LongLength;
+            }
         }
 
         /// <summary>
@@ -105,7 +114,54 @@ namespace Ceen.Extras
             }
 
             return null;
-        }    
+        }
+
+        /// <summary>
+        /// Helper method to apply error handling with parsed error messages
+        /// </summary>
+        /// <param name="func">The function to invoke</param>
+        /// <param name="errorHandler">The optional error handler</param>
+        /// <returns>The result</returns>
+        public static async Task<IResult> WrapBodyInTryCatch(Func<IResult> func, Func<Exception, Task<IResult>> errorHandler = null)
+        {
+            try
+            {
+                return func();
+            }
+            catch (Exception ex)
+            {
+                var r = errorHandler == null
+                    ? WrapExceptionMessage(ex)
+                    : await errorHandler(ex);
+                    
+                if (r != null)
+                    return r;
+                throw;
+            }                   
+        }
+
+        /// <summary>
+        /// Helper method to apply error handling with parsed error messages
+        /// </summary>
+        /// <param name="func">The function to invoke</param>
+        /// <param name="errorHandler">The optional error handler</param>
+        /// <returns>The result</returns>
+        public static async Task<IResult> WrapBodyInTryCatch(Func<Task<IResult>> func, Func<Exception, Task<IResult>> errorHandler = null)
+        {
+            try
+            {
+                return await func();
+            }
+            catch (Exception ex)
+            {
+                var r = errorHandler == null
+                    ? WrapExceptionMessage(ex)
+                    : await errorHandler(ex);
+                if (r != null)
+                    return r;
+                throw;
+            }                   
+        }
     }
 
     /// <summary>
@@ -242,7 +298,7 @@ namespace Ceen.Extras
         /// </summary>
         /// <param name="source">The item to patch</param>
         /// <returns>The patched object</returns>
-        protected virtual object PostProcess(TValue source) => source;
+        protected virtual Task<object> PostProcessAsync(TValue source) => Task.FromResult<object>(source);
 
         /// <summary>
         /// The different access types
@@ -281,6 +337,15 @@ namespace Ceen.Extras
         }
 
         /// <summary>
+        /// Hook function for accessing the IDbConnection and query
+        /// </summary>
+        /// <param name="db">The database connection instance</param>
+        /// <param name="query">The database query</param>
+        /// <returns>The item or <c>null</c></returns>
+        protected virtual Task<TValue> OnGetAsync(IDbConnection db, Query<TValue> query)
+            => Task.FromResult(db.SelectSingle(query));
+
+        /// <summary>
         /// Gets an item
         /// </summary>
         /// <param name="id">The item to get</param>
@@ -302,11 +367,11 @@ namespace Ceen.Extras
                 q = await OnQueryAsync(AccessType.Get, id, q);
 
                 // TODO: Should return NotFound for non-nullable entries as well 
-                var res = await Connection.RunInTransactionAsync(db => db.SelectSingle(q));
+                var res = await Connection.RunInTransactionAsync(async db => await OnGetAsync(db, q));
                 if (res == null)
                     return NotFound;
 
-                return ReportJson(PostProcess(res));
+                return ReportJson(await PostProcessAsync(res));
             }
             catch (Exception ex)
             {
@@ -316,6 +381,25 @@ namespace Ceen.Extras
                 throw;
             }
         }
+
+        /// <summary>
+        /// Hook function for accessing the IDbConnection and query
+        /// </summary>
+        /// <param name="db">The database connection instance</param>
+        /// <param name="id">The item id</param>
+        /// <returns>The item or <c>null</c></returns>
+        protected virtual Task<TValue> OnPatchPreSelectAsync(IDbConnection db, TKey id)
+            => Task.FromResult(db.SelectItemById<TValue>(id));
+
+        /// <summary>
+        /// Hook function for accessing the IDbConnection and query
+        /// </summary>
+        /// <param name="db">The database connection instance</param>
+        /// <param name="query">The update query</param>
+        /// <returns>The number of entries updated</returns>
+        protected virtual Task<int> OnPatchUpdateAsync(IDbConnection db, Query<TValue> query)
+            => Task.FromResult(db.Update(query));
+
 
         /// <summary>
         /// Updates an item
@@ -356,7 +440,7 @@ namespace Ceen.Extras
 
                 return await Connection.RunInTransactionAsync(async db =>
                 {
-                    var item = db.SelectItemById<TValue>(id);
+                    var item = await OnPatchPreSelectAsync(db, id);
                     if (item == null)
                         return NotFound;
 
@@ -371,8 +455,8 @@ namespace Ceen.Extras
 
                     q = await OnQueryAsync(AccessType.Update, id, q);
 
-                    if (db.Update(q) > 0)
-                        return ReportJson(PostProcess(db.SelectItemById<TValue>(id)));
+                    if (await OnPatchUpdateAsync(db, q) > 0)
+                        return ReportJson(await PostProcessAsync(db.SelectItemById<TValue>(id)));
                     return NotFound;
                 });
             }
@@ -384,6 +468,15 @@ namespace Ceen.Extras
                 throw;
             }
         }
+
+        /// <summary>
+        /// Hook function for accessing the IDbConnection and query
+        /// </summary>
+        /// <param name="db">The database connection instance</param>
+        /// <param name="query">The update query</param>
+        /// <returns>The item or <c>null</c></returns>
+        protected virtual Task<TValue> OnPostAsync(IDbConnection db, Query<TValue> query)
+            => Task.FromResult(db.Insert(query));
 
         /// <summary>
         /// Inserts an item into the database
@@ -408,10 +501,9 @@ namespace Ceen.Extras
 
                 q = await OnQueryAsync(AccessType.Add, default(TKey), q);
 
-                return ReportJson(PostProcess(await Connection.RunInTransactionAsync(db =>
+                return ReportJson(await PostProcessAsync(await Connection.RunInTransactionAsync(async db =>
                 {
-                    db.Insert(q);
-                    return item;
+                    return await OnPostAsync(db, q);
                 })));
             }
             catch (Exception ex)
@@ -422,6 +514,15 @@ namespace Ceen.Extras
                 throw;
             }
         }
+
+        /// <summary>
+        /// Hook function for accessing the IDbConnection and query
+        /// </summary>
+        /// <param name="db">The database connection instance</param>
+        /// <param name="query">The update query</param>
+        /// <returns>The item or <c>null</c></returns>
+        protected virtual Task<int> OnDeleteAsync(IDbConnection db, Query<TValue> query)
+            => Task.FromResult(db.Delete(query));
 
         /// <summary>
         /// Deletes an item from the database
@@ -445,9 +546,9 @@ namespace Ceen.Extras
 
                 q = await OnQueryAsync(AccessType.Delete, id, q);
 
-                return await Connection.RunInTransactionAsync(db =>
+                return await Connection.RunInTransactionAsync(async db =>
                 {
-                    if (db.Delete(q) > 0)
+                    if (await OnDeleteAsync(db, q) > 0)
                         return OK;
                     return NotFound;
                 });
@@ -467,10 +568,27 @@ namespace Ceen.Extras
         /// <returns>The results</returns>
         [HttpGet]
         [Ceen.Mvc.Name("index")]
-        public virtual Task<IResult> List(ListRequest request)
+        public virtual Task<IResult> List([Parameter(required: false)]int offset, [Parameter(required: false)]int count, [Parameter(required: false)]string filter, [Parameter(required: false)]string sortorder)
         {
-            return Search(request);
+            if (count <= 0)
+                count = 100;
+            if (offset <= 0)
+                offset = 0;
+
+            return Search(new ListRequest() {
+                Offset = offset,
+                Count = count,
+                Filter = filter,
+                SortOrder = sortorder
+            });
         }
+
+
+        protected virtual Task<IEnumerable<TValue>> OnSearchAsync(IDbConnection db, Query<TValue> q)
+            => Task.FromResult(db.Select(q).ToArray().AsEnumerable());
+
+        protected virtual Task<long> OnSearchCountAsync(IDbConnection db, Query<TValue> q)
+            => Task.FromResult(db.SelectCount(q));
 
         /// <summary>
         /// Gets the current list of items
@@ -478,7 +596,26 @@ namespace Ceen.Extras
         /// <returns>The results</returns>
         [HttpPost]
         [Ceen.Mvc.Route("search")]
-        public virtual async Task<IResult> Search(ListRequest request)
+        public virtual Task<IResult> Search([Parameter(required: false)]int offset, [Parameter(required: false)]int count, [Parameter(required: false)]string filter, [Parameter(required: false)]string sortorder)
+        {
+            if (count <= 0)
+                count = 100;
+            if (offset <= 0)
+                offset = 0;
+
+            return Search(new ListRequest() {
+                Offset = offset,
+                Count = count,
+                Filter = filter,
+                SortOrder = sortorder
+            });
+        }
+
+        /// <summary>
+        /// Gets the current list of items
+        /// </summary>
+        /// <returns>The results</returns>
+        protected virtual async Task<IResult> Search(ListRequest request)
         {
             await Authorize(AccessType.List, default(TKey));
             if (request == null)
@@ -496,14 +633,19 @@ namespace Ceen.Extras
 
                 q = await OnQueryAsync(AccessType.List, default(TKey), q);
 
-                return Json(await Connection.RunInTransactionAsync(db =>
-                    new ListResponse()
+                return Json(await Connection.RunInTransactionAsync(async db =>
+                {
+                    var lst = new List<object>();
+                    foreach(var n in await OnSearchAsync(db, q))
+                        lst.Add(await PostProcessAsync(n));
+
+                    return new ListResponse()
                     {
                         Offset = request.Offset,
-                        Total = db.SelectCount(q),
-                        Result = db.Select(q).Select(PostProcess).ToArray()
-                    }
-                ));
+                        Total = await OnSearchCountAsync(db, q),
+                        Result = lst.ToArray()
+                    };
+                }));
             }
             catch (Exception ex)
             {
