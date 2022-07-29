@@ -166,7 +166,7 @@ namespace Ceen.Httpd
             m_buffersize -= bytes;
 
             // If we found the delimiter in full, we are done
-            if (ix > 0 && m_buffersize >= m_delimiter.Length)
+            if (ix >= 0 && m_buffersize >= m_delimiter.Length)
 			{
 				m_completed = true;
 				// Drop the delimiter from the buffer

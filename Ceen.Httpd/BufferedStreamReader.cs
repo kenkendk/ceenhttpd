@@ -357,7 +357,7 @@ namespace Ceen.Httpd
                         Array.Resize(ref m_buffer, m_buffer.Length + count);
 
 					// Move the current data so the new data fits before it
-					Array.Copy(m_buffer, m_bufferoffset, m_buffer, count, count);
+					Array.Copy(m_buffer, m_bufferoffset, m_buffer, count, m_buffercount);
 					// Then copy the new data behind it
 					Array.Copy(data, offset, m_buffer, 0, count);
 					m_bufferoffset = 0;
