@@ -428,6 +428,8 @@ namespace Ceen.Httpd
                         var filename = RequestUtility.GetHeaderComponent(headers["Content-Disposition"], "filename");
                         var charset = RequestUtility.GetHeaderComponent(headers["Content-Type"], "charset") ?? "ascii";
 
+                        // The logic here is that if the multipart entry has a "filename" value,
+                        // we treat it as a logical file, otherwise we treat it as a (string) value 
                         if (string.IsNullOrWhiteSpace(filename))
                         {
                             using (var sr = new StreamReader(stream, RequestUtility.GetEncodingForCharset(charset)))
