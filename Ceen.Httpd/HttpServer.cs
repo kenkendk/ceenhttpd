@@ -1011,6 +1011,13 @@ namespace Ceen.Httpd
                         requests--;
 
                     } while (keepingalive);
+
+					// Prevent flushing synchronously by the Close() or Dispose() call
+					using(var cts = new CancellationTokenSource(1000))
+					{
+						try { await stream.FlushAsync(cts.Token); }
+						catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to flush stream: {nex}", logtaskid, cur); }
+					}
 				}
 				catch (Exception ex)
 				{
@@ -1031,6 +1038,17 @@ namespace Ceen.Httpd
 						try { await resp.FlushAsErrorAsync(); }
                         catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to FlushAsErrors: {nex}", logtaskid, cur); }
                     }
+
+					// Prevent flushing synchronously by the Close() or Dispose() call
+					using(var cts = new CancellationTokenSource(1000))
+					{
+						if (resp != null)
+							try { await resp.FlushStreamAsync(cts.Token); }
+							catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to flush resp: {nex}", logtaskid, cur); }
+						
+						try { await stream.FlushAsync(cts.Token); }
+						catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to flush stream: {nex}", logtaskid, cur); }
+					}
 
                     try { stream.Close(); }
                     catch (Exception nex) { config.DebugLogHandler?.Invoke($"Failed to close stream: {nex}", logtaskid, cur); }
