@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Login and security package for Ceen.Httpd</description>
-    <releaseNotes>Version bump</releaseNotes>
+    <releaseNotes>Added SameSite support for cookies</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server</tags>
     <dependencies>

@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/kenkendk/ceenhttpd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Platform-as-a-Service addons for Ceen.Httpd</description>
-    <releaseNotes>First release</releaseNotes>
+    <releaseNotes>Version bump</releaseNotes>
     <copyright>Copyright Kenneth Skovhede 2020</copyright>
     <tags>HTTP HTTPS SSL TLS async await mvc server paas</tags>
     <dependencies>
