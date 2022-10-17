@@ -6,7 +6,7 @@
     <RootNamespace>ToDoList</RootNamespace>
     <AnyCPU />
     <OutputType>Exe</OutputType>
-    <ReleaseVersion>0.9.9</ReleaseVersion>
+    <ReleaseVersion>0.9.10</ReleaseVersion>
   </PropertyGroup>
 
   <ItemGroup>

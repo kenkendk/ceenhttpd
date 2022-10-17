@@ -62,9 +62,10 @@ done
 "${XBUILD}" "/p:Configuration=Release" "../Ceen.sln"
 
 find . -type f -name "*.dll" | xargs rm
-cp ../Ceen.Extras/bin/Release/netstandard2.0/*.dll .
-cp ../Ceen.Security/bin/Release/netstandard2.0/*.dll .
-cp ../Ceen.Httpd.Cli/bin/Release/netstandard2.0/*.dll .
+cp ../Ceen.Extras/bin/Release/netstandard2.1/*.dll .
+cp ../Ceen.Security/bin/Release/netstandard2.1/*.dll .
+cp ../Ceen.Httpd.Cli/bin/Release/netstandard2.1/*.dll .
+cp ../Ceen.PaaS/bin/Release/netstandard2.1/*.dll .
 
 SED_EXPR_VER="s/.*\<version\>.*/    \<version\>${VERSION}\<\/version\>/"
 SED_EXPR_DEP="s/\(.*\)\<dependency.*id\=\"Ceen\.\(.*\)\" version\=.*/\1\<dependency id\=\"Ceen.\2\" version\=\"${VERSION}\" \/\>/"
