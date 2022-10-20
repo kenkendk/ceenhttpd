@@ -347,6 +347,7 @@ namespace Ceen.Httpd.Handler
         {
             m_vfs = vfs ?? throw new ArgumentNullException(nameof(vfs));
             m_mimetypelookup = mimetypelookup ?? DefaultMimeTypes;
+            SourceFolder = string.Empty;
         }
 
         /// <summary>
