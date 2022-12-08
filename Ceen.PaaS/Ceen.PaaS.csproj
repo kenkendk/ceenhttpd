@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="5.0.310" />
     <PackageReference Include="Markdig" Version="0.20.0" />
-    <PackageReference Include="NewtonSoft.Json" Version="12.0.3" />
+    <PackageReference Include="NewtonSoft.Json" Version="13.0.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-rc0001" />
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.112" />
   </ItemGroup>
