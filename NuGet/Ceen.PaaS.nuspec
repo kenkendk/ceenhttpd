@@ -19,10 +19,10 @@
         <dependency id="Ceen.Mvc" version="0.9.3" />
         <dependency id="Ceen.Security" version="0.9.3" />
         <dependency id="Ceen.Database" version="0.9.3" />
-        <dependency id="HtmlSanitizer" version="5.0.310" />
-        <dependency id="Markdig" version="0.20.0" />
-        <dependency id="SixLabors.ImageSharp" version="1.0.0-rc0001" />
-        <dependency id="System.Data.SQLite.Core" version="1.0.112" />
+        <dependency id="HtmlSanitizer" version="8.0.865" />
+        <dependency id="Markdig" version="0.37.0" />
+        <dependency id="SixLabors.ImageSharp" version="3.1.4" />
+        <dependency id="System.Data.SQLite.Core" version="1.0.118" />
     </dependencies>
   </metadata>
   <files>
