@@ -12,7 +12,7 @@
     <PackageReference Include="HtmlSanitizer" Version="8.0.865" />
     <PackageReference Include="Markdig" Version="0.37.0" />
     <PackageReference Include="NewtonSoft.Json" Version="13.0.3" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.118" />
   </ItemGroup>
 
